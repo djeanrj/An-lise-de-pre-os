@@ -1,0 +1,6 @@
+streamlit
+pandas
+plotly
+google-search-results
+xlsxwriter
+openpyxl
