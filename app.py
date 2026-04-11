@@ -8,22 +8,44 @@ import re
 # 1. CONFIGURAÇÃO DA INTERFACE
 st.set_page_config(page_title="IA Marketplace Pro BR", layout="wide", page_icon="🇧🇷")
 
-st.title("🚀 Inteligência de Mercado Brasil: Monitor de Preços Real")
+# --- NOVO: CENTRAL DE AJUDA NO TOPO ---
+st.title("🚀 Inteligência de Mercado Brasil")
 
-# --- PASSO 1: ATIVAÇÃO (CHAVE) ---
+with st.sidebar:
+    st.header("📖 Central de Ajuda")
+    st.info("""
+    **O que significam as colunas?**
+    *   **Seu Preço:** Preço com o seu aumento padrão (ex: 70%).
+    *   **Concorrência:** Menor preço real no Brasil (lojas selecionadas).
+    *   **Preço Sugerido:** Valor ideal para vencer o mercado (-2%).
+    *   **Margem Real %:** Lucro limpo após pagar o imposto e o custo.
+    
+    **Legenda de Situação:**
+    *   ✅ **Vencendo:** Você já é o mais barato.
+    *   ⚠️ **Caro:** Precisa baixar para o preço sugerido.
+    *   🟥 **Burn:** Mercado vende abaixo do seu custo.
+    """)
+    
+    st.divider()
+    st.subheader("🎯 Filtros de Mercado")
+    mkt_options = ["Todos", "Amazon", "Mercado Livre", "Magalu", "Shopee", "RiHappy", "Americanas", "Casas Bahia"]
+    mkt_filter = st.multiselect("Comparar apenas com:", mkt_options, default="Todos")
+
+# --- PASSO 1: ATIVAÇÃO ---
 st.markdown("### 1️⃣ Ativação do Sistema")
-with st.expander("🔑 COMO GERAR SUA CHAVE GRATUITA", expanded=True):
+with st.expander("🔑 COMO GERAR SUA CHAVE GRATUITA", expanded=False):
     st.markdown("""
-    1. Aceda ao site **[SerpApi.com](https://serpapi.com)** e crie uma conta.
-    2. No seu Dashboard, copie o código chamado **'API Key'**.
-    3. Cole o código no campo abaixo e clique no botão de ativar.
+    1. Aceda ao site **[SerpApi.com](https://serpapi.com)**.
+    2. Crie uma conta e confirme o seu e-mail.
+    3. No seu Dashboard, copie a **'API Key'**.
+    4. Cole no campo abaixo e clique em 'Confirmar'.
     """)
 
-api_key_input = st.text_input("Insira sua SerpApi Key aqui:", type="password")
-ativado = st.button("Confirmar Chave e Ativar Sistema")
+api_key_input = st.text_input("Insira sua SerpApi Key:", type="password")
+ativado = st.button("Confirmar Chave")
 
 if not ativado and "api_key" not in st.session_state:
-    st.warning("⚠️ Insira a chave e clique no botão para desbloquear.")
+    st.warning("⚠️ O sistema está bloqueado até a inserção da chave.")
     st.stop()
 
 if ativado:
@@ -38,10 +60,9 @@ col_inst1, col_inst2 = st.columns(2)
 
 with col_inst1:
     st.info("""
-    **Instruções de Formato:**
-    *   Sua planilha deve conter: **Nome, Custo e Quantidade**.
-    *   Opcional: **EAN** e **Linha/Categoria**.
-    *   O sistema filtra automaticamente eBay, anúncios internacionais e acessórios.
+    **Formato Necessário:**
+    * Sua planilha deve ter: **Nome, Custo e Quantidade**.
+    * O sistema limpa automaticamente anúncios de acessórios e peças.
     """)
 
 with col_inst2:
@@ -54,23 +75,20 @@ with col_inst2:
         "EAN": ["673419340526", "673419358514"]
     })
     with pd.ExcelWriter(buffer, engine='xlsxwriter') as writer:
-        exemplo_df.to_excel(writer, index=False, sheet_name='Modelo')
-    st.download_button(label="📥 Baixar Planilha Modelo", data=buffer.getvalue(), file_name="modelo_vendas_br.xlsx")
+        exemplo_df.to_excel(writer, index=False)
+    st.download_button(label="📥 Baixar Modelo de Planilha", data=buffer.getvalue(), file_name="modelo_vendas.xlsx")
 
 st.divider()
 
-# --- PASSO 3: UPLOAD E CONFIGURAÇÃO ---
-uploaded_file = st.file_uploader("Suba seu arquivo Excel completo", type=["xlsx", "xls"])
+# --- PASSO 3: UPLOAD E ANÁLISE ---
+st.markdown("### 3️⃣ Upload e Configuração")
+uploaded_file = st.file_uploader("Suba seu Excel completo", type=["xlsx", "xls"])
 
 if uploaded_file:
     df_raw = pd.read_excel(uploaded_file)
     colunas = df_raw.columns.tolist()
     
-    st.sidebar.header("🎯 Filtros de Mercado")
-    mkt_options = ["Todos", "Amazon", "Mercado Livre", "Magalu", "Shopee", "RiHappy", "Americanas", "Casas Bahia"]
-    mkt_filter = st.sidebar.multiselect("Comparar apenas com:", mkt_options, default="Todos")
-    
-    st.info("Identifique as colunas do seu arquivo:")
+    st.info("Mapeie os dados do seu arquivo:")
     c_map1, c_map2, c_map3 = st.columns(3)
     c_map4, c_map5 = st.columns(2)
     
@@ -87,8 +105,8 @@ if uploaded_file:
         col_ean = st.selectbox("Coluna EAN (Opcional):", ["Não possuo"] + colunas)
         imposto = st.number_input("Imposto de Venda (%)", 0, 100, 4) / 100
 
-    if st.button("🚀 INICIAR ANÁLISE DE MERCADO E ESTOQUE"):
-        with st.spinner('Varrendo e-commerces e processando dados...'):
+    if st.button("🚀 INICIAR ANÁLISE"):
+        with st.spinner('Varrendo mercado e calculando estoque...'):
             df = df_raw.copy()
             res_mercado, res_loja = [], []
 
@@ -112,9 +130,8 @@ if uploaded_file:
                         titulo = item.get('title', '').lower()
                         loja = item.get('source', '').lower()
                         p_raw = item.get('price') or item.get('price_raw')
-                        
-                        if any(t in titulo for t in ['peça', 'manual', 'led', 'luz', 'caixa vazia']): continue
-                        if any(b in loja for b in ['ebay', 'shopee international', 'tiendamia']): continue
+                        if any(t in titulo for t in ['peça', 'manual', 'led', 'luz']): continue
+                        if any(b in loja for b in ['ebay', 'tiendamia']): continue
                         if "R$" not in str(p_raw): continue
                         if "Todos" not in mkt_filter:
                             if not any(f.lower() in loja for f in mkt_filter): continue
@@ -137,54 +154,39 @@ if uploaded_file:
             df['Loja Líder'] = res_loja
             df['Qtde'] = df[col_quant]
             df['Categoria'] = df[col_cat] if col_cat != "Nenhuma" else "Geral"
-            
-            # CÁLCULOS
             df['Seu Preço'] = df[col_custo] * (1 + (markup_percentual / 100))
             df['Preço Sugerido'] = df.apply(lambda x: x['Concorrência'] * 0.98 if x['Seu Preço'] > x['Concorrência'] else x['Seu Preço'], axis=1)
             df['Margem Real %'] = (((df['Preço Sugerido'] * (1 - imposto)) - df[col_custo]) / df['Preço Sugerido']) * 100
             df['Lucro Total R$'] = ((df['Preço Sugerido'] * (1 - imposto)) - df[col_custo]) * df['Qtde']
             df['Investimento'] = df[col_custo] * df['Qtde']
 
-            # COLUNA DE SITUAÇÃO (RECUPERADA)
-            def definir_situacao(row):
+            def sit(row):
                 if row['Concorrência'] < row[col_custo]: return "🟥 Burn (Abaixo Custo)"
                 if row['Seu Preço'] > row['Concorrência']: return "⚠️ Caro"
                 return "✅ Vencendo"
-            df['Situação'] = df.apply(definir_situacao, axis=1)
+            df['Situação'] = df.apply(sit, axis=1)
 
-            # FILTRO DE CATEGORIA NO DASHBOARD
+            st.success("Análise Finalizada!")
+            
+            # FILTRO CATEGORIA
             categorias = df['Categoria'].unique().tolist()
-            cat_sel = st.selectbox("🔍 Filtrar Visão por Categoria:", ["Todas"] + categorias)
+            cat_sel = st.selectbox("🔍 Visão por Categoria:", ["Todas"] + categorias)
             df_plot = df if cat_sel == "Todas" else df[df['Categoria'] == cat_sel]
 
-            # MÉTRICAS
-            st.subheader(f"📊 Resumo: {cat_sel}")
+            # DASHBOARD
             m1, m2, m3 = st.columns(3)
-            m1.metric("Investimento Total", f"R$ {df_plot['Investimento'].sum():,.2f}")
-            m2.metric("Lucro Líquido Total", f"R$ {df_plot['Lucro Total R$'].sum():,.2f}")
+            m1.metric("Investimento", f"R$ {df_plot['Investimento'].sum():,.2f}")
+            m2.metric("Lucro Projetado", f"R$ {df_plot['Lucro Total R$'].sum():,.2f}")
             m3.metric("Margem Média", f"{df_plot['Margem Real %'].mean():.1f}%")
 
-            # GRÁFICOS
             c1, c2 = st.columns(2)
-            with c1:
-                st.plotly_chart(px.pie(df_plot, names='Situação', title="Status de Competitividade", 
-                                       color_discrete_map={'✅ Vencendo':'#2ecc71', '⚠️ Caro':'#f1c40f', '🟥 Burn (Abaixo Custo)':'#e74c3c'}), use_container_width=True)
-            with c2:
-                st.plotly_chart(px.bar(df_plot.sort_values('Lucro Total R$', ascending=False), 
-                                       x=col_nome, y='Lucro Total R$', color='Situação',
-                                       title="Ranking de Lucro do Estoque (R$)",
-                                       color_discrete_map={'✅ Vencendo':'#2ecc71', '⚠️ Caro':'#f1c40f', '🟥 Burn (Abaixo Custo)':'#e74c3c'}), use_container_width=True)
-
-            # TABELA FINAL COM ESTILO
-            def color_margin(val):
-                color = 'red' if val < 15 else 'green'
-                return f'color: {color}'
+            with c1: st.plotly_chart(px.pie(df_plot, names='Situação', title="Status de Competitividade", color_discrete_map={'✅ Vencendo':'#2ecc71', '⚠️ Caro':'#f1c40f', '🟥 Burn (Abaixo Custo)':'#e74c3c'}))
+            with c2: st.plotly_chart(px.bar(df_plot.sort_values('Lucro Total R$', ascending=False), x=col_nome, y='Lucro Total R$', color='Situação', title="Lucro por Produto (R$)", color_discrete_map={'✅ Vencendo':'#2ecc71', '⚠️ Caro':'#f1c40f', '🟥 Burn (Abaixo Custo)':'#e74c3c'}))
 
             st.subheader("📋 Detalhes dos Itens")
-            st.dataframe(df_plot[[col_nome, 'Categoria', 'Qtde', col_custo, 'Seu Preço', 'Concorrência', 'Loja Líder', 'Preço Sugerido', 'Margem Real %', 'Situação', 'Lucro Total R$']].style.map(color_margin, subset=['Margem Real %']))
+            st.dataframe(df_plot[[col_nome, 'Categoria', 'Qtde', col_custo, 'Seu Preço', 'Concorrência', 'Loja Líder', 'Preço Sugerido', 'Margem Real %', 'Situação', 'Lucro Total R$']].style.map(lambda x: 'color: red' if isinstance(x, float) and x < 15 else 'color: green', subset=['Margem Real %']))
 
-            # DOWNLOAD
             output = io.BytesIO()
             with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-                df.to_excel(writer, index=False, sheet_name='Analise_Final')
+                df.to_excel(writer, index=False, sheet_name='Analise')
             st.download_button(label="📥 Baixar Relatório", data=output.getvalue(), file_name="analise_vendas.xlsx")
