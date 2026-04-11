@@ -34,9 +34,10 @@ col_inst1, col_inst2 = st.columns(2)
 
 with col_inst1:
     st.info("""
-    **Novidade: Análise de Margem Realista**
-    * O sistema agora calcula a margem que você teria caso precise baixar o preço para vencer a concorrência.
-    * Bloqueio automático de eBay e lojas internacionais.
+    **Novidades nesta versão:**
+    * **Filtro de Marketplaces:** Escolha quais lojas quer considerar na comparação.
+    * **Gráficos Automáticos:** Visualização de competitividade e margens.
+    * **Margem Realista:** Cálculo baseado no preço necessário para vencer o mercado.
     """)
 
 with col_inst2:
@@ -53,14 +54,21 @@ with col_inst2:
 st.divider()
 
 # --- PASSO 3: UPLOAD E CONFIGURAÇÃO ---
-st.markdown("### 3️⃣ Upload e Análise")
+st.markdown("### 3️⃣ Upload e Configuração")
 uploaded_file = st.file_uploader("Suba seu arquivo Excel", type=["xlsx", "xls"])
 
 if uploaded_file:
     df_raw = pd.read_excel(uploaded_file)
     colunas = df_raw.columns.tolist()
     
+    st.sidebar.header("🎯 Filtros de Comparação")
+    # OPÇÃO DE RESTRIÇÃO DE MARKETPLACE
+    mkt_options = ["Todos", "Amazon", "Mercado Livre", "Magalu", "Shopee", "RiHappy", "Americanas", "Casas Bahia"]
+    mkt_filter = st.sidebar.multiselect("Considerar apenas estas lojas:", mkt_options, default="Todos")
+
+    st.info("Ajuste os parâmetros abaixo:")
     c_map1, c_map2, c_map3 = st.columns(3)
+    
     with c_map1:
         col_nome = st.selectbox("Coluna de NOME:", colunas)
         imposto = st.number_input("Imposto de Venda (%)", 0, 100, 4) / 100
@@ -71,7 +79,7 @@ if uploaded_file:
         col_ean = st.selectbox("Coluna de EAN (Opcional):", ["Não possuo"] + colunas)
 
     if st.button("🚀 INICIAR BUSCA NO MERCADO BRASILEIRO"):
-        with st.spinner('Consultando mercado brasileiro e calculando margens...'):
+        with st.spinner('Consultando mercado e filtrando lojas selecionadas...'):
             df = df_raw.copy()
             res_mercado, res_loja = [], []
 
@@ -87,17 +95,25 @@ if uploaded_file:
                 search = GoogleSearch(params)
                 results = search.get_dict()
 
-                melhor_oferta = {"preco": custo_ref * 2, "loja": "Não encontrado"}
+                melhor_oferta = {"preco": custo_ref * 2.5, "loja": "Não encontrado"}
                 
                 if "shopping_results" in results:
-                    ofertas_br = []
+                    ofertas_validas = []
                     for item in results['shopping_results']:
                         titulo = item.get('title', '').lower()
-                        loja = item.get('source', '').lower()
+                        loja_nome = item.get('source', '')
+                        loja_lower = loja_nome.lower()
                         p_raw = item.get('price') or item.get('price_raw')
+                        
+                        # Filtros Básicos (Sujeira)
                         if any(t in titulo for t in ['peça', 'manual', 'led', 'luz', 'usado', 'minifigura']): continue
-                        if any(b in loja for b in ['ebay', 'shopee international', 'tiendamia', 'aliexpress']): continue
+                        if any(b in loja_lower for b in ['ebay', 'shopee international', 'tiendamia', 'aliexpress']): continue
                         if "R$" not in str(p_raw): continue
+
+                        # FILTRO DE MARKETPLACE SELECIONADO
+                        if "Todos" not in mkt_filter:
+                            if not any(f.lower() in loja_lower for f in mkt_filter):
+                                continue
 
                         if p_raw:
                             p_limpo = re.sub(r'[^\d,.]', '', str(p_raw))
@@ -105,46 +121,49 @@ if uploaded_file:
                             elif ',' in p_limpo: p_limpo = p_limpo.replace(',', '.')
                             try:
                                 valor = float(p_limpo)
-                                if valor > (custo_ref * 0.5): # Filtro de segurança básico
-                                    ofertas_br.append({"preco": valor, "loja": item.get('source', 'Varejo BR')})
+                                if valor > (custo_ref * 0.5):
+                                    ofertas_validas.append({"preco": valor, "loja": loja_nome})
                             except: continue
                     
-                    if ofertas_br:
-                        melhor_oferta = min(ofertas_br, key=lambda x: x['preco'])
+                    if ofertas_validas:
+                        melhor_oferta = min(ofertas_validas, key=lambda x: x['preco'])
 
                 res_mercado.append(melhor_oferta['preco'])
                 res_loja.append(melhor_oferta['loja'])
 
-            df['Preço Concorrência'] = res_mercado
-            df['Loja Concorrente'] = res_loja
-            df['Seu Preço (Estratégico)'] = df[col_custo] * (1 + (markup_percentual / 100))
-            
-            # PREÇO SUGERIDO PARA VENCER (2% abaixo da concorrência)
-            df['Preço Sugerido'] = df.apply(lambda x: x['Preço Concorrência'] * 0.98 if x['Seu Preço (Estratégico)'] > x['Preço Concorrência'] else x['Seu Preço (Estratégico)'], axis=1)
-
-            # MARGEM LÍQUIDA REALISTA (Baseada no Preço Sugerido)
-            # Agora a margem vai variar produto a produto!
-            df['Margem Líquida Realista %'] = (((df['Preço Sugerido'] * (1 - imposto)) - df[col_custo]) / df['Preço Sugerido']) * 100
+            df['Concorrência'] = res_mercado
+            df['Loja Líder'] = res_loja
+            df['Seu Preço'] = df[col_custo] * (1 + (markup_percentual / 100))
+            df['Preço Sugerido'] = df.apply(lambda x: x['Concorrência'] * 0.98 if x['Seu Preço'] > x['Concorrência'] else x['Seu Preço'], axis=1)
+            df['Margem Real %'] = (((df['Preço Sugerido'] * (1 - imposto)) - df[col_custo]) / df['Preço Sugerido']) * 100
             
             def situacao(row):
-                if row['Preço Concorrência'] < row[col_custo]: return "🟥 Burn (Abaixo do Custo)"
-                if row['Seu Preço (Estratégico)'] > row['Preço Concorrência']: return "⚠️ Caro"
+                if row['Concorrência'] < row[col_custo]: return "🟥 Burn (Abaixo do Custo)"
+                if row['Seu Preço'] > row['Concorrência']: return "⚠️ Caro"
                 return "✅ Vencendo"
-
             df['Situação'] = df.apply(situacao, axis=1)
 
             st.success("Análise Concluída!")
             
+            # --- VOLTANDO COM OS GRÁFICOS ---
+            c1, c2 = st.columns(2)
+            with c1:
+                fig_pie = px.pie(df, names='Situação', title="Competitividade Geral", color_discrete_map={'✅ Vencendo':'#2ecc71', '⚠️ Caro':'#f1c40f', '🟥 Burn (Abaixo do Custo)':'#e74c3c'})
+                st.plotly_chart(fig_pie, use_container_width=True)
+            with c2:
+                fig_bar = px.bar(df, x=col_nome, y='Margem Real %', color='Situação', title="Margem Realista por Produto")
+                st.plotly_chart(fig_bar, use_container_width=True)
+
+            # EXIBIÇÃO DA TABELA
             def color_margin(val):
                 color = 'red' if val < 15 else 'green'
                 return f'color: {color}'
 
-            st.subheader("📋 Relatório Final de Precificação")
-            # Exibição com foco na Margem Realista que agora varia
-            st.dataframe(df[[col_nome, col_custo, 'Seu Preço (Estratégico)', 'Preço Concorrência', 'Loja Concorrente', 'Preço Sugerido', 'Margem Líquida Realista %', 'Situação']].style.map(color_margin, subset=['Margem Líquida Realista %']))
+            st.subheader("📋 Relatório Final")
+            st.dataframe(df[[col_nome, col_custo, 'Seu Preço', 'Concorrência', 'Loja Líder', 'Preço Sugerido', 'Margem Real %', 'Situação']].style.map(color_margin, subset=['Margem Real %']))
             
             output = io.BytesIO()
             with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
                 df.to_excel(writer, index=False, sheet_name='Analise')
-            st.download_button(label="📥 Baixar Planilha Final", data=output.getvalue(), file_name="precificacao_final.xlsx")
+            st.download_button(label="📥 Baixar Planilha Final", data=output.getvalue(), file_name="precificacao_completa.xlsx")
 
