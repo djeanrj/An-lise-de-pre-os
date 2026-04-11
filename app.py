@@ -10,57 +10,41 @@ st.set_page_config(page_title="IA de Precificação Pro", layout="wide", page_ic
 
 st.title("🚀 Inteligência de Mercado: Monitor de Preços Real")
 
-# --- PASSO 1: ATIVAÇÃO COM INSTRUÇÕES MELHORADAS ---
+# --- PASSO 1: ATIVAÇÃO ---
 st.markdown("### 1️⃣ Ativação do Sistema")
-
-with st.expander("👉 CLIQUE AQUI PARA VER O PASSO A PASSO PARA GERAR SUA CHAVE", expanded=True):
+with st.expander("🔑 COMO GERAR SUA CHAVE GRATUITA", expanded=True):
     st.markdown("""
-    O sistema utiliza o motor de busca do Google para encontrar preços reais. Para isso, você precisa de uma chave gratuita:
-    
-    1. **Aceda ao site:** [SerpApi.com](https://serpapi.com) e crie uma conta.
-    2. **Confirme o e-mail:** Verifique a sua caixa de entrada e clique no link de confirmação.
-    3. **Dashboard:** Após logar, você verá o campo **'Your Private API Key'**.
-    4. **Copiar:** Clique no ícone de copiar ao lado do código e cole no campo abaixo.
-    
-    *Nota: O plano gratuito oferece 100 pesquisas por mês sem custo.*
+    1. Acesse [SerpApi.com](https://serpapi.com) e crie uma conta.
+    2. No Dashboard, copie a **'API Key'** e cole abaixo.
     """)
 
-api_key = st.text_input("Cole sua API Key aqui para desbloquear:", type="password")
+api_key = st.text_input("Cole sua API Key aqui:", type="password")
 
 if not api_key:
-    st.warning("⚠️ O sistema está bloqueado. Insira a chave acima para prosseguir.")
+    st.warning("⚠️ O sistema está bloqueado. Insira a chave acima.")
     st.stop()
 
-st.success("✅ Sistema Ativado!")
 st.divider()
 
-# --- PASSO 2: INSTRUÇÕES E MODELO ---
-st.markdown("### 2️⃣ Preparação da Planilha")
+# --- PASSO 2: PREPARAÇÃO ---
+st.markdown("### 2️⃣ Preparação e Modelo")
 col_inst1, col_inst2 = st.columns(2)
-
 with col_inst1:
-    st.markdown("""
-    **Como funciona a análise:**
-    *   **Seu Preço:** É o seu custo + a % de aumento que você escolher.
-    *   **Trava de Segurança:** O sistema ignora preços de mercado menores que o seu custo (usados/falsos).
-    *   **Alerta:** Se o lucro final for menor que 15%, o valor aparecerá em **Vermelho**.
+    st.info("""
+    **Transparência de Mercado:**
+    * O sistema mostrará o **menor preço real** e a **loja** que o pratica.
+    * Se o preço estiver abaixo do seu custo, o sistema marcará como 🟥 **Preço Crítico**.
     """)
-
 with col_inst2:
     buffer = io.BytesIO()
-    exemplo_df = pd.DataFrame({
-        "Nome do Produto": ["LEGO Star Wars", "LEGO Technic Ferrari"],
-        "Custo": [308.19, 1200.00],
-        "EAN": ["673419340526", "673419358514"]
-    })
+    exemplo_df = pd.DataFrame({"Nome": ["LEGO 10280"], "Custo": [308.19], "EAN": ["673419340526"]})
     with pd.ExcelWriter(buffer, engine='xlsxwriter') as writer:
-        exemplo_df.to_excel(writer, index=False, sheet_name='Modelo')
-    st.download_button(label="📥 Baixar Planilha Exemplo", data=buffer.getvalue(), file_name="modelo_lego.xlsx")
+        exemplo_df.to_excel(writer, index=False)
+    st.download_button(label="📥 Baixar Planilha Exemplo", data=buffer.getvalue(), file_name="modelo.xlsx")
 
 st.divider()
 
-# --- PASSO 3: UPLOAD E CONFIGURAÇÃO ---
-st.markdown("### 3️⃣ Configuração de Venda")
+# --- PASSO 3: UPLOAD E ANÁLISE ---
 uploaded_file = st.file_uploader("Suba seu arquivo Excel", type=["xlsx", "xls"])
 
 if uploaded_file:
@@ -77,74 +61,68 @@ if uploaded_file:
     with c_map3:
         col_ean = st.selectbox("Coluna de EAN:", ["Não possuo"] + colunas)
 
-    if st.button("🚀 INICIAR ANÁLISE COMPLETA"):
-        with st.spinner('Consultando mercado e eliminando anúncios irreais...'):
+    if st.button("🚀 INICIAR ANÁLISE DE MERCADO"):
+        with st.spinner('Consultando lojas e validando preços...'):
             df = df_raw.copy()
-            res_mercado, res_pop = [], []
+            res_mercado, res_loja = [], []
 
             for idx, row in df.iterrows():
                 ean_q = f" {row[col_ean]}" if col_ean != "Não possuo" else ""
-                custo_ref = row[col_custo]
-                
                 search = GoogleSearch({
-                    "engine": "google_shopping",
-                    "q": f"{row[col_nome]}{ean_q}",
+                    "engine": "google_shopping", "q": f"{row[col_nome]}{ean_q}",
                     "google_domain": "google.com.br", "hl": "pt-br", "gl": "br", "api_key": api_key
                 })
                 results = search.get_dict()
 
-                precos_validos = []
+                melhor_oferta = {"preco": row[col_custo] * 2, "loja": "Não encontrado"}
+                
                 if "shopping_results" in results:
+                    ofertas_validas = []
                     for item in results['shopping_results']:
-                        p_text = item.get('price') or item.get('price_raw')
                         titulo = item.get('title', '').lower()
+                        # Filtro apenas para remover acessórios/peças (sujeira pesada)
+                        if any(t in titulo for t in ['peça', 'manual', 'led', 'luz', 'caixa vazia']): continue
                         
-                        # Filtro de termos irrelevantes
-                        if any(t in titulo for t in ['peça', 'manual', 'led', 'luz', 'usado', 'caixa vazia', 'minifigura']): continue
-
-                        if p_text:
-                            p_limpo = re.sub(r'[^\d,.]', '', str(p_text))
+                        p_raw = item.get('price') or item.get('price_raw')
+                        if p_raw:
+                            p_limpo = re.sub(r'[^\d,.]', '', str(p_raw))
                             if ',' in p_limpo and '.' in p_limpo: p_limpo = p_limpo.replace('.', '').replace(',', '.')
                             elif ',' in p_limpo: p_limpo = p_limpo.replace(',', '.')
                             try:
-                                valor_num = float(p_limpo)
-                                # CORREÇÃO: O preço de mercado deve ser no mínimo o seu custo + 5%
-                                # Isso ignora anúncios internacionais/usados de R$ 264 para custos de R$ 308
-                                if valor_num >= (custo_ref * 1.05): 
-                                    precos_validos.append(valor_num)
+                                valor = float(p_limpo)
+                                ofertas_validas.append({"preco": valor, "loja": item.get('source', 'Desconhecida')})
                             except: continue
-                
-                # Se não achar preço válido acima do custo, assume um valor de mercado padrão (Custo + 75%)
-                res_mercado.append(min(precos_validos) if precos_validos else custo_ref * 1.75)
-                res_pop.append("🔥 Alta" if len(precos_validos) > 5 else "💎 Baixa")
+                    
+                    if ofertas_validas:
+                        # Pega a oferta com o menor preço real encontrado
+                        melhor_oferta = min(ofertas_validas, key=lambda x: x['preco'])
 
-            df['Concorrência'] = res_mercado
-            df['Popularidade'] = res_pop
-            
-            # CÁLCULOS
+                res_mercado.append(melhor_oferta['preco'])
+                res_loja.append(melhor_oferta['loja'])
+
+            df['Preço Concorrência'] = res_mercado
+            df['Loja Concorrente'] = res_loja
             df['Seu Preço'] = df[col_custo] * (1 + (markup_percentual / 100))
             
-            def gerar_sugestao(row):
-                if row['Seu Preço'] > row['Concorrência']:
-                    return row['Concorrência'] * 0.98
-                return row['Seu Preço']
+            # ANÁLISE DE SAÚDE DO PREÇO
+            def analisar_situacao(row):
+                if row['Preço Concorrência'] < row[col_custo]:
+                    return "🟥 Preço Crítico (Abaixo do Custo)"
+                if row['Seu Preço'] > row['Preço Concorrência']:
+                    return "⚠️ Caro"
+                return "✅ Vencendo"
 
-            df['Preço Sugerido'] = df.apply(gerar_sugestao, axis=1)
-            df['Status'] = df.apply(lambda x: "✅ Vencendo" if x['Seu Preço'] <= x['Concorrência'] else "⚠️ Caro", axis=1)
+            df['Situação'] = df.apply(analisar_situacao, axis=1)
             df['Margem Líquida %'] = (((df['Seu Preço'] * (1 - imposto)) - df[col_custo]) / df['Seu Preço']) * 100
-            df['Alerta'] = df['Margem Líquida %'].apply(lambda x: "🚨 Margem Baixa!" if x < 15 else "💰 Saudável")
 
-            # EXIBIÇÃO
             st.success("Análise Finalizada!")
             
-            def color_margin(val):
-                color = 'red' if val < 15 else 'green'
-                return f'color: {color}'
-
-            st.subheader("📋 Resultados Detalhados")
-            st.dataframe(df[[col_nome, col_custo, 'Seu Preço', 'Concorrência', 'Status', 'Preço Sugerido', 'Margem Líquida %', 'Alerta']].style.map(color_margin, subset=['Margem Líquida %']))
+            # Exibe a tabela com as novas colunas de confirmação
+            st.subheader("📋 Relatório de Verificação")
+            st.dataframe(df[[col_nome, col_custo, 'Seu Preço', 'Preço Concorrência', 'Loja Concorrente', 'Situação', 'Margem Líquida %']])
             
             output = io.BytesIO()
             with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-                df.to_excel(writer, index=False, sheet_name='Analise')
-            st.download_button(label="📥 Baixar Relatório Final", data=output.getvalue(), file_name="analise_mercado_lego.xlsx")
+                df.to_excel(writer, index=False, sheet_name='Analise_Completa')
+            st.download_button(label="📥 Baixar Relatório para Excel", data=output.getvalue(), file_name="verificacao_mercado.xlsx")
+
