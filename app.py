@@ -35,9 +35,9 @@ col_inst1, col_inst2 = st.columns(2)
 with col_inst1:
     st.info("""
     **Novidades nesta versão:**
-    * **Filtro de Marketplaces:** Escolha quais lojas quer considerar na comparação.
-    * **Gráficos Automáticos:** Visualização de competitividade e margens.
-    * **Margem Realista:** Cálculo baseado no preço necessário para vencer o mercado.
+    * **Resumo Financeiro:** Veja o lucro total estimado da sua operação.
+    * **Filtro de Marketplaces:** No menu lateral, escolha quais lojas comparar.
+    * **Gráficos de Performance:** Análise visual de margens e preços.
     """)
 
 with col_inst2:
@@ -62,8 +62,7 @@ if uploaded_file:
     colunas = df_raw.columns.tolist()
     
     st.sidebar.header("🎯 Filtros de Comparação")
-    # OPÇÃO DE RESTRIÇÃO DE MARKETPLACE
-    mkt_options = ["Todos", "Amazon", "Mercado Livre", "Magalu", "Shopee", "RiHappy", "Americanas", "Casas Bahia"]
+    mkt_options = ["Todos", "Amazon", "Mercado Livre", "Magalu", "Shopee", "RiHappy", "Americanas", "Casas Bahia", "Ponto", "Extra"]
     mkt_filter = st.sidebar.multiselect("Considerar apenas estas lojas:", mkt_options, default="Todos")
 
     st.info("Ajuste os parâmetros abaixo:")
@@ -79,7 +78,7 @@ if uploaded_file:
         col_ean = st.selectbox("Coluna de EAN (Opcional):", ["Não possuo"] + colunas)
 
     if st.button("🚀 INICIAR BUSCA NO MERCADO BRASILEIRO"):
-        with st.spinner('Consultando mercado e filtrando lojas selecionadas...'):
+        with st.spinner('Consultando mercado e processando inteligência financeira...'):
             df = df_raw.copy()
             res_mercado, res_loja = [], []
 
@@ -105,15 +104,12 @@ if uploaded_file:
                         loja_lower = loja_nome.lower()
                         p_raw = item.get('price') or item.get('price_raw')
                         
-                        # Filtros Básicos (Sujeira)
-                        if any(t in titulo for t in ['peça', 'manual', 'led', 'luz', 'usado', 'minifigura']): continue
+                        if any(t in titulo for t in ['peça', 'manual', 'led', 'luz', 'usado', 'caixa vazia']): continue
                         if any(b in loja_lower for b in ['ebay', 'shopee international', 'tiendamia', 'aliexpress']): continue
                         if "R$" not in str(p_raw): continue
 
-                        # FILTRO DE MARKETPLACE SELECIONADO
                         if "Todos" not in mkt_filter:
-                            if not any(f.lower() in loja_lower for f in mkt_filter):
-                                continue
+                            if not any(f.lower() in loja_lower for f in mkt_filter): continue
 
                         if p_raw:
                             p_limpo = re.sub(r'[^\d,.]', '', str(p_raw))
@@ -121,7 +117,7 @@ if uploaded_file:
                             elif ',' in p_limpo: p_limpo = p_limpo.replace(',', '.')
                             try:
                                 valor = float(p_limpo)
-                                if valor > (custo_ref * 0.5):
+                                if valor > (custo_ref * 0.1):
                                     ofertas_validas.append({"preco": valor, "loja": loja_nome})
                             except: continue
                     
@@ -131,11 +127,13 @@ if uploaded_file:
                 res_mercado.append(melhor_oferta['preco'])
                 res_loja.append(melhor_oferta['loja'])
 
+            # CÁLCULOS
             df['Concorrência'] = res_mercado
             df['Loja Líder'] = res_loja
             df['Seu Preço'] = df[col_custo] * (1 + (markup_percentual / 100))
             df['Preço Sugerido'] = df.apply(lambda x: x['Concorrência'] * 0.98 if x['Seu Preço'] > x['Concorrência'] else x['Seu Preço'], axis=1)
             df['Margem Real %'] = (((df['Preço Sugerido'] * (1 - imposto)) - df[col_custo]) / df['Preço Sugerido']) * 100
+            df['Lucro Líquido Unitário'] = (df['Preço Sugerido'] * (1 - imposto)) - df[col_custo]
             
             def situacao(row):
                 if row['Concorrência'] < row[col_custo]: return "🟥 Burn (Abaixo do Custo)"
@@ -145,7 +143,7 @@ if uploaded_file:
 
             st.success("Análise Concluída!")
             
-            # --- VOLTANDO COM OS GRÁFICOS ---
+            # --- GRÁFICOS ---
             c1, c2 = st.columns(2)
             with c1:
                 fig_pie = px.pie(df, names='Situação', title="Competitividade Geral", color_discrete_map={'✅ Vencendo':'#2ecc71', '⚠️ Caro':'#f1c40f', '🟥 Burn (Abaixo do Custo)':'#e74c3c'})
@@ -154,16 +152,22 @@ if uploaded_file:
                 fig_bar = px.bar(df, x=col_nome, y='Margem Real %', color='Situação', title="Margem Realista por Produto")
                 st.plotly_chart(fig_bar, use_container_width=True)
 
-            # EXIBIÇÃO DA TABELA
+            # --- RESUMO FINANCEIRO ---
+            st.subheader("💰 Resumo Financeiro da Operação")
+            f1, f2, f3 = st.columns(3)
+            f1.metric("Custo Total de Estoque", f"R$ {df[col_custo].sum():,.2f}")
+            f2.metric("Faturamento Líquido Estimado", f"R$ {(df['Preço Sugerido']*(1-imposto)).sum():,.2f}")
+            f3.metric("Lucro Líquido Total", f"R$ {df['Lucro Líquido Unitário'].sum():,.2f}", delta=f"{df['Margem Real %'].mean():.1f}% (Margem Médio)")
+
+            # TABELA
             def color_margin(val):
                 color = 'red' if val < 15 else 'green'
                 return f'color: {color}'
 
-            st.subheader("📋 Relatório Final")
+            st.subheader("📋 Relatório Final Detalhado")
             st.dataframe(df[[col_nome, col_custo, 'Seu Preço', 'Concorrência', 'Loja Líder', 'Preço Sugerido', 'Margem Real %', 'Situação']].style.map(color_margin, subset=['Margem Real %']))
             
             output = io.BytesIO()
             with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
                 df.to_excel(writer, index=False, sheet_name='Analise')
             st.download_button(label="📥 Baixar Planilha Final", data=output.getvalue(), file_name="precificacao_completa.xlsx")
-
