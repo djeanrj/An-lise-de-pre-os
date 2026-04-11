@@ -17,11 +17,10 @@ with st.expander("👉 CLIQUE AQUI PARA VER O PASSO A PASSO PARA GERAR SUA CHAVE
     st.markdown("""
     O sistema utiliza o motor de busca do Google para encontrar preços reais. Para isso, você precisa de uma chave gratuita:
     
-    1. **Aceda ao site:** [SerpApi.com](https://serpapi.com) e crie uma conta (pode usar o botão 'Sign up with Google').
-    2. **Confirme o e-mail:** Verifique a sua caixa de entrada e clique no link de confirmação enviado pela SerpApi.
-    3. **Dashboard:** Após logar, você verá um campo chamado **'Your Private API Key'**.
-    4. **Copiar:** Clique no botão de copiar (ícone de prancheta) ao lado do código.
-    5. **Ativar:** Cole o código no campo abaixo.
+    1. **Aceda ao site:** [SerpApi.com](https://serpapi.com) e crie uma conta.
+    2. **Confirme o e-mail:** Verifique a sua caixa de entrada e clique no link de confirmação.
+    3. **Dashboard:** Após logar, você verá o campo **'Your Private API Key'**.
+    4. **Copiar:** Clique no ícone de copiar ao lado do código e cole no campo abaixo.
     
     *Nota: O plano gratuito oferece 100 pesquisas por mês sem custo.*
     """)
@@ -43,7 +42,7 @@ with col_inst1:
     st.markdown("""
     **Como funciona a análise:**
     *   **Seu Preço:** É o seu custo + a % de aumento que você escolher.
-    *   **Preço Sugerido:** Se você estiver caro, a IA sugere um valor para bater o mercado.
+    *   **Trava de Segurança:** O sistema ignora preços de mercado menores que o seu custo (usados/falsos).
     *   **Alerta:** Se o lucro final for menor que 15%, o valor aparecerá em **Vermelho**.
     """)
 
@@ -79,7 +78,7 @@ if uploaded_file:
         col_ean = st.selectbox("Coluna de EAN:", ["Não possuo"] + colunas)
 
     if st.button("🚀 INICIAR ANÁLISE COMPLETA"):
-        with st.spinner('Consultando mercado e eliminando anúncios de peças/acessórios...'):
+        with st.spinner('Consultando mercado e eliminando anúncios irreais...'):
             df = df_raw.copy()
             res_mercado, res_pop = [], []
 
@@ -99,8 +98,9 @@ if uploaded_file:
                     for item in results['shopping_results']:
                         p_text = item.get('price') or item.get('price_raw')
                         titulo = item.get('title', '').lower()
-                        # Filtro de ruído
-                        if any(t in titulo for t in ['peça', 'manual', 'led', 'luz', 'usado', 'caixa vazia']): continue
+                        
+                        # Filtro de termos irrelevantes
+                        if any(t in titulo for t in ['peça', 'manual', 'led', 'luz', 'usado', 'caixa vazia', 'minifigura']): continue
 
                         if p_text:
                             p_limpo = re.sub(r'[^\d,.]', '', str(p_text))
@@ -108,10 +108,14 @@ if uploaded_file:
                             elif ',' in p_limpo: p_limpo = p_limpo.replace(',', '.')
                             try:
                                 valor_num = float(p_limpo)
-                                if valor_num > (custo_ref * 0.85): precos_validos.append(valor_num)
+                                # CORREÇÃO: O preço de mercado deve ser no mínimo o seu custo + 5%
+                                # Isso ignora anúncios internacionais/usados de R$ 264 para custos de R$ 308
+                                if valor_num >= (custo_ref * 1.05): 
+                                    precos_validos.append(valor_num)
                             except: continue
                 
-                res_mercado.append(min(precos_validos) if precos_validos else custo_ref * 2)
+                # Se não achar preço válido acima do custo, assume um valor de mercado padrão (Custo + 75%)
+                res_mercado.append(min(precos_validos) if precos_validos else custo_ref * 1.75)
                 res_pop.append("🔥 Alta" if len(precos_validos) > 5 else "💎 Baixa")
 
             df['Concorrência'] = res_mercado
@@ -133,13 +137,11 @@ if uploaded_file:
             # EXIBIÇÃO
             st.success("Análise Finalizada!")
             
-            # FUNÇÃO CORRIGIDA PARA O ERRO ATTRIBUTEERROR
             def color_margin(val):
                 color = 'red' if val < 15 else 'green'
                 return f'color: {color}'
 
             st.subheader("📋 Resultados Detalhados")
-            # Uso de .map() em vez de .applymap() para compatibilidade
             st.dataframe(df[[col_nome, col_custo, 'Seu Preço', 'Concorrência', 'Status', 'Preço Sugerido', 'Margem Líquida %', 'Alerta']].style.map(color_margin, subset=['Margem Líquida %']))
             
             output = io.BytesIO()
