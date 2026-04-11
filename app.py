@@ -24,7 +24,6 @@ with col_inst1:
     """)
 
 with col_inst2:
-    # CRIAR MODELO PARA DOWNLOAD
     buffer = io.BytesIO()
     exemplo_df = pd.DataFrame({
         "Nome do Produto": ["LEGO Star Wars", "LEGO Technic Ferrari"],
@@ -82,7 +81,7 @@ if uploaded_file:
         col_ean = st.selectbox("Selecione a coluna de EAN (Opcional):", ["Não possuo"] + colunas)
 
     if st.button("🚀 INICIAR ANÁLISE DE MERCADO REAL"):
-        with st.spinner('Varrendo Amazon, Mercado Livre, Magalu e outros...'):
+        with st.spinner('Consultando Amazon, Mercado Livre, Magalu e outros...'):
             
             df = df_raw.copy()
             res_mercado = []
@@ -99,13 +98,25 @@ if uploaded_file:
                 })
                 results = search.get_dict()
 
+                menor_mercado = row[col_custo] * 2
+                pop = "💎 Raro"
+
                 if "shopping_results" in results:
-                    precos = [item['price_raw'] for item in results['shopping_results']]
-                    menor_mercado = min(precos)
-                    pop = "🔥 Alta Saída" if len(precos) > 10 else "💎 Raro" if len(precos) < 3 else "👍 Estável"
-                else:
-                    menor_mercado = row[col_custo] * 2
-                    pop = "💎 Raro"
+                    precos_encontrados = []
+                    for item in results['shopping_results']:
+                        # Tenta obter o preço de várias chaves possíveis
+                        p_raw = item.get('price_raw') or item.get('price')
+                        if p_raw:
+                            try:
+                                # Limpeza de string para float (remove R$, pontos de milhar e troca vírgula por ponto)
+                                p_limpo = str(p_raw).replace('R$', '').replace(' ', '').replace('.', '').replace(',', '.').strip()
+                                precos_encontrados.append(float(p_limpo))
+                            except:
+                                continue
+                    
+                    if precos_encontrados:
+                        menor_mercado = min(precos_encontrados)
+                        pop = "🔥 Alta Saída" if len(precos_encontrados) > 8 else "👍 Estável"
                 
                 res_mercado.append(menor_mercado)
                 res_popularidade.append(pop)
@@ -115,6 +126,7 @@ if uploaded_file:
             
             # IA DE PRECIFICAÇÃO
             def precificar(preco_m, custo, pop):
+                # Tenta ser 3% mais barato que o mercado
                 alvo = (preco_m * 0.97) / custo
                 if pop == "💎 Raro": return max(alvo, 1.9)
                 return max(alvo, markup_min)
@@ -128,13 +140,14 @@ if uploaded_file:
             
             # DASHBOARD
             c1, c2 = st.columns(2)
-            c1.plotly_chart(px.pie(df, names='Status', title="Competitividade"))
-            c2.plotly_chart(px.bar(df, x=col_nome, y='Margem Líquida %', color='Potencial de Saída', title="Margem vs Potencial"))
+            c1.plotly_chart(px.pie(df, names='Status', title="Competitividade Geral", color_discrete_sequence=['#2ecc71', '#f1c40f']))
+            c2.plotly_chart(px.bar(df, x=col_nome, y='Margem Líquida %', color='Potencial de Saída', title="Margem Estimada por Produto"))
 
+            st.subheader("📋 Resultados Detalhados")
             st.dataframe(df)
 
             # DOWNLOAD
             output = io.BytesIO()
             with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
                 df.to_excel(writer, index=False, sheet_name='Analise')
-            st.download_button(label="📥 Baixar Resultados", data=output.getvalue(), file_name="analise_mercado.xlsx")
+            st.download_button(label="📥 Baixar Planilha de Resultados", data=output.getvalue(), file_name="analise_mercado_ia.xlsx")
