@@ -3,6 +3,7 @@ import pandas as pd
 import plotly.express as px
 from serpapi import GoogleSearch
 import io
+import re
 
 # 1. CONFIGURAÇÃO DA INTERFACE
 st.set_page_config(page_title="IA de Precificação Pro", layout="wide", page_icon="📈")
@@ -16,18 +17,18 @@ col_inst1, col_inst2 = st.columns(2)
 with col_inst1:
     st.info("""
     **O sistema precisa de 3 informações básicas:**
-    *   **Nome do Produto:** Para a busca no Google/Amazon/ML.
-    *   **Custo:** O valor que você pagou (para calcular sua margem).
-    *   **EAN (Opcional):** O código de barras garante o preço exato.
+    *   **Nome do Produto:** Ex: LEGO Star Wars.
+    *   **Custo:** O valor que você pagou (ICMS 4%).
+    *   **EAN (Opcional):** Código de barras para precisão total.
     
-    *Dica: Você pode usar qualquer nome nas colunas do seu Excel.*
+    *O robô ignora automaticamente anúncios de peças, manuais e preços irreais.*
     """)
 
 with col_inst2:
     buffer = io.BytesIO()
     exemplo_df = pd.DataFrame({
         "Nome do Produto": ["LEGO Star Wars", "LEGO Technic Ferrari"],
-        "Custo": [450.00, 1200.00],
+        "Custo": [308.19, 1200.00],
         "EAN": ["673419340526", "673419358514"]
     })
     with pd.ExcelWriter(buffer, engine='xlsxwriter') as writer:
@@ -44,20 +45,11 @@ st.divider()
 
 # 3. ATIVAÇÃO POR CHAVE
 st.markdown("### 2️⃣ Ativação do Sistema")
-with st.expander("🔑 Como obter sua chave gratuita (Obrigatório)", expanded=False):
-    st.markdown("""
-    1. Aceda ao site **[SerpApi.com](https://serpapi.com)** e crie uma conta.
-    2. No seu Dashboard, copie o código **'API Key'**.
-    3. Cole no campo abaixo. A conta gratuita permite 100 buscas mensais.
-    """)
-
-api_key = st.text_input("Cole sua SerpApi Key aqui:", type="password")
+api_key = st.text_input("Cole sua SerpApi Key aqui (obtenha em serpapi.com):", type="password")
 
 if not api_key:
-    st.warning("⚠️ O sistema está desativado. Insira a chave para continuar.")
+    st.warning("⚠️ Insira a chave para desbloquear as funcionalidades.")
     st.stop()
-
-st.success("✅ Sistema Ativado!")
 
 # 4. UPLOAD E MAPEAMENTO
 st.divider()
@@ -68,20 +60,20 @@ if uploaded_file:
     df_raw = pd.read_excel(uploaded_file)
     colunas = df_raw.columns.tolist()
     
-    st.success("Arquivo recebido! Mapeie os dados abaixo:")
+    st.success("Arquivo recebido!")
     c_map1, c_map2, c_map3 = st.columns(3)
     
     with c_map1:
-        col_nome = st.selectbox("Selecione a coluna de NOME:", colunas)
+        col_nome = st.selectbox("Coluna de NOME:", colunas)
         imposto = st.number_input("Imposto sobre Venda (%)", 0, 100, 4) / 100
     with c_map2:
-        col_custo = st.selectbox("Selecione a coluna de CUSTO:", colunas)
-        markup_min = st.slider("Markup de Segurança", 1.1, 1.5, 1.3)
+        col_custo = st.selectbox("Coluna de CUSTO:", colunas)
+        markup_min = st.slider("Markup de Segurança (Mínimo)", 1.1, 2.0, 1.3)
     with c_map3:
-        col_ean = st.selectbox("Selecione a coluna de EAN (Opcional):", ["Não possuo"] + colunas)
+        col_ean = st.selectbox("Coluna de EAN (Opcional):", ["Não possuo"] + colunas)
 
     if st.button("🚀 INICIAR ANÁLISE DE MERCADO REAL"):
-        with st.spinner('Consultando Amazon, Mercado Livre, Magalu e outros...'):
+        with st.spinner('Limpando ruídos e consultando grandes players...'):
             
             df = df_raw.copy()
             res_mercado = []
@@ -89,6 +81,8 @@ if uploaded_file:
 
             for idx, row in df.iterrows():
                 ean_q = f" {row[col_ean]}" if col_ean != "Não possuo" else ""
+                custo_unitario = row[col_custo]
+                
                 search = GoogleSearch({
                     "engine": "google_shopping",
                     "q": f"{row[col_nome]}{ean_q}",
@@ -98,25 +92,42 @@ if uploaded_file:
                 })
                 results = search.get_dict()
 
-                menor_mercado = row[col_custo] * 2
-                pop = "💎 Raro"
+                precos_validos = []
 
                 if "shopping_results" in results:
-                    precos_encontrados = []
                     for item in results['shopping_results']:
-                        # Tenta obter o preço de várias chaves possíveis
-                        p_raw = item.get('price_raw') or item.get('price')
-                        if p_raw:
+                        p_text = item.get('price') or item.get('price_raw')
+                        titulo = item.get('title', '').lower()
+                        
+                        # FILTRO 1: Ignorar acessórios e peças
+                        termos_sujeira = ['peça', 'manual', 'led', 'luz', 'compatível', 'similar', 'minifigura', 'acessório', 'expositor']
+                        if any(termo in titulo for termo in termos_sujeira):
+                            continue
+
+                        if p_text:
+                            # Limpeza de moeda e formatação
+                            p_limpo = re.sub(r'[^\d,.]', '', str(p_text))
+                            if ',' in p_limpo and '.' in p_limpo:
+                                p_limpo = p_limpo.replace('.', '').replace(',', '.')
+                            elif ',' in p_limpo:
+                                p_limpo = p_limpo.replace(',', '.')
+                                
                             try:
-                                # Limpeza de string para float (remove R$, pontos de milhar e troca vírgula por ponto)
-                                p_limpo = str(p_raw).replace('R$', '').replace(' ', '').replace('.', '').replace(',', '.').strip()
-                                precos_encontrados.append(float(p_limpo))
+                                valor_num = float(p_limpo)
+                                # FILTRO 2: Sanidade Financeira (Preço mercado deve ser > 80% do seu custo)
+                                # Isso remove o erro de achar anúncios de R$ 35 para itens de R$ 300
+                                if valor_num >= (custo_unitario * 0.8):
+                                    precos_validos.append(valor_num)
                             except:
                                 continue
-                    
-                    if precos_encontrados:
-                        menor_mercado = min(precos_encontrados)
-                        pop = "🔥 Alta Saída" if len(precos_encontrados) > 8 else "👍 Estável"
+                
+                if precos_validos:
+                    menor_mercado = min(precos_validos)
+                    pop = "🔥 Alta Saída" if len(precos_validos) > 8 else "👍 Estável"
+                else:
+                    # Se não achar nada real, assume que é raro e sugere margem cheia
+                    menor_mercado = custo_unitario * 1.75
+                    pop = "💎 Raro / Sem Concorrência Direta"
                 
                 res_mercado.append(menor_mercado)
                 res_popularidade.append(pop)
@@ -124,12 +135,12 @@ if uploaded_file:
             df['Preço Concorrência'] = res_mercado
             df['Potencial de Saída'] = res_popularidade
             
-            # IA DE PRECIFICAÇÃO
+            # LÓGICA DE PRECIFICAÇÃO IA
             def precificar(preco_m, custo, pop):
-                # Tenta ser 3% mais barato que o mercado
-                alvo = (preco_m * 0.97) / custo
-                if pop == "💎 Raro": return max(alvo, 1.9)
-                return max(alvo, markup_min)
+                # Tenta ser 3% mais barato que a média baixa do mercado
+                markup_alvo = (preco_m * 0.97) / custo
+                if pop == "💎 Raro / Sem Concorrência Direta": return 1.9
+                return max(markup_alvo, markup_min)
 
             df['Markup Sugerido'] = df.apply(lambda x: precificar(x['Preço Concorrência'], x[col_custo], x['Potencial de Saída']), axis=1)
             df['Seu Preço Sugerido'] = df[col_custo] * df['Markup Sugerido']
@@ -138,16 +149,17 @@ if uploaded_file:
 
             st.success("Análise Finalizada!")
             
-            # DASHBOARD
+            # Dashboards rápidos
             c1, c2 = st.columns(2)
             c1.plotly_chart(px.pie(df, names='Status', title="Competitividade Geral", color_discrete_sequence=['#2ecc71', '#f1c40f']))
-            c2.plotly_chart(px.bar(df, x=col_nome, y='Margem Líquida %', color='Potencial de Saída', title="Margem Estimada por Produto"))
+            c2.plotly_chart(px.bar(df, x=col_nome, y='Margem Líquida %', color='Potencial de Saída', title="Margem Estimada"))
 
-            st.subheader("📋 Resultados Detalhados")
+            st.subheader("📋 Tabela de Resultados")
             st.dataframe(df)
 
             # DOWNLOAD
             output = io.BytesIO()
             with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-                df.to_excel(writer, index=False, sheet_name='Analise')
-            st.download_button(label="📥 Baixar Planilha de Resultados", data=output.getvalue(), file_name="analise_mercado_ia.xlsx")
+                df.to_excel(writer, index=False, sheet_name='Analise_IA')
+            st.download_button(label="📥 Baixar Planilha Finalizada", data=output.getvalue(), file_name="precificacao_ia_lego.xlsx")
+
