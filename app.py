@@ -10,14 +10,29 @@ st.set_page_config(page_title="IA de Precificação Pro", layout="wide", page_ic
 
 st.title("🚀 Inteligência de Mercado: Monitor de Preços Real")
 
-# --- PASSO 1: ATIVAÇÃO (CHAVE) ---
+# --- PASSO 1: ATIVAÇÃO COM INSTRUÇÕES MELHORADAS ---
 st.markdown("### 1️⃣ Ativação do Sistema")
-api_key = st.text_input("Insira sua SerpApi Key aqui:", type="password")
+
+with st.expander("👉 CLIQUE AQUI PARA VER O PASSO A PASSO PARA GERAR SUA CHAVE", expanded=True):
+    st.markdown("""
+    O sistema utiliza o motor de busca do Google para encontrar preços reais. Para isso, você precisa de uma chave gratuita:
+    
+    1. **Aceda ao site:** [SerpApi.com](https://serpapi.com) e crie uma conta (pode usar o botão 'Sign up with Google').
+    2. **Confirme o e-mail:** Verifique a sua caixa de entrada e clique no link de confirmação enviado pela SerpApi.
+    3. **Dashboard:** Após logar, você verá um campo chamado **'Your Private API Key'**.
+    4. **Copiar:** Clique no botão de copiar (ícone de prancheta) ao lado do código.
+    5. **Ativar:** Cole o código no campo abaixo.
+    
+    *Nota: O plano gratuito oferece 100 pesquisas por mês sem custo.*
+    """)
+
+api_key = st.text_input("Cole sua API Key aqui para desbloquear:", type="password")
 
 if not api_key:
-    st.warning("⚠️ Insira a chave da SerpApi para desbloquear o sistema.")
+    st.warning("⚠️ O sistema está bloqueado. Insira a chave acima para prosseguir.")
     st.stop()
 
+st.success("✅ Sistema Ativado!")
 st.divider()
 
 # --- PASSO 2: INSTRUÇÕES E MODELO ---
@@ -28,8 +43,8 @@ with col_inst1:
     st.markdown("""
     **Como funciona a análise:**
     *   **Seu Preço:** É o seu custo + a % de aumento que você escolher.
-    *   **Preço Sugerido:** Sugestão da IA para bater a concorrência mantendo lucro.
-    *   **Alerte:** Itens com margem líquida < 15% aparecerão com aviso.
+    *   **Preço Sugerido:** Se você estiver caro, a IA sugere um valor para bater o mercado.
+    *   **Alerta:** Se o lucro final for menor que 15%, o valor aparecerá em **Vermelho**.
     """)
 
 with col_inst2:
@@ -64,7 +79,7 @@ if uploaded_file:
         col_ean = st.selectbox("Coluna de EAN:", ["Não possuo"] + colunas)
 
     if st.button("🚀 INICIAR ANÁLISE COMPLETA"):
-        with st.spinner('Consultando mercado e calculando estratégias...'):
+        with st.spinner('Consultando mercado e eliminando anúncios de peças/acessórios...'):
             df = df_raw.copy()
             res_mercado, res_pop = [], []
 
@@ -84,7 +99,8 @@ if uploaded_file:
                     for item in results['shopping_results']:
                         p_text = item.get('price') or item.get('price_raw')
                         titulo = item.get('title', '').lower()
-                        if any(t in titulo for t in ['peça', 'manual', 'led', 'luz', 'usado']): continue
+                        # Filtro de ruído
+                        if any(t in titulo for t in ['peça', 'manual', 'led', 'luz', 'usado', 'caixa vazia']): continue
 
                         if p_text:
                             p_limpo = re.sub(r'[^\d,.]', '', str(p_text))
@@ -101,12 +117,12 @@ if uploaded_file:
             df['Concorrência'] = res_mercado
             df['Popularidade'] = res_pop
             
-            # --- CÁLCULOS ---
+            # CÁLCULOS
             df['Seu Preço'] = df[col_custo] * (1 + (markup_percentual / 100))
             
             def gerar_sugestao(row):
                 if row['Seu Preço'] > row['Concorrência']:
-                    return row['Concorrência'] * 0.98 # Sugere 2% abaixo da concorrência
+                    return row['Concorrência'] * 0.98
                 return row['Seu Preço']
 
             df['Preço Sugerido'] = df.apply(gerar_sugestao, axis=1)
@@ -117,16 +133,16 @@ if uploaded_file:
             # EXIBIÇÃO
             st.success("Análise Finalizada!")
             
-            # Estilização da tabela para mostrar no Streamlit
+            # FUNÇÃO CORRIGIDA PARA O ERRO ATTRIBUTEERROR
             def color_margin(val):
                 color = 'red' if val < 15 else 'green'
                 return f'color: {color}'
 
             st.subheader("📋 Resultados Detalhados")
-            st.dataframe(df[[col_nome, col_custo, 'Seu Preço', 'Concorrência', 'Status', 'Preço Sugerido', 'Margem Líquida %', 'Alerta']].style.applymap(color_margin, subset=['Margem Líquida %']))
+            # Uso de .map() em vez de .applymap() para compatibilidade
+            st.dataframe(df[[col_nome, col_custo, 'Seu Preço', 'Concorrência', 'Status', 'Preço Sugerido', 'Margem Líquida %', 'Alerta']].style.map(color_margin, subset=['Margem Líquida %']))
             
             output = io.BytesIO()
             with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
                 df.to_excel(writer, index=False, sheet_name='Analise')
-            st.download_button(label="📥 Baixar Relatório", data=output.getvalue(), file_name="analise_precificacao_ia.xlsx")
-
+            st.download_button(label="📥 Baixar Relatório Final", data=output.getvalue(), file_name="analise_mercado_lego.xlsx")
