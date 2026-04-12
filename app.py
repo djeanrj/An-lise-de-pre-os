@@ -13,7 +13,7 @@ from email.mime.multipart import MIMEMultipart
 # 1. CONFIGURAÇÃO DA INTERFACE
 st.set_page_config(page_title="IA Marketplace + Bling Sync", layout="wide", page_icon="🚀")
 
-# --- FUNÇÃO DE LOG E E-MAIL (CORRIGIDA) ---
+# --- FUNÇÃO DE LOG E E-MAIL ---
 def enviar_email_log(n, e, m, tipo="SUPORTE"):
     dest = "contato@vembrincarcomagente.com"
     try:
@@ -42,8 +42,13 @@ with st.sidebar:
     mkt_filter = st.multiselect("Comparar apenas com:", mkt_options, default="Todos")
     
     st.divider()
-    st.header("📖 Help & Legenda")
-    st.info("✅ **Vencendo**: Preço ideal.\n\n⚠️ **Caro**: Acima do mercado.\n\n🟥 **Burn**: Preço abaixo do seu custo.")
+    st.header("📖 Central de Ajuda")
+    st.info("""
+    **Legenda de Situação:**
+    *   ✅ **Vencendo:** Seu preço já é o menor.
+    *   ⚠️ **Caro:** Precisa baixar para o sugerido.
+    *   🟥 **Burn:** Mercado vende abaixo do seu custo.
+    """)
     
     st.divider()
     st.header("💬 Assistente Virtual")
@@ -70,7 +75,7 @@ AVISO IMPORTANTE AOS UTILIZADORES:
 4. LIMITAÇÃO DE DANOS: Não assumimos responsabilidade por perdas financeiras ou decisões geradas sobre os dados.
 """
 st.text_area("Leia atentamente:", termos_texto, height=150)
-aceite = st.checkbox("Eu compreendo que os dados vêm da internet e aceito a responsabilidade total pelas minhas decisões.")
+aceite = st.checkbox("Eu aceito os Termos de Uso e a responsabilidade total pelas minhas decisões.")
 
 if not aceite:
     st.warning("👉 Aceite os termos para desbloquear o sistema.")
@@ -92,7 +97,7 @@ if fonte == "Bling (API V3)":
                 r = requests.get("https://bling.com.br", headers=h)
                 if r.status_code == 200:
                     df_base = pd.DataFrame([{"ID": i['id'], "Nome": i['nome'], "Custo": round(float(i.get('precoCusto',0)), 2), "Preço Atual": round(float(i.get('preco',0)), 2), "Qtde": float(i.get('estoque',{}).get('quantidade',1) or 1), "EAN": i.get('codigoBarra',''), "Linha": "Importado Bling"} for i in r.json().get('data', [])])
-                    st.success("Produtos carregados!")
+                    st.success(f"{len(df_base)} produtos carregados!")
             except: st.error("Erro na conexão com Bling.")
 else:
     uploaded_file = st.file_uploader("Suba seu Excel", type=["xlsx", "xls"])
@@ -126,7 +131,7 @@ if not df_base.empty:
                         validos = []
                         for it in results['shopping_results']:
                             loja = it.get('source','').lower()
-                            if any(t in it.get('title','').lower() for t in ['peça','manual','led']) or any(b in loja for b in ['ebay','aliexpress','international']) or "R$" not in str(it.get('price','')): continue
+                            if any(t in it.get('title','').lower() for t in ['peça','manual','led']) or any(b in loja for b in ['ebay','aliexpress']) or "R$" not in str(it.get('price','')): continue
                             if "Todos" not in mkt_filter and not any(f.lower() in loja for f in mkt_filter): continue
                             try:
                                 v = float(re.sub(r'[^\d,.]','',str(it.get('price'))).replace('.','').replace(',','.'))
@@ -143,11 +148,10 @@ if not df_base.empty:
                 st.session_state.df_final = df
                 enviar_email_log("Sistema", "Automático", f"Análise concluída: {len(df)} itens.", "LOG_ATIVIDADE")
 
-# --- PASSO 3: RESULTADOS E BOTÕES ALINHADOS ---
+# --- PASSO 3: RESULTADOS E BOTÕES ---
 if "df_final" in st.session_state:
     df = st.session_state.df_final
     st.divider(); st.subheader("📊 Resultados Estratégicos")
-    
     lin_sel = st.selectbox("🔍 Filtrar por Linha:", ["Todas"] + df['Linha'].unique().tolist())
     df_plot = df if lin_sel == "Todas" else df[df['Linha'] == lin_sel]
     
@@ -162,9 +166,17 @@ if "df_final" in st.session_state:
     }).map(lambda x: 'color: red' if isinstance(x, (int, float)) and x < 15 else 'color: green', subset=['Margem %']))
 
     st.divider()
-    # ALINHAMENTO DOS BOTÕES LADO A LADO
-    btn_col1, btn_col2 = st.columns(2)
     
+    # NOVA CONFIGURAÇÃO PARA LISTAS DE PREÇO NO SYNC
+    st.subheader("🔄 Bling Sync Inteligente")
+    col_sync1, col_sync2 = st.columns(2)
+    with col_sync1:
+        tipo_atualizacao = st.selectbox("Onde atualizar o preço?", ["Preço Padrão (Geral)", "Lista de Preço Específica"])
+    with col_sync2:
+        id_lista = st.text_input("ID da Lista de Preço (Se selecionado):", placeholder="Ex: 123456789")
+        st.caption("Você encontra o ID da lista na URL da página de Listas de Preços no Bling.")
+
+    btn_col1, btn_col2 = st.columns(2)
     with btn_col1:
         output = io.BytesIO()
         with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
@@ -173,10 +185,27 @@ if "df_final" in st.session_state:
     
     with btn_col2:
         if fonte == "Bling (API V3)":
-            if st.button("📤 Aceitar sugestões de preço para o bling", use_container_width=True):
+            if st.button("📤 Aceitar sugestões de preço para o bling e atualizar na plataforma", use_container_width=True):
                 h = {"Authorization": f"Bearer {bling_token}", "Content-Type": "application/json"}
+                sucesso, total = 0, len(df)
+                barra = st.progress(0)
+                status = st.empty()
                 for i, (idx, row) in enumerate(df.iterrows()):
-                    requests.put(f"https://bling.com.br{row['ID']}", json={"preco": round(row['Preço Sugerido'], 2)}, headers=h)
-                st.success("Bling Atualizado!")
+                    try:
+                        # Lógica condicional: Se for lista de preço, o endpoint muda
+                        if tipo_atualizacao == "Lista de Preço Específica" and id_lista:
+                            url = f"https://bling.com.br{row['ID']}/listas/{id_lista}"
+                            payload = {"preco": round(row['Preço Sugerido'], 2)}
+                        else:
+                            url = f"https://bling.com.br{row['ID']}"
+                            payload = {"preco": round(row['Preço Sugerido'], 2)}
+                        
+                        res = requests.put(url, json=payload, headers=h)
+                        if res.status_code in [200, 204]: sucesso += 1
+                    except: pass
+                    barra.progress((i + 1) / total)
+                    status.text(f"Sincronizando item {i+1} de {total}...")
+                    time.sleep(0.05)
+                st.success(f"✅ Sincronizado! {sucesso} preços atualizados.")
         else:
             st.info("💡 Sincronismo disponível apenas para importações via Bling.")
