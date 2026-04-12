@@ -13,7 +13,7 @@ from email.mime.multipart import MIMEMultipart
 # 1. CONFIGURAÇÃO DA INTERFACE
 st.set_page_config(page_title="IA Marketplace + Bling Sync", layout="wide", page_icon="🚀")
 
-# --- FUNÇÃO DE LOG E E-MAIL (SUPORTE OCULTO) ---
+# --- FUNÇÃO DE LOG E E-MAIL ---
 def enviar_email_log(n, e, m, tipo="SUPORTE"):
     dest = "contato@vembrincarcomagente.com"
     try:
@@ -21,7 +21,7 @@ def enviar_email_log(n, e, m, tipo="SUPORTE"):
         senha = st.secrets["SENHA_APP"].replace(" ", "")
         msg = MIMEMultipart()
         msg['From'], msg['To'], msg['Subject'] = origem, dest, f"[{tipo}] - Usuário: {n}"
-        msg.attach(MIMEText(f"Contato: {n}\nEmail: {e}\n\nMensagem:\n{m}", 'plain'))
+        msg.attach(MIMEText(f"Contato: {n}\nEmail: {e}\n\nConteúdo:\n{m}", 'plain'))
         s = smtplib.SMTP("://gmail.com", 587, timeout=10)
         s.starttls(); s.login(origem, senha); s.sendmail(origem, dest, msg.as_string()); s.quit()
         return True
@@ -38,7 +38,7 @@ with st.sidebar:
 
     st.divider()
     st.header("🎯 Filtros de Mercado")
-    mkt_options = ["Todos", "Amazon", "Mercado Livre", "Magalu", "Shopee", "RiHappy", "Americanas", "Casas Bahia"]
+    mkt_options = ["Todos", "Amazon", "Mercado Livre", "Magalu", "Shopee", "RiHappy", "Americanas", "Casas Bahia", "Ponto", "Extra"]
     mkt_filter = st.multiselect("Comparar apenas com:", mkt_options, default="Todos")
     
     st.divider()
@@ -58,7 +58,7 @@ with st.sidebar:
         else:
             with st.form("suporte_form", clear_on_submit=True):
                 n, e, m = st.text_input("Nome"), st.text_input("Email"), st.text_area("Mensagem")
-                if st.form_submit_button("Enviar para Suporte"):
+                if st.form_submit_button("Enviar"):
                     if enviar_email_log(n, e, m, "SUPORTE"): st.success("✅ Enviado!")
 
 # --- TÍTULO PRINCIPAL ---
@@ -147,7 +147,7 @@ if not df_base.empty:
                 st.session_state.df_final = df
                 enviar_email_log("Sistema", "Automático", f"Análise concluída: {len(df)} itens.", "LOG_ATIVIDADE")
 
-# --- PASSO 3: RESULTADOS, DOWNLOAD E SYNC (POR ÚLTIMO) ---
+# --- PASSO 3: RESULTADOS, DOWNLOAD E SYNC ---
 if "df_final" in st.session_state:
     df = st.session_state.df_final
     st.divider(); st.subheader("📊 Resultados Estratégicos")
@@ -163,21 +163,21 @@ if "df_final" in st.session_state:
     }).map(lambda x: 'color: red' if isinstance(x, (int, float)) and x < 15 else 'color: green', subset=['Margem %']))
 
     st.divider()
-    # 1. BOTÃO DE DOWNLOAD DO EXCEL
     st.subheader("📥 Exportar Relatório")
     out = io.BytesIO()
     with pd.ExcelWriter(out, engine='xlsxwriter') as wr: df.to_excel(wr, index=False)
-    st.download_button(label="Clique aqui para Baixar os Resultados em Excel", data=out.getvalue(), file_name="analise_mercado.xlsx", use_container_width=True)
+    # BOTÃO REDUZIDO (Tamanho do texto)
+    st.download_button(label="Baixar Resultados em Excel", data=out.getvalue(), file_name="analise_vendas.xlsx")
 
     st.divider()
-    # 2. BLING SYNC (POR ÚLTIMO)
     if fonte == "Bling (API V3)":
-        st.subheader("🔄 Bling Sync Inteligente")
+        st.subheader("🔄 Bling Sync")
         cs1, cs2 = st.columns(2)
-        with cs1: t_up = st.selectbox("Onde atualizar o preço?", ["Preço Padrão (Geral)", "Lista de Preço Específica"])
-        with cs2: id_l = st.text_input("ID da Lista de Preço (Se selecionado):")
+        with cs1: t_up = st.selectbox("Destino da atualização:", ["Preço Padrão (Geral)", "Lista de Preço Específica"])
+        with cs2: id_l = st.text_input("ID da Lista (Se selecionado):")
 
-        if st.button("📤 Aceitar sugestões de preço para o bling e atualizar na plataforma", use_container_width=True):
+        # BOTÃO REDUZIDO (Tamanho do texto)
+        if st.button("Aceitar sugestões de preço para o bling e atualizar na plataforma"):
             h = {"Authorization": f"Bearer {bling_token}", "Content-Type": "application/json"}
             sucesso, total = 0, len(df)
             barra = st.progress(0); status = st.empty()
@@ -187,7 +187,5 @@ if "df_final" in st.session_state:
                     requests.put(u, json={"preco": round(row['Preço Sugerido'], 2)}, headers=h)
                     sucesso += 1
                 except: pass
-                barra.progress((i+1)/total); status.text(f"Sincronizando {i+1}/{total}")
-            st.success(f"✅ Sincronizado: {sucesso} itens atualizados com sucesso no Bling!")
-    else:
-        st.info("💡 A sincronização automática está disponível apenas para produtos importados diretamente via API do Bling.")
+                barra.progress((i+1)/total); status.text(f"Atualizando {i+1}/{total}")
+            st.success(f"✅ Concluído: {sucesso} itens atualizados!")
