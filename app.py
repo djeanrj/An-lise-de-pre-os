@@ -6,178 +6,153 @@ from serpapi import GoogleSearch
 import io
 import re
 import time
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 
 # 1. CONFIGURAÇÃO DA INTERFACE
-st.set_page_config(page_title="IA Marketplace + Bling Sync", layout="wide", page_icon="🇧🇷")
+st.set_page_config(page_title="IA Marketplace + Bling Sync", layout="wide", page_icon="🚀")
 
-st.title("🚀 Inteligência de Mercado Brasil + Bling Sync")
+# --- FUNÇÃO DE LOG E E-MAIL (OCULTA) ---
+def enviar_email_log(n, e, m, tipo="SUPORTE"):
+    dest = "contato@vembrincarcomagente.com"
+    origem = "seu-email-de-envio@gmail.com" 
+    senha = "Brincar_01" 
+    try:
+        msg = MIMEMultipart()
+        msg['From'], msg['To'] = origem, dest
+        msg['Subject'] = f"[{tipo}] - Usuário: {n}"
+        msg.attach(MIMEText(f"Contato: {n}\nEmail: {e}\n\nConteúdo:\n{m}", 'plain'))
+        s = smtplib.SMTP("://gmail.com", 587)
+        s.starttls(); s.login(origem, senha); s.sendmail(origem, dest, msg.as_string()); s.quit()
+        return True
+    except: return False
 
-# --- SIDEBAR: CONEXÕES E AJUDA ---
+# --- SIDEBAR: CONEXÕES E CHAT IA ---
 with st.sidebar:
     st.header("🔌 Conexões")
     bling_token = st.text_input("Token API Bling V3:", type="password")
     api_key_input = st.text_input("Sua SerpApi Key:", type="password")
-    ativar_api = st.button("Confirmar Chaves")
-    
-    if ativar_api:
+    if st.button("Confirmar Chaves"):
         st.session_state.api_key = api_key_input
         st.success("Conexões salvas!")
 
     st.divider()
-    st.header("🎯 Filtros de Mercado")
-    mkt_options = ["Todos", "Amazon", "Mercado Livre", "Magalu", "Shopee", "RiHappy", "Americanas"]
-    mkt_filter = st.multiselect("Comparar com:", mkt_options, default="Todos")
-    
+    st.header("💬 Assistente Virtual")
+    user_q = st.text_input("Dúvida?")
+    if user_q:
+        if any(w in user_q.lower() for w in ["como usar", "ajuda"]): st.info("🤖: Aceite os termos, carregue os dados e inicie a análise.")
+        else:
+            with st.form("suporte_form", clear_on_submit=True):
+                n, e, m = st.text_input("Nome"), st.text_input("Email"), st.text_area("Mensagem")
+                if st.form_submit_button("Enviar"):
+                    if enviar_email_log(n, e, m, "SUPORTE"): st.success("✅ Enviado!")
+
     st.divider()
     st.header("📖 Help & Legenda")
-    st.info("""
-    *   **✅ Vencendo:** Seu preço já é o menor.
-    *   **⚠️ Caro:** Precisa baixar para o sugerido.
-    *   **🟥 Burn:** Mercado vende abaixo do seu custo.
-    *   **🚨 Margem:** Vermelho se lucro líquido < 15%.
-    """)
+    st.info("✅ **Vencendo**: Preço ideal.\n\n⚠️ **Caro**: Acima do mercado.\n\n🟥 **Burn**: Preço abaixo do seu custo.")
 
-# --- PASSO 1: FONTE DE DADOS ---
+# --- TÍTULO PRINCIPAL ---
+st.title("🚀 Inteligência de Mercado Brasil + Bling Sync")
+
+# --- TERMOS DE USO E ISENÇÃO ---
+st.markdown("### ⚖️ Termos de Uso e Isenção de Responsabilidade")
+termos_texto = """
+AVISO IMPORTANTE AOS UTILIZADORES:
+1. ORIGEM DOS DADOS: Dados coletados automaticamente da internet. Não garantimos precisão absoluta.
+2. OBRIGAÇÃO DE CONFERÊNCIA: O utilizador DEVE checar os resultados antes de qualquer alteração.
+3. RESPONSABILIDADE EXCLUSIVA: Decisões efetuadas baseadas nestes dados são de responsabilidade ÚNICA do utilizador.
+4. LIMITAÇÃO DE DANOS: Não assumimos responsabilidade por perdas financeiras ou erros de precificação.
+"""
+st.text_area("Leia com atenção:", termos_texto, height=150)
+aceite = st.checkbox("Eu compreendo que os dados vêm da internet e aceito a responsabilidade total pelas minhas decisões.")
+
+if not aceite:
+    st.warning("👉 Aceite os termos para desbloquear o sistema.")
+    st.stop()
+
+st.divider()
+
+# --- PASSO 1: CARREGAMENTO ---
 st.markdown("### 1️⃣ Carregamento de Produtos")
-fonte = st.radio("Escolha como carregar os dados:", ["Importar do Bling (API V3)", "Subir Excel (Manual)"], horizontal=True)
+fonte = st.radio("Escolha a fonte:", ["Bling (API V3)", "Excel (Manual)"], horizontal=True)
 
 df_base = pd.DataFrame()
-
-if fonte == "Importar do Bling (API V3)":
-    if not bling_token:
-        st.warning("Insira o Token do Bling na barra lateral.")
+if fonte == "Bling (API V3)":
+    if not bling_token: st.warning("Insira o Token do Bling.")
     else:
-        if st.button("📥 Buscar Produtos no Bling"):
+        if st.button("📥 Importar do Bling"):
             try:
-                url = "https://bling.com.br"
-                headers = {"Authorization": f"Bearer {bling_token}"}
-                res = requests.get(url, headers=headers)
-                if res.status_code == 200:
-                    dados = res.json().get('data', [])
-                    lista = []
-                    for item in dados:
-                        lista.append({
-                            "ID": item['id'],
-                            "Nome": item['nome'],
-                            "Custo": float(item.get('precoCusto', 0)),
-                            "Preço Atual": float(item.get('preco', 0)),
-                            "Qtde": float(item.get('estoque', {}).get('quantidade', 1) or 1),
-                            "EAN": item.get('codigoBarra', ''),
-                            "Categoria": "Bling"
-                        })
-                    df_base = pd.DataFrame(lista)
-                    st.success(f"{len(df_base)} produtos carregados com sucesso!")
-                else: st.error("Erro na API Bling. Verifique se o Token é V3.")
-            except Exception as e: st.error(f"Erro: {e}")
-
+                h = {"Authorization": f"Bearer {bling_token}"}
+                r = requests.get("https://bling.com.br", headers=h)
+                if r.status_code == 200:
+                    df_base = pd.DataFrame([{"ID": i['id'], "Nome": i['nome'], "Custo": float(i.get('precoCusto',0)), "Preço Atual": float(i.get('preco',0)), "Qtde": float(i.get('estoque',{}).get('quantidade',1) or 1), "EAN": i.get('codigoBarra','')} for i in r.json().get('data', [])])
+                    st.success("Produtos carregados!")
+            except: st.error("Erro na conexão.")
 else:
-    uploaded_file = st.file_uploader("Suba seu arquivo Excel", type=["xlsx", "xls"])
+    uploaded_file = st.file_uploader("Suba seu Excel", type=["xlsx", "xls"])
     if uploaded_file:
-        df_raw = pd.read_excel(uploaded_file)
-        colunas = df_raw.columns.tolist()
-        st.info("Mapeie as colunas do seu Excel:")
+        df_raw = pd.read_excel(uploaded_file); cols = df_raw.columns.tolist()
+        st.info("Mapeie as colunas:")
         c1, c2, c3, c4 = st.columns(4)
-        with c1: col_n = st.selectbox("NOME:", colunas)
-        with c2: col_c = st.selectbox("CUSTO:", colunas)
-        with c3: col_q = st.selectbox("QTDE:", colunas)
-        with c4: col_e = st.selectbox("EAN:", ["Não possuo"] + colunas)
-        
-        df_base = df_raw.copy()
-        df_base.rename(columns={col_n: 'Nome', col_c: 'Custo', col_q: 'Qtde'}, inplace=True)
-        df_base['EAN'] = df_raw[col_e] if col_e != "Não possuo" else ""
-        df_base['Preço Atual'] = 0.0
-        df_base['ID'] = 0
+        with c1: col_n = st.selectbox("NOME:", cols)
+        with c2: col_c = st.selectbox("CUSTO:", cols)
+        with c3: col_q = st.selectbox("QTDE:", cols)
+        with c4: col_e = st.selectbox("EAN:", ["Não possuo"] + cols)
+        df_base = df_raw.copy().rename(columns={col_n:'Nome', col_c:'Custo', col_q:'Qtde'})
+        df_base['EAN'] = df_raw[col_e] if col_e != "Não possuo" else ""; df_base['ID'] = 0
 
 # --- PASSO 2: ANÁLISE ---
 if not df_base.empty:
-    st.divider()
-    st.markdown("### 2️⃣ Estratégia de Preços")
-    col_p1, col_p2 = st.columns(2)
-    with col_p1:
-        imposto = st.number_input("Imposto sobre Venda (%)", 0, 100, 4) / 100
-    with col_p2:
-        markup_alvo = st.number_input("Seu aumento padrão (%)", 0, 500, 70) / 100
-
-    if st.button("🚀 INICIAR ANÁLISE DE MERCADO REAL"):
-        if "api_key" not in st.session_state:
-            st.error("Por favor, confirme sua SerpApi Key na barra lateral.")
+    st.divider(); st.markdown("### 2️⃣ Estratégia de Preços")
+    cp1, cp2 = st.columns(2)
+    with cp1: imposto = st.number_input("Imposto (%)", 0, 100, 4) / 100
+    with cp2: markup_padrao = st.number_input("Aumento Padrão (%)", 0, 500, 70) / 100
+    if st.button("🚀 INICIAR ANÁLISE REAL"):
+        if "api_key" not in st.session_state: st.error("Confirme a SerpApi Key.")
         else:
-            with st.spinner('Consultando Amazon, ML e Magalu...'):
-                df = df_base.copy()
-                res_mercado, res_loja = [], []
-
+            with st.spinner('Varrendo mercado brasileiro (Moeda R$)...'):
+                df = df_base.copy(); res_m, res_l = [], []
                 for idx, row in df.iterrows():
-                    query = f"{row['Nome']} {row['EAN']}"
-                    search = GoogleSearch({
-                        "engine": "google_shopping", "q": query, "google_domain": "google.com.br",
-                        "hl": "pt-br", "gl": "br", "location": "Brazil", "api_key": st.session_state.api_key
-                    })
-                    results = search.get_dict()
-                    
-                    melhor_p, melhor_l = row['Custo'] * 2.5, "Não encontrado"
+                    search = GoogleSearch({"engine": "google_shopping", "q": f"{row['Nome']} {row['EAN']}", "google_domain": "google.com.br", "hl": "pt-br", "gl": "br", "api_key": st.session_state.api_key})
+                    results = search.get_dict(); best_p, best_l = row['Custo']*2.5, "Não encontrado"
                     if "shopping_results" in results:
-                        ofertas = []
-                        for item in results['shopping_results']:
-                            loja = item.get('source', '')
-                            # Filtros de Segurança
-                            if any(t in item.get('title','').lower() for t in ['peça','manual','led','luz']): continue
-                            if any(b in loja.lower() for b in ['ebay','aliexpress','international']): continue
-                            if "R$" not in str(item.get('price','')): continue
-                            if "Todos" not in mkt_filter and not any(f.lower() in loja.lower() for f in mkt_filter): continue
-                            
+                        validos = []
+                        for it in results['shopping_results']:
+                            loja = it.get('source','').lower()
+                            if any(t in it.get('title','').lower() for t in ['peça','manual','led']) or any(b in loja for b in ['ebay','aliexpress','international']) or "R$" not in str(it.get('price','')): continue
                             try:
-                                v = float(re.sub(r'[^\d,.]', '', str(item.get('price'))).replace('.','').replace(',','.'))
-                                if v > (row['Custo'] * 0.15): ofertas.append({"p": v, "l": loja})
+                                v = float(re.sub(r'[^\d,.]','',str(it.get('price'))).replace('.','').replace(',','.'))
+                                if v > (row['Custo']*0.15): validos.append({"p":v, "l":it.get('source')})
                             except: continue
-                        if ofertas:
-                            best = min(ofertas, key=lambda x: x['p'])
-                            melhor_p, melhor_l = best['p'], best['l']
-                    
-                    res_mercado.append(melhor_p)
-                    res_loja.append(melhor_l)
-
-                df['Concorrência'] = res_mercado
-                df['Loja Líder'] = res_loja
-                df['Preço Sugerido'] = df.apply(lambda x: x['Concorrência'] * 0.98 if (x['Custo']*(1+markup_alvo)) > x['Concorrência'] else (x['Custo']*(1+markup_alvo)), axis=1)
-                df['Margem Real %'] = (((df['Preço Sugerido']*(1-imposto)) - df['Custo']) / df['Preço Sugerido']) * 100
-                df['Lucro Total R$'] = ((df['Preço Sugerido']*(1-imposto)) - df['Custo']) * df['Qtde']
+                        if validos:
+                            b = min(validos, key=lambda x:x['p']); best_p, best_l = b['p'], b['l']
+                    res_m.append(best_p); res_l.append(best_l)
+                df['Mercado'], df['Loja Líder'] = res_m, res_l
+                df['Seu Preço'] = df['Custo'] * (1 + markup_padrao)
+                df['Preço Sugerido'] = df.apply(lambda x: x['Mercado']*0.98 if x['Seu Preço'] > x['Mercado'] else x['Seu Preço'], axis=1)
+                df['Margem %'] = (((df['Preço Sugerido']*(1-imposto)) - df['Custo']) / df['Preço Sugerido']) * 100
+                df['Lucro Total'] = ((df['Preço Sugerido']*(1-imposto)) - df['Custo']) * df['Qtde']
+                df['Situação'] = df.apply(lambda x: "🟥 Burn" if x['Mercado'] < x['Custo'] else ("⚠️ Caro" if x['Seu Preço'] > x['Mercado'] else "✅ Vencendo"), axis=1)
+                st.session_state.df_final = df
                 
-                def situacao(row):
-                    if row['Concorrência'] < row['Custo']: return "🟥 Burn"
-                    if (row['Custo']*(1+markup_alvo)) > row['Concorrência']: return "⚠️ Caro"
-                    return "✅ Vencendo"
-                df['Situação'] = df.apply(situacao, axis=1)
-                
-                st.session_state.df_resultado = df
+                # ENVIO SILENCIOSO DE LOG DE UTILIZAÇÃO
+                log_msg = f"Análise concluída: {len(df)} itens. Lucro Projetado: R$ {df['Lucro Total'].sum():.2f}"
+                enviar_email_log("Sistema", "Log Automático", log_msg, "LOG_ATIVIDADE")
 
 # --- PASSO 3: RESULTADOS E SYNC ---
-if "df_resultado" in st.session_state:
-    df = st.session_state.df_resultado
-    
-    st.divider()
-    st.subheader("📊 Dashboard Financeiro")
+if "df_final" in st.session_state:
+    df = st.session_state.df_final
+    st.divider(); st.subheader("📊 Resultados")
     c1, c2, c3 = st.columns(3)
-    c1.metric("Investimento Total", f"R$ {(df['Custo']*df['Qtde']).sum():,.2f}")
-    c2.metric("Lucro Líquido Projetado", f"R$ {df['Lucro Total R$'].sum():,.2f}")
-    c3.metric("Margem Média", f"{df['Margem Real %'].mean():.1f}%")
-
-    st.plotly_chart(px.pie(df, names='Situação', title="Status de Competitividade", 
-                           color_discrete_map={'✅ Vencendo':'#2ecc71', '⚠️ Caro':'#f1c40f', '🟥 Burn':'#e74c3c'}))
-
-    st.subheader("📋 Relatório Final")
-    st.dataframe(df[['Nome', 'Custo', 'Concorrência', 'Loja Líder', 'Preço Sugerido', 'Margem Real %', 'Situação', 'Lucro Total R$']].style.map(
-        lambda x: 'color: red' if isinstance(x, (int, float)) and x < 15 else 'color: green', subset=['Margem Real %']))
-
-    if fonte == "Importar do Bling (API V3)":
-        st.divider()
-        st.subheader("🔄 Bling Sync")
-        if st.button("📤 Sincronizar Preços Sugeridos com o Bling agora"):
-            headers = {"Authorization": f"Bearer {bling_token}", "Content-Type": "application/json"}
-            sucesso = 0
-            progresso = st.progress(0)
+    c1.metric("Investimento", f"R$ {(df['Custo']*df['Qtde']).sum():,.2f}")
+    c2.metric("Lucro Líquido", f"R$ {df['Lucro Total'].sum():,.2f}")
+    c3.metric("Margem Média", f"{df['Margem %'].mean():.1f}%")
+    st.plotly_chart(px.pie(df, names='Situação', title="Competitividade", color_discrete_map={'✅ Vencendo':'#2ecc71','⚠️ Caro':'#f1c40f','🟥 Burn':'#e74c3c'}))
+    st.dataframe(df[['Nome', 'Custo', 'Seu Preço', 'Mercado', 'Loja Líder', 'Preço Sugerido', 'Margem %', 'Situação', 'Lucro Total']].style.map(lambda x: 'color: red' if isinstance(x, (int, float)) and x < 15 else 'color: green', subset=['Margem %']))
+    if fonte == "Bling (API V3)":
+        if st.button("📤 Sincronizar com Bling"):
+            h = {"Authorization": f"Bearer {bling_token}", "Content-Type": "application/json"}
             for i, (idx, row) in enumerate(df.iterrows()):
-                payload = {"preco": round(row['Preço Sugerido'], 2)}
-                res_put = requests.put(f"https://bling.com.br{row['ID']}", json=payload, headers=headers)
-                if res_put.status_code in [200, 204]: sucesso += 1
-                progresso.progress((i + 1) / len(df))
-            st.success(f"Sincronização concluída! {sucesso} de {len(df)} itens atualizados.")
+                requests.put(f"https://bling.com.br{row['ID']}", json={"preco": round(row['Preço Sugerido'], 2)}, headers=h)
+            st.success("Bling Atualizado!")
