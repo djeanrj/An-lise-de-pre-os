@@ -17,49 +17,49 @@ idiomas = {
     "BR 🇧🇷": {
         "id": "BR", "moeda": "R$", "lang": "pt-BR", "domain": "google.com.br", "gl": "br", "loc": "Brazil",
         "titulo": "🚀 Inteligência de Mercado Brasil + Bling Sync",
-        "label_chave": "SerpApi Key", "help_chave": "Obtenha em SerpApi.com",
+        "label_chave": "SerpApi Key", "help_chave": "Código para pesquisar preços reais no Google Shopping. Obtenha em SerpApi.com.",
         "btn_confirmar": "Confirmar Chave", "msg_ativado": "Sistema Ativado!",
         "bling_token": "Token API Bling V3:",
-        "ajuda_header": "📖 Legenda", "ajuda_corpo": "✅ Vencendo\n⚠️ Caro\n🟥 Burn",
+        "ajuda_header": "📖 Legenda", "ajuda_corpo": "✅ **Vencendo**: Preço ideal.\n\n⚠️ **Caro**: Acima do mercado.\n\n🟥 **Burn**: Concorrência abaixo do custo.",
         "suporte_header": "💬 Suporte", "suporte_label": "Como podemos ajudar?",
-        "termos_header": "### ⚖️ Termos de Uso", "termos_check": "Eu aceito os Termos.",
-        "termos_aviso": "👉 Aceite os termos.",
-        "passo1": "1️⃣ Carregamento", "btn_excel": "Subir Excel", "mapeamento": "Mapeie as colunas:",
-        "passo2": "2️⃣ Análise", "btn_analisar": "🚀 INICIAR ANÁLISE REAL",
+        "termos_header": "### ⚖️ Termos de Uso e Isenção", "termos_check": "Eu aceito os Termos de Uso.",
+        "termos_aviso": "👉 Aceite os termos para prosseguir.",
+        "passo1": "1️⃣ Carregamento", "btn_excel": "Subir arquivo Excel", "mapeamento": "Mapeie as colunas do seu arquivo:",
+        "passo2": "2️⃣ Estratégia", "btn_analisar": "🚀 INICIAR ANÁLISE REAL",
         "invest": "Investimento", "lucro": "Lucro Projetado", "margem": "Margem Média",
         "download_btn": "Baixar Excel", "sinc_btn": "Aceitar sugestões de preço para o bling"
     },
     "PT 🇵🇹": {
         "id": "PT", "moeda": "€", "lang": "pt-PT", "domain": "google.pt", "gl": "pt", "loc": "Portugal",
         "titulo": "🚀 Inteligência de Mercado Portugal & UE",
-        "label_chave": "Chave SerpApi", "help_chave": "Obtenha em SerpApi.com",
+        "label_chave": "Chave SerpApi", "help_chave": "Código para pesquisar preços reais no Google Shopping. Obtenha em SerpApi.com.",
         "btn_confirmar": "Confirmar Chave", "msg_ativado": "Sistema Ativado!",
-        "ajuda_header": "📖 Legenda", "ajuda_corpo": "✅ A Vencer\n⚠️ Caro\n🟥 Crítico",
+        "ajuda_header": "📖 Legenda", "ajuda_corpo": "✅ **A Vencer**: O seu preço é o mais baixo.\n\n⚠️ **Caro**: Acima do mercado.\n\n🟥 **Crítico**: Preços abaixo do custo.",
         "suporte_header": "💬 Suporte", "suporte_label": "Como podemos ajudar?",
-        "termos_header": "### ⚖️ Termos de Utilização", "termos_check": "Aceito os Termos.",
-        "termos_aviso": "👉 Aceite os termos.",
-        "passo1": "1️⃣ Carregamento", "btn_excel": "Carregar Excel", "mapeamento": "Identifique as colunas:",
-        "passo2": "2️⃣ Análise", "btn_analisar": "🚀 INICIAR ANÁLISE DE MERCADO",
+        "termos_header": "### ⚖️ Termos de Utilização", "termos_check": "Aceito os Termos de Utilização.",
+        "termos_aviso": "👉 Aceite os termos para prosseguir.",
+        "passo1": "1️⃣ Carregamento", "btn_excel": "Carregar ficheiro Excel", "mapeamento": "Identifique as colunas do seu ficheiro:",
+        "passo2": "2️⃣ Estratégia", "btn_analisar": "🚀 INICIAR ANÁLISE DE MERCADO",
         "invest": "Investimento", "lucro": "Lucro Projetado", "margem": "Margem Média",
         "download_btn": "Descarregar Excel"
     },
     "US 🇺🇸": {
         "id": "US", "moeda": "$", "lang": "en", "domain": "google.com", "gl": "us", "loc": "United States",
         "titulo": "🚀 USA Marketplace Intelligence",
-        "label_chave": "SerpApi Key", "help_chave": "Get it at SerpApi.com",
+        "label_chave": "SerpApi Key", "help_chave": "Code for real-time prices. Get it at SerpApi.com.",
         "btn_confirmar": "Confirm Key", "msg_ativado": "System Activated!",
-        "ajuda_header": "📖 Legend", "ajuda_corpo": "✅ Winning\n⚠️ Expensive\n🟥 Alert",
+        "ajuda_header": "📖 Legend", "ajuda_corpo": "✅ **Winning**: Best price.\n\n⚠️ **Expensive**: Above market.\n\n🟥 **Alert**: Market below cost.",
         "suporte_header": "💬 Support", "suporte_label": "How can we help?",
-        "termos_header": "### ⚖️ Terms of Use", "termos_check": "I accept terms.",
-        "termos_aviso": "👉 Please accept terms.",
-        "passo1": "1️⃣ Upload", "btn_excel": "Upload Excel", "mapeamento": "Map columns:",
-        "passo2": "2️⃣ Analysis", "btn_analisar": "🚀 START MARKET ANALYSIS",
+        "termos_header": "### ⚖️ Terms of Use", "termos_check": "I accept the Terms.",
+        "termos_aviso": "👉 Please accept terms to unlock.",
+        "passo1": "1️⃣ Upload", "btn_excel": "Upload Excel file", "mapeamento": "Map your file columns:",
+        "passo2": "2️⃣ Strategy", "btn_analisar": "🚀 START MARKET ANALYSIS",
         "invest": "Investment", "lucro": "Profit", "margem": "Avg Margin",
         "download_btn": "Download Excel"
     }
 }
 
-# --- DETECÇÃO REAL DE PAÍS POR IP ---
+# --- DETECÇÃO REAL DE PAÍS POR IP (Lisboa = PT) ---
 @st.cache_data(ttl=3600)
 def detectar_pais():
     try:
@@ -87,13 +87,10 @@ def enviar_email_log(n, e, m, tipo="SUPORTE"):
 
 # --- SIDEBAR ---
 with st.sidebar:
-    st.header("🌎 Market Selection")
-    
+    st.header("🌎 Market / Mercado")
     pais_padrao = detectar_pais()
-    opcoes = sorted(list(idiomas.keys())) # Ordem: BR 🇧🇷, PT 🇵🇹, US 🇺🇸
-    
-    # SELETOR COM BANDEIRAS VISÍVEIS
-    pais_sel = st.selectbox("Select Country / Selecione:", opcoes, index=opcoes.index(pais_padrao))
+    opcoes = sorted(list(idiomas.keys()))
+    pais_sel = st.selectbox("Select:", opcoes, index=opcoes.index(pais_padrao))
     t = idiomas[pais_sel]
     
     st.divider()
@@ -116,7 +113,7 @@ with st.sidebar:
     if user_q:
         with st.form("suporte_form", clear_on_submit=True):
             n, e, m = st.text_input("Name/Nome"), st.text_input("Email"), st.text_area("Msg", value=user_q)
-            if st.form_submit_button("Send/Enviar"):
+            if st.form_submit_button("Enviar"):
                 if enviar_email_log(n, e, m, "SUPORTE"): st.success("✅")
 
 # --- CORPO PRINCIPAL ---
@@ -147,7 +144,9 @@ if "BR" in pais_sel:
     else:
         uploaded_file = st.file_uploader(t["btn_excel"], type=["xlsx", "xls"])
         if uploaded_file:
-            df_raw = pd.read_excel(uploaded_file); cols = df_raw.columns.tolist()
+            df_raw = pd.read_excel(uploaded_file)
+            cols = df_raw.columns.tolist()
+            st.write(t["mapeamento"])
             c1, c2, c3, c4, c5 = st.columns(5)
             with c1: col_n = st.selectbox("NOME:", cols)
             with c2: col_c = st.selectbox("CUSTO:", cols)
@@ -159,13 +158,28 @@ if "BR" in pais_sel:
 else:
     uploaded_file = st.file_uploader(t["btn_excel"], type=["xlsx", "xls"])
     if uploaded_file:
-        df_raw = pd.read_excel(uploaded_file); cols = df_raw.columns.tolist()
+        df_raw = pd.read_excel(uploaded_file)
+        cols = df_raw.columns.tolist()
+        st.write(t["mapeamento"])
+        # CORREÇÃO DO ERRO DE SINTAXE (Linhas separadas)
         c1, c2, c3, c4, c5 = st.columns(5)
-        with c1: col_n = st.selectbox("NAME:", cols); with c2: col_c = st.selectbox("COST:", cols); with c3: col_q = st.selectbox("QTY:", cols); with c4: col_l = st.selectbox("LINE:", ["None"] + cols); with c5: col_e = st.selectbox("EAN:", ["N/A"] + cols)
+        with c1:
+            col_n = st.selectbox("NAME:", cols)
+        with c2:
+            col_c = st.selectbox("COST:", cols)
+        with c3:
+            col_q = st.selectbox("QTY:", cols)
+        with c4:
+            col_l = st.selectbox("LINE:", ["None"] + cols)
+        with c5:
+            col_e = st.selectbox("EAN:", ["N/A"] + cols)
+            
         df_base = df_raw.copy().rename(columns={col_n:'Nome', col_c:'Custo', col_q:'Qtde'})
-        df_base['EAN'] = df_raw[col_e] if col_e != "N/A" else ""; df_base['Linha'] = df_raw[col_l] if col_l != "None" else "General"; df_base['ID'] = 0
+        df_base['EAN'] = df_raw[col_e] if col_e != "N/A" else ""
+        df_base['Linha'] = df_raw[col_l] if col_l != "None" else "General"
+        df_base['ID'] = 0
 
-# --- ANÁLISE ---
+# --- PASSO 2: ANÁLISE ---
 if not df_base.empty:
     st.divider(); st.markdown(f"### {t['passo2']}")
     cp1, cp2 = st.columns(2)
