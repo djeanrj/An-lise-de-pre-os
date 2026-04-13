@@ -10,99 +10,77 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
 # 1. CONFIGURAÇÃO DA INTERFACE
-st.set_page_config(page_title="IA Marketplace Global", layout="wide", page_icon="🌎")
+st.set_page_config(page_title="Global Marketplace Intelligence", layout="wide", page_icon="🌎")
 
-# --- DICIONÁRIO DE TRADUÇÃO ORIENTADO PELOS SÍMBOLOS DAS BANDEIRAS ---
+# --- DICIONÁRIO DE TRADUÇÃO TOTALMENTE ISOLADO ---
 idiomas = {
-    "🇵🇹": {
-        "sigla": "PT",
+    "PT": {
+        "flag": "🇵🇹", "sigla": "PT", "moeda": "€", "lang": "pt-PT", "domain": "google.pt", "gl": "pt", "loc": "Portugal",
         "titulo": "🚀 Inteligência de Mercado Portugal & UE",
-        "label_chave": "Chave SerpApi",
-        "help_chave": "Código para pesquisar preços reais no Google. Obtenha em SerpApi.com.",
-        "btn_confirmar": "Confirmar Chave",
-        "msg_ativado": "Sistema Ativado!",
-        "ajuda_header": "📖 Legenda",
-        "ajuda_corpo": "✅ **A Vencer**: Preço ideal.\n\n⚠️ **Caro**: Acima do mercado.\n\n🟥 **Crítico**: Abaixo do custo.",
-        "suporte_header": "💬 Suporte",
-        "suporte_label": "Como podemos ajudar?",
+        "label_chave": "Chave SerpApi", "help_chave": "Código para pesquisar preços reais. Obtenha em SerpApi.com.",
+        "btn_confirmar": "Confirmar Chave", "msg_ativado": "Sistema Ativado!",
+        "ajuda_header": "📖 Legenda", "ajuda_corpo": "✅ **A Vencer**: Preço ideal.\n\n⚠️ **Caro**: Acima do mercado.\n\n🟥 **Crítico**: Abaixo do custo.",
+        "suporte_header": "💬 Suporte", "suporte_label": "Como podemos ajudar?",
         "termos_header": "### ⚖️ Termos de Utilização",
-        "termos_check": "Aceito os Termos de Utilização.",
-        "termos_aviso": "👉 Aceite os termos para continuar.",
-        "passo1": "1️⃣ Carregamento de Produtos",
-        "btn_excel": "Carregar Ficheiro Excel",
+        "termos_corpo": "A folha deve conter: **Nome, Custo e Quantidade**.",
+        "termos_check": "Aceito os Termos de Utilização e a responsabilidade total pelas minhas decisões.",
+        "passo1": "1️⃣ Carregamento de Produtos", "btn_excel": "Carregar Ficheiro Excel",
         "mapeamento": "Identifique as colunas do seu ficheiro:",
-        "passo2": "2️⃣ Estratégia e Análise",
-        "label_imposto": "IVA (%)",
-        "label_markup": "Margem de Aumento (%)",
+        "passo2": "2️⃣ Estratégia e Análise", "label_imposto": "IVA (%)", "label_markup": "Margem de Aumento (%)",
         "btn_analisar": "🚀 INICIAR ANÁLISE DE MERCADO",
         "invest": "Investimento", "lucro": "Lucro Projetado", "margem": "Margem Média",
-        "download_btn": "Descarregar Excel",
-        "moeda": "€", "lang": "pt-PT", "domain": "google.pt", "gl": "pt", "loc": "Portugal"
+        "download_btn": "Descarregar Excel"
     },
-    "🇧🇷": {
-        "sigla": "BR",
+    "BR": {
+        "flag": "🇧🇷", "sigla": "BR", "moeda": "R$", "lang": "pt-BR", "domain": "google.com.br", "gl": "br", "loc": "Brazil",
         "titulo": "🚀 Inteligência de Mercado Brasil + Bling Sync",
-        "label_chave": "SerpApi Key",
-        "help_chave": "Código para pesquisar preços reais no Google. Obtenha em SerpApi.com.",
-        "btn_confirmar": "Confirmar Chave",
-        "msg_ativado": "Sistema Ativado!",
+        "label_chave": "SerpApi Key", "help_chave": "Código para pesquisar preços reais. Obtenha em SerpApi.com.",
+        "btn_confirmar": "Confirmar Chave", "msg_ativado": "Sistema Ativado!",
         "bling_token": "Token API Bling V3:",
-        "ajuda_header": "📖 Legenda",
-        "ajuda_corpo": "✅ **Vencendo**: Preço ideal.\n\n⚠️ **Caro**: Acima do mercado.\n\n🟥 **Burn**: Abaixo do custo.",
-        "suporte_header": "💬 Suporte",
-        "suporte_label": "Como podemos ajudar?",
+        "ajuda_header": "📖 Legenda", "ajuda_corpo": "✅ **Vencendo**: Preço ideal.\n\n⚠️ **Caro**: Acima do mercado.\n\n🟥 **Burn**: Abaixo do custo.",
+        "suporte_header": "💬 Suporte", "suporte_label": "Como podemos ajudar?",
         "termos_header": "### ⚖️ Termos de Uso",
-        "termos_check": "Eu aceito os Termos de Uso.",
-        "termos_aviso": "👉 Aceite os termos para prosseguir.",
-        "passo1": "1️⃣ Carregamento de Produtos",
-        "btn_excel": "Subir Arquivo Excel",
+        "termos_corpo": "A planilha deve conter: **Nome, Custo e Quantidade**.",
+        "termos_check": "Eu aceito os Termos de Uso e a responsabilidade total pelas minhas decisões.",
+        "passo1": "1️⃣ Carregamento de Produtos", "btn_excel": "Subir Arquivo Excel",
         "mapeamento": "Mapeie as colunas do seu arquivo:",
-        "passo2": "2️⃣ Estratégia e Análise",
-        "label_imposto": "Imposto (%)",
-        "label_markup": "Aumento Padrão (%)",
+        "passo2": "2️⃣ Estratégia e Análise", "label_imposto": "Imposto (%)", "label_markup": "Aumento Padrão (%)",
         "btn_analisar": "🚀 INICIAR ANÁLISE REAL",
         "invest": "Investimento", "lucro": "Lucro Projetado", "margem": "Margem Média",
         "download_btn": "Baixar Excel",
-        "sinc_btn": "Aceitar sugestões de preço para o bling e atualizar na plataforma",
-        "moeda": "R$", "lang": "pt-BR", "domain": "google.com.br", "gl": "br", "loc": "Brazil"
+        "sinc_btn": "Aceitar sugestões de preço para o bling"
     },
-    "🇺🇸": {
-        "sigla": "US",
+    "USA": {
+        "flag": "🇺🇸", "sigla": "US", "moeda": "$", "lang": "en", "domain": "google.com", "gl": "us", "loc": "United States",
         "titulo": "🚀 USA Marketplace Intelligence",
-        "label_chave": "SerpApi Key",
-        "help_chave": "Code for real-time prices. Get it at SerpApi.com.",
-        "btn_confirmar": "Confirm Key",
-        "msg_ativado": "System Activated!",
-        "ajuda_header": "📖 Legend",
-        "ajuda_corpo": "✅ **Winning**: Best price.\n\n⚠️ **Expensive**: Above market.\n\n🟥 **Alert**: Below cost.",
-        "suporte_header": "💬 Support",
-        "suporte_label": "How can we help?",
+        "label_chave": "SerpApi Key", "help_chave": "Get it at SerpApi.com.",
+        "btn_confirmar": "Confirm Key", "msg_ativado": "System Activated!",
+        "ajuda_header": "📖 Legend", "ajuda_corpo": "✅ **Winning**: Best price.\n\n⚠️ **Expensive**: Above market.\n\n🟥 **Alert**: Below cost.",
+        "suporte_header": "💬 Support", "suporte_label": "How can we help?",
         "termos_header": "### ⚖️ Terms of Use",
-        "termos_check": "I accept the Terms.",
-        "termos_aviso": "👉 Accept terms to unlock.",
-        "passo1": "1️⃣ Data Upload",
-        "btn_excel": "Upload Excel file",
+        "termos_corpo": "Sheet required: **Name, Cost, and Quantity**.",
+        "termos_check": "I accept the Terms and take full responsibility.",
+        "passo1": "1️⃣ Data Upload", "btn_excel": "Upload Excel file",
         "mapeamento": "Map your columns:",
-        "passo2": "2️⃣ Strategy & Analysis",
-        "label_imposto": "Tax (%)",
-        "label_markup": "Markup (%)",
+        "passo2": "2️⃣ Strategy & Analysis", "label_imposto": "Tax (%)", "label_markup": "Markup (%)",
         "btn_analisar": "🚀 START MARKET ANALYSIS",
         "invest": "Investment", "lucro": "Projected Profit", "margem": "Avg Margin",
-        "download_btn": "Download Excel",
-        "moeda": "$", "lang": "en", "domain": "google.com", "gl": "us", "loc": "United States"
+        "download_btn": "Download Excel"
     }
 }
 
-# --- DETECÇÃO FÍSICA POR IP (LISBOA = 🇵🇹) ---
-if "bandeira_ativa" not in st.session_state:
+# --- INICIALIZAÇÃO DE MEMÓRIA (SESSION STATE) ---
+if "pais_key" not in st.session_state:
     try:
+        # Detecção Fìsica (Lisboa detectada aqui)
         res = requests.get("https://ipapi.co", timeout=3).json()
         cc = res.get("country_code", "BR")
-        # Mapeia sigla do IP para o símbolo da bandeira
-        mapeamento_ip = {"PT": "🇵🇹", "BR": "🇧🇷", "US": "🇺🇸"}
-        st.session_state.bandeira_ativa = mapeamento_ip.get(cc, "🇧🇷")
+        st.session_state.pais_key = "PT" if cc == "PT" else ("USA" if cc == "US" else "BR")
     except:
-        st.session_state.bandeira_ativa = "🇧🇷"
+        st.session_state.pais_key = "BR"
+
+if "aceitou_termos" not in st.session_state:
+    st.session_state.aceitou_termos = False
 
 # --- FUNÇÃO DE E-MAIL ---
 def enviar_email_log(n, e, m, tipo="SUPORTE"):
@@ -112,25 +90,25 @@ def enviar_email_log(n, e, m, tipo="SUPORTE"):
         senha = st.secrets["SENHA_APP"].replace(" ", "")
         msg = MIMEMultipart()
         msg['From'], msg['To'], msg['Subject'] = origem, dest, f"[{tipo}] - {n}"
-        msg.attach(MIMEText(f"Nome: {n}\nEmail: {e}\n\nMsg: {m}", 'plain'))
+        msg.attach(MIMEText(f"Contato: {n}\nEmail: {e}\n\nMsg: {m}", 'plain'))
         s = smtplib.SMTP("://gmail.com", 587, timeout=10)
         s.starttls(); s.login(origem, senha); s.sendmail(origem, dest, msg.as_string()); s.quit()
         return True
     except: return False
 
-# --- SIDEBAR: SELETOR DE BANDEIRAS ---
+# --- SIDEBAR: SELETOR DE MERCADO ---
 with st.sidebar:
-    st.header("🌎 Market Selection")
+    st.header("🌎 Market / Mercado")
     
-    # O seletor agora exibe apenas os símbolos das bandeiras
-    opcoes_bandeiras = list(idiomas.keys())
-    escolha = st.selectbox(
-        "Select Country / País:",
-        options=opcoes_bandeiras,
-        index=opcoes_bandeiras.index(st.session_state.bandeira_ativa)
+    # Criamos o seletor com as bandeiras visíveis forçadas
+    escolha_pais = st.radio(
+        "Selecione o Mercado:",
+        options=["BR", "PT", "USA"],
+        index=["BR", "PT", "USA"].index(st.session_state.pais_key),
+        format_func=lambda x: f"{idiomas[x]['flag']} {x}"
     )
-    st.session_state.bandeira_ativa = escolha
-    t = idiomas[st.session_state.bandeira_ativa]
+    st.session_state.pais_key = escolha_pais
+    t = idiomas[st.session_state.pais_key]
     
     st.divider()
     st.header("🔑 Activation")
@@ -139,7 +117,7 @@ with st.sidebar:
         st.session_state.api_key = api_key_input
         st.success(t["msg_ativado"])
 
-    if st.session_state.bandeira_ativa == "🇵🇹":
+    if st.session_state.pais_key == "PT":
         st.divider()
         scope_pt = st.radio("Âmbito:", ["Apenas Portugal", "Toda a União Europeia"])
     
@@ -158,19 +136,24 @@ with st.sidebar:
 
 # --- CORPO PRINCIPAL ---
 st.title(t["titulo"])
-st.markdown(t["termos_header"])
-aceite = st.checkbox(t["termos_check"])
 
-if not aceite:
-    st.warning(t["termos_aviso"])
+# TRAVA DE TERMOS COM MEMÓRIA
+st.markdown(t["termos_header"])
+if not st.session_state.aceitou_termos:
+    st.info(t["termos_corpo"])
+    if st.checkbox(t["termos_check"]):
+        st.session_state.aceitou_termos = True
+        st.rerun()
     st.stop()
 
+st.success("🔒 Access Authorized / Acesso Autorizado")
 st.divider()
+
 # --- PASSO 1: CARREGAMENTO ---
 st.markdown(f"### {t['passo1']}")
 df_base = pd.DataFrame()
 
-if st.session_state.bandeira_ativa == "🇧🇷":
+if st.session_state.pais_key == "BR":
     fonte = st.radio("Fonte:", ["Bling (API V3)", "Excel (Manual)"], horizontal=True)
     if fonte == "Bling (API V3)":
         bling_token = st.text_input("Bling Token:", type="password")
@@ -185,8 +168,7 @@ if st.session_state.bandeira_ativa == "🇧🇷":
     else:
         uploaded_file = st.file_uploader(t["btn_excel"], type=["xlsx", "xls"])
         if uploaded_file:
-            df_raw = pd.read_excel(uploaded_file)
-            cols = df_raw.columns.tolist()
+            df_raw = pd.read_excel(uploaded_file); cols = df_raw.columns.tolist()
             st.write(t["mapeamento"])
             c1, c2, c3, c4, c5 = st.columns(5)
             with c1: col_n = st.selectbox("NOME:", cols)
@@ -199,8 +181,7 @@ if st.session_state.bandeira_ativa == "🇧🇷":
 else:
     uploaded_file = st.file_uploader(t["btn_excel"], type=["xlsx", "xls"])
     if uploaded_file:
-        df_raw = pd.read_excel(uploaded_file)
-        cols = df_raw.columns.tolist()
+        df_raw = pd.read_excel(uploaded_file); cols = df_raw.columns.tolist()
         st.write(t["mapeamento"])
         c1, c2, c3, c4, c5 = st.columns(5)
         with c1: col_n = st.selectbox("NAME:", cols)
@@ -211,7 +192,7 @@ else:
         df_base = df_raw.copy().rename(columns={col_n:'Nome', col_c:'Custo', col_q:'Qtde'})
         df_base['EAN'] = df_raw[col_e] if col_e != "N/A" else ""; df_base['Linha'] = df_raw[col_l] if col_l != "None" else "General"; df_base['ID'] = 0
 
-# --- ANÁLISE ---
+# --- PASSO 2: ANÁLISE ---
 if not df_base.empty:
     st.divider(); st.markdown(f"### {t['passo2']}")
     cp1, cp2 = st.columns(2)
@@ -223,7 +204,7 @@ if not df_base.empty:
             with st.spinner('...'):
                 df = df_base.copy(); res_m, res_l = [], []
                 loc_f = t["loc"]
-                if st.session_state.bandeira_ativa == "🇵🇹" and scope_pt == "Toda a União Europeia": loc_f = "Western Europe"
+                if st.session_state.pais_key == "PT" and scope_pt == "Toda a União Europeia": loc_f = "Western Europe"
                 for idx, row in df.iterrows():
                     search = GoogleSearch({"engine": "google_shopping", "q": f"{row['Nome']} {row['EAN']}", "google_domain": t["domain"], "hl": t["lang"][:2], "gl": t["gl"], "location": loc_f, "api_key": st.session_state.api_key})
                     results = search.get_dict(); best_p, best_l = round(row['Custo']*2.5, 2), "N/A"
@@ -260,7 +241,7 @@ if "df_final" in st.session_state:
     with pd.ExcelWriter(out, engine='xlsxwriter') as wr: df.to_excel(wr, index=False)
     st.download_button(label=t["download_btn"], data=out.getvalue(), file_name="analysis.xlsx")
 
-    if st.session_state.bandeira_ativa == "🇧🇷" and fonte == "Bling (API V3)":
+    if st.session_state.pais_key == "BR" and fonte == "Bling (API V3)":
         if st.button(t["sinc_btn"]):
             h = {"Authorization": f"Bearer {bling_token}", "Content-Type": "application/json"}
             for i, (idx, row) in enumerate(df.iterrows()):
