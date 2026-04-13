@@ -1,5 +1,6 @@
 import streamlit as st
 import pandas as pd
+import plotly.express as px
 import requests
 from serpapi import GoogleSearch
 import io
@@ -10,7 +11,7 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
 # 1. CONFIGURAÇÃO DA INTERFACE
-st.set_page_config(page_title="IA Marketplace Global", layout="wide", page_icon="🌎")
+st.set_page_config(page_title="Global Price Intelligence", layout="wide", page_icon="🌎")
 
 # --- DICIONÁRIO DE TRADUÇÃO TOTALMENTE ISOLADO ---
 idiomas = {
@@ -21,8 +22,7 @@ idiomas = {
         "btn_confirmar": "Confirmar Chave", "msg_ativado": "Sistema Ativado!",
         "aviso_chave": "⚠️ Por favor, confirme sua SerpApi Key na barra lateral antes de prosseguir.",
         "bling_token": "Token API Bling V3",
-        "ajuda_header": "Legenda", "ajuda_corpo": "✅ Vencendo\n⚠️ Caro\n🟥 Burn",
-        "suporte_header": "Suporte", "suporte_label": "Como podemos ajudar?",
+        "ajuda_header": "Legenda de Situação", "ajuda_corpo": "✅ Vencendo\n⚠️ Caro\n🟥 Burn",
         "termos_header": "Termos de Uso e Isenção",
         "termos_corpo": "A planilha deve conter: Nome, Custo e Quantidade. O uso de dados da internet exige conferência obrigatória.",
         "termos_check": "Eu aceito os Termos de Uso do Brasil.",
@@ -32,6 +32,7 @@ idiomas = {
         "invest": "Investimento em Estoque", 
         "lucro": "Lucro Total Projetado", 
         "margem": "Margem s/ Sugerido",
+        "grafico_titulo": "Status de Competitividade",
         "help_margem": "Cálculo baseado no Preço Sugerido após impostos e custos sobre o estoque total.",
         "download_btn": "Baixar Excel", "sinc_btn": "Aceitar sugestões de preço para o bling"
     },
@@ -41,8 +42,7 @@ idiomas = {
         "label_chave": "Chave SerpApi", "help_chave": "Código de pesquisa real obtido em SerpApi.com.",
         "btn_confirmar": "Confirmar Chave", "msg_ativado": "Sistema Ativado!",
         "aviso_chave": "⚠️ Por favor, confirme a sua Chave SerpApi na barra lateral antes de continuar.",
-        "ajuda_header": "Legenda", "ajuda_corpo": "✅ A Vencer\n⚠️ Caro\n🟥 Crítico",
-        "suporte_header": "Suporte", "suporte_label": "Como podemos ajudar?",
+        "ajuda_header": "Legenda de Situação", "ajuda_corpo": "✅ A Vencer\n⚠️ Caro\n🟥 Crítico",
         "termos_header": "Termos de Utilização",
         "termos_corpo": "A folha deve conter: Nome, Custo e Quantidade. A conferência dos dados é da responsabilidade do utilizador.",
         "termos_check": "Aceito os Termos de Utilização de Portugal.",
@@ -52,6 +52,7 @@ idiomas = {
         "invest": "Investimento em Stock", 
         "lucro": "Lucro Total Projetado", 
         "margem": "Margem s/ Sugerido",
+        "grafico_titulo": "Estado da Competitividade",
         "help_margem": "Cálculo baseado no Preço Sugerido deduzido de IVA e custos sobre o stock total.",
         "download_btn": "Descarregar Excel"
     },
@@ -62,7 +63,6 @@ idiomas = {
         "btn_confirmar": "Confirm Key", "msg_ativado": "Activated!",
         "aviso_chave": "⚠️ Please confirm your SerpApi Key in the sidebar before proceeding.",
         "ajuda_header": "Legend", "ajuda_corpo": "✅ Winning\n⚠️ Expensive\n🟥 Alert",
-        "suporte_header": "Support", "suporte_label": "How can we help?",
         "termos_header": "Terms of Use",
         "termos_corpo": "Sheet required: Name, Cost, and Quantity. Internet data must be validated by the user.",
         "termos_check": "I accept the USA Terms of Use.",
@@ -72,6 +72,7 @@ idiomas = {
         "invest": "Total Inventory Investment", 
         "lucro": "Projected Total Profit", 
         "margem": "Margin s/ Suggested",
+        "grafico_titulo": "Competitiveness Status",
         "help_margem": "Based on Suggested Price after taxes and costs over total inventory.",
         "download_btn": "Download Excel"
     }
@@ -103,8 +104,6 @@ with st.sidebar:
 
 # --- CORPO PRINCIPAL ---
 st.title(t["titulo"])
-
-# CORREÇÃO: Removidas as hashtags manuais, usando st.subheader nativo
 st.subheader(t["termos_header"])
 st.info(t["termos_corpo"])
 
@@ -165,17 +164,12 @@ if aceite_atual:
             with cp1: imposto = st.number_input("% Tax", 0, 100, 4) / 100
             with cp2: markup_padrao = st.number_input("% Markup", 0, 500, 70) / 100
             if st.button(t["btn_analisar"]):
-                with st.spinner('Filtrando lojistas internacionais e validando fiscalmente...'):
+                with st.spinner('Analisando...'):
                     df = df_base.copy(); res_m, res_l = [], []
                     loc_f = t["loc"]
                     if pais_sel == "Portugal" and scope_pt == "União Europeia": loc_f = "Western Europe"
                     
-                    # BLACKLIST RIGOROSA CONTRA VENDILOSHOP, KIDINN, ETC.
-                    blacklist = [
-                        'kidiin', 'kidinn', 'tradeinn', 'fruugo', 'desertcart', 'ubuy', 
-                        'tiendamia', 'fishpond', 'grandado', 'vendiloshop', 'vendiilo', 
-                        'temu', 'aliexpress', 'ebay', 'china', 'duty free'
-                    ]
+                    blacklist = ['kidiin', 'kidinn', 'tradeinn', 'fruugo', 'desertcart', 'ubuy', 'vendiloshop', 'vendiilo', 'grandado']
 
                     for idx, row in df.iterrows():
                         search = GoogleSearch({"engine": "google_shopping", "q": f"{row['Nome']} {row['EAN']}", "google_domain": t["domain"], "hl": t["lang"][:2], "gl": t["gl"], "location": loc_f, "api_key": st.session_state.api_key})
@@ -203,21 +197,29 @@ if aceite_atual:
                     df['Preço Sugerido'] = df.apply(lambda x: round(x['Mercado']*0.98, 2) if x['Seu Preço'] > x['Mercado'] else x['Seu Preço'], axis=1)
                     df['Margem %'] = round((((df['Preço Sugerido']*(1-imposto)) - df['Custo']) / df['Preço Sugerido']) * 100, 2)
                     df['Lucro Total'] = round(((df['Preço Sugerido']*(1-imposto)) - df['Custo']) * df['Qtde'], 2)
+                    # Coluna de Situação para o Gráfico
                     df['Situação'] = df.apply(lambda x: "🟥" if x['Mercado'] < x['Custo'] else ("⚠️" if x['Seu Preço'] > x['Mercado'] else "✅"), axis=1)
                     st.session_state.df_final = df
 
         if "df_final" in st.session_state:
             df = st.session_state.df_final
-            st.divider(); st.subheader("Resultados Estratégicos")
+            st.divider(); st.subheader("Resumo Estratégico")
+            
+            # --- MÉTRICAS ---
             c1, c2, c3 = st.columns(3)
-            
-            # CÁLCULO DE INVESTIMENTO REAL (Custo x Qtde)
             investimento_estoque = (df['Custo'] * df['Qtde']).sum()
-            
             c1.metric(t["invest"], f"{t['moeda']} {investimento_estoque:,.2f}")
             c2.metric(t["lucro"], f"{t['moeda']} {df['Lucro Total'].sum():,.2f}", help=t["help_margem"])
             c3.metric(t["margem"], f"{df['Margem %'].mean():.2f}%", help=t["help_margem"])
             
+            # --- RESTAURAÇÃO DOS GRÁFICOS ---
+            st.write("")
+            fig = px.pie(df, names='Situação', title=t["grafico_titulo"], 
+                         color='Situação', 
+                         color_discrete_map={'✅':'#2ecc71', '⚠️':'#f1c40f', '🟥':'#e74c3c'})
+            st.plotly_chart(fig, use_container_width=True)
+            
+            # --- TABELA ---
             st.dataframe(df[['Nome', 'Linha', 'Qtde', 'Custo', 'Seu Preço', 'Mercado', 'Loja Líder', 'Preço Sugerido', 'Margem %', 'Situação', 'Lucro Total']].style.format({'Custo': '{:.2f}', 'Seu Preço': '{:.2f}', 'Mercado': '{:.2f}', 'Preço Sugerido': '{:.2f}', 'Margem %': '{:.2f}', 'Lucro Total': '{:.2f}'}))
             
             st.divider()
