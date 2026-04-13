@@ -14,63 +14,60 @@ st.set_page_config(page_title="IA Marketplace Global", layout="wide", page_icon=
 
 # --- DICIONÁRIO DE TRADUÇÃO TOTALMENTE ISOLADO ---
 idiomas = {
-    "Brasil 🇧🇷": {
-        "id": "BR", "moeda": "R$", "lang": "pt-BR", "domain": "google.com.br", "gl": "br", "loc": "Brazil",
-        "titulo": "🚀 Inteligência de Mercado Brasil + Bling Sync",
-        "label_chave": "SerpApi Key", "help_chave": "Código para pesquisar preços reais. Obtenha em SerpApi.com.",
+    "Brasil": {
+        "moeda": "R$", "lang": "pt-BR", "domain": "google.com.br", "gl": "br", "loc": "Brazil",
+        "titulo": "Inteligência de Mercado Brasil + Bling Sync",
+        "label_chave": "SerpApi Key", "help_chave": "Código de pesquisa real obtido em SerpApi.com.",
         "btn_confirmar": "Confirmar Chave", "msg_ativado": "Sistema Ativado!",
-        "bling_token": "Token API Bling V3:",
-        "ajuda_header": "📖 Legenda", "ajuda_corpo": "✅ **Vencendo**: Preço ideal.\n\n⚠️ **Caro**: Acima do mercado.\n\n🟥 **Burn**: Concorrência abaixo do custo.",
-        "suporte_header": "💬 Suporte", "suporte_label": "Como podemos ajudar?",
-        "termos_header": "### ⚖️ Termos de Uso e Isenção",
+        "bling_token": "Token API Bling V3",
+        "ajuda_header": "Legenda", "ajuda_corpo": "✅ Vencendo\n⚠️ Caro\n🟥 Burn",
+        "suporte_header": "Suporte", "suporte_label": "Como podemos ajudar?",
+        "termos_header": "Termos de Uso e Isenção",
         "termos_corpo": "A planilha deve conter: Nome, Custo e Quantidade.",
         "termos_check": "Eu aceito os Termos de Uso do Brasil.",
-        "passo1": "1️⃣ Carregamento de Produtos", "btn_excel": "Subir Arquivo Excel",
-        "mapeamento": "Mapeie as colunas do seu arquivo:",
-        "passo2": "2️⃣ Estratégia e Análise", "label_imposto": "Imposto (%)", "label_markup": "Aumento Padrão (%)",
-        "btn_analisar": "🚀 INICIAR ANÁLISE REAL",
-        "invest": "Investimento", "lucro": "Lucro Projetado", "margem": "Margem Média",
+        "header_dados": "Carregamento de Produtos", "btn_excel": "Subir Arquivo Excel",
+        "mapeamento": "Mapeie as colunas:", "header_analise": "Estratégia e Análise",
+        "btn_analisar": "Iniciar Análise Real", "invest": "Investimento",
+        "lucro": "Lucro Projetado", "margem": "Margem Média",
         "download_btn": "Baixar Excel", "sinc_btn": "Aceitar sugestões de preço para o bling"
     },
-    "Portugal 🇵🇹": {
-        "id": "PT", "moeda": "€", "lang": "pt-PT", "domain": "google.pt", "gl": "pt", "loc": "Portugal",
-        "titulo": "🚀 Inteligência de Mercado Portugal & UE",
-        "label_chave": "Chave SerpApi", "help_chave": "Código para pesquisar preços reais. Obtenha em SerpApi.com.",
+    "Portugal": {
+        "moeda": "€", "lang": "pt-PT", "domain": "google.pt", "gl": "pt", "loc": "Portugal",
+        "titulo": "Inteligência de Mercado Portugal & UE",
+        "label_chave": "Chave SerpApi", "help_chave": "Código de pesquisa real obtido em SerpApi.com.",
         "btn_confirmar": "Confirmar Chave", "msg_ativado": "Sistema Ativado!",
-        "ajuda_header": "📖 Legenda", "ajuda_corpo": "✅ **A Vencer**: O seu preço é o mais baixo.\n\n⚠️ **Caro**: Acima do mercado.\n\n🟥 **Crítico**: Mercado abaixo do custo.",
-        "suporte_header": "💬 Suporte", "suporte_label": "Como podemos ajudar?",
-        "termos_header": "### ⚖️ Termos de Utilização",
+        "ajuda_header": "Legenda", "ajuda_corpo": "✅ A Vencer\n⚠️ Caro\n🟥 Crítico",
+        "suporte_header": "Suporte", "suporte_label": "Como podemos ajudar?",
+        "termos_header": "Termos de Utilização",
         "termos_corpo": "A folha deve conter: Nome, Custo e Quantidade.",
         "termos_check": "Aceito os Termos de Utilização de Portugal.",
-        "passo1": "1️⃣ Carregamento de Produtos", "btn_excel": "Carregar Ficheiro Excel",
-        "mapeamento": "Identifique as colunas do seu ficheiro:",
-        "passo2": "2️⃣ Estratégia e Análise", "label_imposto": "IVA (%)", "label_markup": "Margem de Aumento (%)",
-        "btn_analisar": "🚀 INICIAR ANÁLISE DE MERCADO",
-        "invest": "Investimento", "lucro": "Lucro Projetado", "margem": "Margem Média",
+        "header_dados": "Carregamento de Produtos", "btn_excel": "Carregar Ficheiro Excel",
+        "mapeamento": "Identifique as colunas:", "header_analise": "Estratégia e Análise",
+        "btn_analisar": "Iniciar Análise de Mercado", "invest": "Investimento",
+        "lucro": "Lucro Projetado", "margem": "Margem Média",
         "download_btn": "Descarregar Excel"
     },
-    "USA 🇺🇸": {
-        "id": "US", "moeda": "$", "lang": "en", "domain": "google.com", "gl": "us", "loc": "United States",
-        "titulo": "🚀 USA Marketplace Intelligence",
-        "label_chave": "SerpApi Key", "help_chave": "Code for real-time prices. Get it at SerpApi.com.",
-        "btn_confirmar": "Confirm Key", "msg_ativado": "System Activated!",
-        "ajuda_header": "📖 Legend", "ajuda_corpo": "✅ **Winning**: Best price.\n\n⚠️ **Expensive**: Above market.\n\n🟥 **Alert**: Market below cost.",
-        "suporte_header": "💬 Support", "suporte_label": "How can we help?",
-        "termos_header": "### ⚖️ Terms of Use",
-        "termos_corpo": "Sheet must have: Name, Cost, and Quantity.",
+    "USA": {
+        "moeda": "$", "lang": "en", "domain": "google.com", "gl": "us", "loc": "United States",
+        "titulo": "USA Marketplace Intelligence",
+        "label_chave": "SerpApi Key", "help_chave": "Search code from SerpApi.com.",
+        "btn_confirmar": "Confirm Key", "msg_ativado": "Activated!",
+        "ajuda_header": "Legend", "ajuda_corpo": "✅ Winning\n⚠️ Expensive\n🟥 Alert",
+        "suporte_header": "Support", "suporte_label": "How can we help?",
+        "termos_header": "Terms of Use",
+        "termos_corpo": "Sheet required: Name, Cost, and Quantity.",
         "termos_check": "I accept the USA Terms of Use.",
-        "passo1": "1️⃣ Data Upload", "btn_excel": "Upload Excel file",
-        "mapeamento": "Map your columns:",
-        "passo2": "2️⃣ Strategy & Analysis", "label_imposto": "Tax (%)", "label_markup": "Markup (%)",
-        "btn_analisar": "🚀 START MARKET ANALYSIS",
-        "invest": "Investment", "lucro": "Projected Profit", "margem": "Avg Margin",
+        "header_dados": "Product Upload", "btn_excel": "Upload Excel File",
+        "mapeamento": "Map Columns:", "header_analise": "Strategy & Analysis",
+        "btn_analisar": "Start Market Analysis", "invest": "Investment",
+        "lucro": "Profit", "margem": "Avg Margin",
         "download_btn": "Download Excel"
     }
 }
 
-# --- INICIALIZAÇÃO DOS ACEITES (Dicionário de controle por país) ---
-if "aceites_paises" not in st.session_state:
-    st.session_state.aceites_paises = {k: False for k in idiomas.keys()}
+# --- CONTROLE DE SESSÃO ---
+if "aceites" not in st.session_state:
+    st.session_state.aceites = {k: False for k in idiomas.keys()}
 
 # --- FUNÇÃO DE E-MAIL ---
 def enviar_email_log(n, e, m, tipo="SUPORTE"):
@@ -88,20 +85,19 @@ def enviar_email_log(n, e, m, tipo="SUPORTE"):
 
 # --- SIDEBAR ---
 with st.sidebar:
-    st.header("🌎 Região / Region")
-    pais_sel = st.selectbox("Escolha o Mercado:", list(idiomas.keys()))
+    st.header("Região / Region")
+    pais_sel = st.selectbox("Mercado:", list(idiomas.keys()))
     t = idiomas[pais_sel]
     
     st.divider()
-    st.header("🔑 Activation")
+    st.header("Configuração")
     api_key_input = st.text_input(t["label_chave"], type="password", help=t["help_chave"])
     if st.button(t["btn_confirmar"]):
         st.session_state.api_key = api_key_input
         st.success(t["msg_ativado"])
 
-    if "Portugal" in pais_sel:
-        st.divider()
-        scope_pt = st.radio("Âmbito:", ["Apenas Portugal", "Toda a União Europeia"])
+    if pais_sel == "Portugal":
+        scope_pt = st.radio("Âmbito:", ["Apenas Portugal", "União Europeia"])
     
     st.divider()
     st.header(t["ajuda_header"])
@@ -118,37 +114,33 @@ with st.sidebar:
 
 # --- CORPO PRINCIPAL ---
 st.title(t["titulo"])
-st.markdown(t["termos_header"])
+st.subheader(t["termos_header"])
 
-# CONTROLE DE TERMOS INDIVIDUALIZADO POR PAÍS
-if not st.session_state.aceites_paises[pais_sel]:
+if not st.session_state.aceites[pais_sel]:
     st.info(t["termos_corpo"])
-    if st.checkbox(t["termos_check"], key=f"check_{pais_sel}"):
-        st.session_state.aceites_paises[pais_sel] = True
+    if st.checkbox(t["termos_check"], key=f"c_{pais_sel}"):
+        st.session_state.aceites[pais_sel] = True
         st.rerun()
     st.stop()
 
 st.divider()
-
-# --- PASSO 1: CARREGAMENTO ---
-st.markdown(f"### {t['passo1']}")
+st.subheader(t["header_dados"])
 df_base = pd.DataFrame()
 
-if "Brasil" in pais_sel:
-    fonte = st.radio("Fonte:", ["Bling (API V3)", "Excel (Manual)"], horizontal=True)
+if pais_sel == "Brasil":
+    fonte = st.radio("Fonte:", ["Bling (API V3)", "Excel"], horizontal=True)
     if fonte == "Bling (API V3)":
-        # AJUSTE: Usando colunas para diminuir o tamanho do campo do Bling
-        col_bling, _ = st.columns([0.5, 0.5])
-        with col_bling:
-            bling_token = st.text_input("Bling Token:", type="password")
-        if st.button("📥 Importar do Bling"):
+        c_bl, _ = st.columns([0.5, 0.5])
+        with c_bl:
+            bling_token = st.text_input(t["bling_token"], type="password")
+        if st.button("📥 Importar Dados"):
             try:
                 h = {"Authorization": f"Bearer {bling_token}"}
                 r = requests.get("https://bling.com.br", headers=h)
                 if r.status_code == 200:
                     df_base = pd.DataFrame([{"ID": i['id'], "Nome": i['nome'], "Custo": round(float(i.get('precoCusto',0)), 2), "Qtde": float(i.get('estoque',{}).get('quantidade',1) or 1), "EAN": i.get('codigoBarra',''), "Linha": "Bling"} for i in r.json().get('data', [])])
-                    st.success("Produtos carregados!")
-            except: st.error("Erro na conexão.")
+                    st.success("Sucesso!")
+            except: st.error("Erro")
     else:
         uploaded_file = st.file_uploader(t["btn_excel"], type=["xlsx", "xls"])
         if uploaded_file:
@@ -176,19 +168,19 @@ else:
         df_base = df_raw.copy().rename(columns={col_n:'Nome', col_c:'Custo', col_q:'Qtde'})
         df_base['EAN'] = df_raw[col_e] if col_e != "N/A" else ""; df_base['Linha'] = df_raw[col_l] if col_l != "None" else "General"; df_base['ID'] = 0
 
-# [Restante do código de análise permanece idêntico e preservado]
+# --- ANÁLISE ---
 if not df_base.empty:
-    st.divider(); st.markdown(f"### {t['passo2']}")
+    st.divider(); st.subheader(t["header_analise"])
     cp1, cp2 = st.columns(2)
-    with cp1: imposto = st.number_input(t["label_imposto"], 0, 100, 4) / 100
-    with cp2: markup_padrao = st.number_input(t["label_markup"], 0, 500, 70) / 100
+    with cp1: imposto = st.number_input("%", 0, 100, 4) / 100
+    with cp2: markup_padrao = st.number_input("Markup %", 0, 500, 70) / 100
     if st.button(t["btn_analisar"]):
-        if "api_key" not in st.session_state: st.error("API Key!")
+        if "api_key" not in st.session_state: st.error("Key?")
         else:
             with st.spinner('...'):
                 df = df_base.copy(); res_m, res_l = [], []
                 loc_f = t["loc"]
-                if "Portugal" in pais_sel and scope_pt == "Toda a União Europeia": loc_f = "Western Europe"
+                if pais_sel == "Portugal" and scope_pt == "União Europeia": loc_f = "Western Europe"
                 for idx, row in df.iterrows():
                     search = GoogleSearch({"engine": "google_shopping", "q": f"{row['Nome']} {row['EAN']}", "google_domain": t["domain"], "hl": t["lang"][:2], "gl": t["gl"], "location": loc_f, "api_key": st.session_state.api_key})
                     results = search.get_dict(); best_p, best_l = round(row['Custo']*2.5, 2), "N/A"
@@ -208,26 +200,26 @@ if not df_base.empty:
                 df['Preço Sugerido'] = df.apply(lambda x: round(x['Mercado']*0.98, 2) if x['Seu Preço'] > x['Mercado'] else x['Seu Preço'], axis=1)
                 df['Margem %'] = round((((df['Preço Sugerido']*(1-imposto)) - df['Custo']) / df['Preço Sugerido']) * 100, 2)
                 df['Lucro Total'] = round(((df['Preço Sugerido']*(1-imposto)) - df['Custo']) * df['Qtde'], 2)
-                df['Situação'] = df.apply(lambda x: f"🟥" if x['Mercado'] < x['Custo'] else (f"⚠️" if x['Seu Preço'] > x['Mercado'] else f"✅"), axis=1)
+                df['Situação'] = df.apply(lambda x: "🟥" if x['Mercado'] < x['Custo'] else ("⚠️" if x['Seu Preço'] > x['Mercado'] else "✅"), axis=1)
                 st.session_state.df_final = df
 
 if "df_final" in st.session_state:
     df = st.session_state.df_final
-    st.divider(); st.subheader(t["passo3"])
+    st.divider(); st.subheader("Dash")
     c1, c2, c3 = st.columns(3)
     c1.metric(t["invest"], f"{t['moeda']} {df['Custo'].sum():,.2f}")
     c2.metric(t["lucro"], f"{t['moeda']} {df['Lucro Total'].sum():,.2f}")
     c3.metric(t["margem"], f"{df['Margem %'].mean():.2f}%")
-    st.dataframe(df[['Nome', 'Linha', 'Qtde', 'Custo', 'Seu Preço', 'Mercado', 'Loja Líder', 'Preço Sugerido', 'Margem %', 'Situação', 'Lucro Total']].style.format({'Custo': '{:.2f}', 'Seu Preço': '{:.2f}', 'Market': '{:.2f}', 'Suggest': '{:.2f}', 'Margin %': '{:.2f}', 'Profit': '{:.2f}'}))
+    st.dataframe(df[['Nome', 'Linha', 'Qtde', 'Custo', 'Seu Preço', 'Mercado', 'Loja Líder', 'Preço Sugerido', 'Margem %', 'Situação', 'Lucro Total']].style.format({'Custo': '{:.2f}', 'Seu Preço': '{:.2f}', 'Mercado': '{:.2f}', 'Preço Sugerido': '{:.2f}', 'Margem %': '{:.2f}', 'Lucro Total': '{:.2f}'}))
     
     st.divider()
     out = io.BytesIO()
     with pd.ExcelWriter(out, engine='xlsxwriter') as wr: df.to_excel(wr, index=False)
-    st.download_button(label=t["download_btn"], data=out.getvalue(), file_name="analysis.xlsx")
+    st.download_button(label=t["download_btn"], data=out.getvalue(), file_name="analise.xlsx")
 
-    if "Brasil" in pais_sel and fonte == "Bling (API V3)":
+    if pais_sel == "Brasil" and fonte == "Bling (API V3)":
         if st.button(t["sinc_btn"]):
             h = {"Authorization": f"Bearer {bling_token}", "Content-Type": "application/json"}
             for i, (idx, row) in enumerate(df.iterrows()):
                 requests.put(f"https://bling.com.br{row['ID']}", json={"preco": round(row['Preço Sugerido'], 2)}, headers=h)
-            st.success("OK!")
+            st.success("Sincronizado!")
