@@ -31,11 +31,13 @@ idiomas = {
         "passo1": "1️⃣ Carregamento de Produtos",
         "btn_importar": "📥 Importar do Bling",
         "btn_excel": "Suba seu arquivo Excel",
+        "mapeamento": "Mapeie as colunas do seu arquivo:",
         "passo2": "2️⃣ Estratégia e Análise",
         "btn_analisar": "🚀 INICIAR ANÁLISE REAL",
         "invest": "Investimento", "lucro": "Lucro Projetado", "margem": "Margem Média",
         "download_btn": "Baixar Resultados em Excel",
         "sinc_btn": "Aceitar sugestões de preço para o bling e atualizar na plataforma",
+        "sinc_sucesso": "✅ Bling Atualizado com sucesso!",
         "moeda": "R$", "lang": "pt-BR", "domain": "google.com.br", "gl": "br", "loc": "Brazil"
     },
     "Portugal 🇵🇹": {
@@ -52,6 +54,7 @@ idiomas = {
         "termos_aviso": "👉 Aceite os termos para desbloquear o sistema.",
         "passo1": "1️⃣ Carregamento de Produtos",
         "btn_excel": "Carregue o seu ficheiro Excel",
+        "mapeamento": "Identifique as colunas do seu ficheiro:",
         "passo2": "2️⃣ Estratégia e Análise",
         "btn_analisar": "🚀 INICIAR ANÁLISE DE MERCADO",
         "invest": "Investimento", "lucro": "Lucro Projetado", "margem": "Margem Média",
@@ -72,6 +75,7 @@ idiomas = {
         "termos_aviso": "👉 You must accept terms to unlock the system.",
         "passo1": "1️⃣ Product Upload",
         "btn_excel": "Upload your Excel file",
+        "mapeamento": "Map your file columns:",
         "passo2": "2️⃣ Strategy & Analysis",
         "btn_analisar": "🚀 START MARKET ANALYSIS",
         "invest": "Total Investment", "lucro": "Projected Profit", "margem": "Avg Margin",
@@ -102,8 +106,6 @@ with st.sidebar:
     
     st.divider()
     st.header("🔑 Activation / Ativação")
-    
-    # CAMPO COM A INTERROGAÇÃO DE AJUDA SOLICITADA
     api_key_input = st.text_input(t["label_chave"], type="password", help=t["help_chave"])
     
     if st.button(t["btn_confirmar"]):
@@ -125,9 +127,12 @@ with st.sidebar:
     user_q = st.text_input("?")
     if user_q:
         with st.form("suporte_form", clear_on_submit=True):
-            n, e, m = st.text_input("Name/Nome"), st.text_input("Email"), st.text_area("Message/Mensagem")
+            n = st.text_input("Name/Nome")
+            e = st.text_input("Email")
+            m = st.text_area("Message/Mensagem")
             if st.form_submit_button("Send/Enviar"):
-                if enviar_email_log(n, e, m, "SUPORTE"): st.success("OK!")
+                if enviar_email_log(n, e, m, "SUPORTE"): 
+                    st.success("OK!")
 
 # --- CORPO PRINCIPAL ---
 st.title(t["titulo"])
@@ -159,23 +164,40 @@ if "Brasil" in pais_sel:
     else:
         uploaded_file = st.file_uploader(t["btn_excel"], type=["xlsx", "xls"])
         if uploaded_file:
-            df_raw = pd.read_excel(uploaded_file); cols = df_raw.columns.tolist()
+            df_raw = pd.read_excel(uploaded_file)
+            cols = df_raw.columns.tolist()
+            st.write(t["mapeamento"])
             c1, c2, c3, c4, c5 = st.columns(5)
-            with c1: col_n = st.selectbox("NOME:", cols); with c2: col_c = st.selectbox("CUSTO:", cols); with c3: col_q = st.selectbox("QTDE:", cols); with c4: col_l = st.selectbox("LINHA:", ["Nenhuma"] + cols); with c5: col_e = st.selectbox("EAN:", ["Não possuo"] + cols)
+            with c1: col_n = st.selectbox("NOME:", cols)
+            with c2: col_c = st.selectbox("CUSTO:", cols)
+            with c3: col_q = st.selectbox("QTDE:", cols)
+            with c4: col_l = st.selectbox("LINHA:", ["Nenhuma"] + cols)
+            with c5: col_e = st.selectbox("EAN:", ["Não possuo"] + cols)
             df_base = df_raw.copy().rename(columns={col_n:'Nome', col_c:'Custo', col_q:'Qtde'})
-            df_base['EAN'] = df_raw[col_e] if col_e != "Não possuo" else ""; df_base['Linha'] = df_raw[col_l] if col_l != "Nenhuma" else "Geral"; df_base['ID'] = 0
+            df_base['EAN'] = df_raw[col_e] if col_e != "Não possuo" else ""
+            df_base['Linha'] = df_raw[col_l] if col_l != "Nenhuma" else "Geral"
+            df_base['ID'] = 0
 else:
     uploaded_file = st.file_uploader(t["btn_excel"], type=["xlsx", "xls"])
     if uploaded_file:
-        df_raw = pd.read_excel(uploaded_file); cols = df_raw.columns.tolist()
+        df_raw = pd.read_excel(uploaded_file)
+        cols = df_raw.columns.tolist()
+        st.write(t["mapeamento"])
         c1, c2, c3, c4, c5 = st.columns(5)
-        with c1: col_n = st.selectbox("NAME:", cols); with c2: col_c = st.selectbox("COST:", cols); with c3: col_q = st.selectbox("QTY:", cols); with c4: col_l = st.selectbox("LINE:", ["None"] + cols); with c5: col_e = st.selectbox("EAN:", ["N/A"] + cols)
+        with c1: col_n = st.selectbox("NAME:", cols)
+        with c2: col_c = st.selectbox("COST:", cols)
+        with c3: col_q = st.selectbox("QTY:", cols)
+        with c4: col_l = st.selectbox("LINE:", ["None"] + cols)
+        with c5: col_e = st.selectbox("EAN:", ["N/A"] + cols)
         df_base = df_raw.copy().rename(columns={col_n:'Nome', col_c:'Custo', col_q:'Qtde'})
-        df_base['EAN'] = df_raw[col_e] if col_e != "N/A" else ""; df_base['Linha'] = df_raw[col_l] if col_l != "None" else "General"; df_base['ID'] = 0
+        df_base['EAN'] = df_raw[col_e] if col_e != "N/A" else ""
+        df_base['Linha'] = df_raw[col_l] if col_l != "None" else "General"
+        df_base['ID'] = 0
 
 # --- PASSO 2: ANÁLISE ---
 if not df_base.empty:
-    st.divider(); st.markdown(f"### {t['passo2']}")
+    st.divider()
+    st.markdown(f"### {t['passo2']}")
     cp1, cp2 = st.columns(2)
     with cp1: imposto = st.number_input("% Tax", 0, 100, 4) / 100
     with cp2: markup_padrao = st.number_input("% Markup", 0, 500, 70) / 100
@@ -183,14 +205,20 @@ if not df_base.empty:
     if st.button(t["btn_analisar"]):
         if "api_key" not in st.session_state: st.error("API Key!")
         else:
-            with st.spinner('...'):
-                df = df_base.copy(); res_m, res_l = [], []
+            with st.spinner('Scanning market...'):
+                df = df_base.copy()
+                res_m, res_l = [], []
                 loc_f = t["loc"]
                 if "Portugal" in pais_sel and scope_pt == "Toda a União Europeia": loc_f = "Western Europe"
 
                 for idx, row in df.iterrows():
-                    search = GoogleSearch({"engine": "google_shopping", "q": f"{row['Nome']} {row['EAN']}", "google_domain": t["domain"], "hl": t["lang"][:2], "gl": t["gl"], "location": loc_f, "api_key": st.session_state.api_key})
-                    results = search.get_dict(); best_p, best_l = round(row['Custo']*2.5, 2), "N/A"
+                    search = GoogleSearch({
+                        "engine": "google_shopping", "q": f"{row['Nome']} {row['EAN']}", 
+                        "google_domain": t["domain"], "hl": t["lang"][:2], "gl": t["gl"], 
+                        "location": loc_f, "api_key": st.session_state.api_key
+                    })
+                    results = search.get_dict()
+                    best_p, best_l = round(row['Custo']*2.5, 2), "N/A"
                     if "shopping_results" in results:
                         validos = []
                         for it in results['shopping_results']:
@@ -200,8 +228,11 @@ if not df_base.empty:
                                 v = float(re.sub(r'[^\d,.]','',str(it.get('price'))).replace('.','').replace(',','.'))
                                 if v > (row['Custo']*0.15): validos.append({"p": round(v,2), "l":it.get('source')})
                             except: continue
-                        if validos: b = min(validos, key=lambda x:x['p']); best_p, best_l = b['p'], b['l']
-                    res_m.append(best_p); res_l.append(best_l)
+                        if validos:
+                            b = min(validos, key=lambda x:x['p'])
+                            best_p, best_l = b['p'], b['l']
+                    res_m.append(best_p)
+                    res_l.append(best_l)
                 
                 df['Mercado'], df['Loja Líder'] = res_m, res_l
                 df['Seu Preço'] = round(df['Custo'] * (1 + markup_padrao), 2)
@@ -214,19 +245,24 @@ if not df_base.empty:
 # --- PASSO 3: RESULTADOS ---
 if "df_final" in st.session_state:
     df = st.session_state.df_final
-    st.divider(); st.subheader(t["passo3"])
+    st.divider()
+    st.subheader(t["passo3"])
     
+    lin_sel = st.selectbox(t["filtro_linha"], ["Todas" if "Brasil" in pais_sel else "All"] + df['Linha'].unique().tolist())
+    df_p = df if lin_sel in ["Todas", "All"] else df[df['Linha'] == lin_sel]
+
     c1, c2, c3 = st.columns(3)
-    c1.metric(t["invest"], f"{t['moeda']} {df['Custo'].sum():,.2f}")
-    c2.metric(t["lucro"], f"{t['moeda']} {df['Lucro Total'].sum():,.2f}")
-    c3.metric(t["margem"], f"{df['Margem %'].mean():.2f}%")
+    c1.metric(t["invest"], f"{t['moeda']} {df_p['Custo'].sum():,.2f}")
+    c2.metric(t["lucro"], f"{t['moeda']} {df_p['Lucro Total'].sum():,.2f}")
+    c3.metric(t["margem"], f"{df_p['Margem %'].mean():.2f}%")
     
-    st.dataframe(df[['Nome', 'Linha', 'Qtde', 'Custo', 'Seu Preço', 'Mercado', 'Loja Líder', 'Preço Sugerido', 'Margem %', 'Situação', 'Lucro Total']].style.format({
+    st.dataframe(df_p[['Nome', 'Linha', 'Qtde', 'Custo', 'Seu Preço', 'Mercado', 'Loja Líder', 'Preço Sugerido', 'Margem %', 'Situação', 'Lucro Total']].style.format({
         'Custo': '{:.2f}', 'Seu Preço': '{:.2f}', 'Mercado': '{:.2f}', 'Preço Sugerido': '{:.2f}', 'Margem %': '{:.2f}', 'Lucro Total': '{:.2f}'
     }))
 
     out = io.BytesIO()
-    with pd.ExcelWriter(out, engine='xlsxwriter') as wr: df.to_excel(wr, index=False)
+    with pd.ExcelWriter(out, engine='xlsxwriter') as wr: 
+        df.to_excel(wr, index=False)
     st.download_button(label=t["download_btn"], data=out.getvalue(), file_name="analysis.xlsx")
 
     if "Brasil" in pais_sel and fonte == "Bling (API V3)":
