@@ -14,38 +14,13 @@ st.set_page_config(page_title="Global Marketplace Intelligence", layout="wide", 
 
 # --- DICIONÁRIO DE TRADUÇÃO E CONFIGURAÇÃO ---
 idiomas = {
-    "BR": {
-        "bandeira": "🇧🇷", "nome": "Brasil",
-        "titulo": "🚀 Inteligência de Mercado Brasil + Bling Sync",
-        "label_chave": "SerpApi Key",
-        "help_chave": "Código para pesquisar preços reais no Google Shopping. Obtenha em SerpApi.com.",
-        "btn_confirmar": "Confirmar Chave", "msg_ativado": "Sistema Ativado!",
-        "bling_token": "Token API Bling V3:",
-        "ajuda_header": "📖 Legenda",
-        "ajuda_corpo": "✅ **Vencendo**: Seu preço é o menor.\n\n⚠️ **Caro**: Acima do mercado.\n\n🟥 **Burn**: Concorrência abaixo do custo.",
-        "suporte_header": "💬 Suporte ao Cliente", "suporte_label": "Como podemos ajudar?",
-        "termos_header": "### ⚖️ Termos de Uso e Instruções",
-        "termos_corpo": "Planilha necessária: **Nome, Custo e Quantidade**. O EAN é recomendado.",
-        "termos_check": "Eu aceito os Termos de Uso.",
-        "termos_aviso": "👉 Aceite os termos para desbloquear.",
-        "passo1": "1️⃣ Carregamento de Produtos",
-        "btn_excel": "Suba seu arquivo Excel",
-        "mapeamento": "Mapeie as colunas do seu arquivo:",
-        "passo2": "2️⃣ Estratégia e Análise",
-        "label_imposto": "Imposto (%)", "label_markup": "Aumento Padrão (%)",
-        "btn_analisar": "🚀 INICIAR ANÁLISE REAL",
-        "invest": "Investimento", "lucro": "Lucro Projetado", "margem": "Margem Média",
-        "download_btn": "Baixar Resultados em Excel",
-        "sinc_btn": "Aceitar sugestões de preço para o bling e atualizar na plataforma",
-        "moeda": "R$", "lang": "pt-BR", "domain": "google.com.br", "gl": "br", "loc": "Brazil"
-    },
     "PT": {
-        "bandeira": "🇵🇹", "nome": "Portugal",
+        "label": "🇵🇹 Portugal",
         "titulo": "🚀 Inteligência de Mercado Portugal & UE",
         "label_chave": "Chave SerpApi",
         "help_chave": "Código para pesquisar preços reais no Google Shopping. Obtenha em SerpApi.com.",
         "btn_confirmar": "Confirmar Chave", "msg_ativado": "Sistema Ativado!",
-        "ajuda_header": "📖 Legenda",
+        "ajuda_header": "📖 Legenda de Situação",
         "ajuda_corpo": "✅ **A Vencer**: O seu preço é o mais baixo.\n\n⚠️ **Caro**: Acima do mercado.\n\n🟥 **Crítico**: Mercado abaixo do custo.",
         "suporte_header": "💬 Suporte ao Utilizador", "suporte_label": "Como podemos ajudar?",
         "termos_header": "### ⚖️ Termos de Utilização",
@@ -58,12 +33,37 @@ idiomas = {
         "passo2": "2️⃣ Estratégia e Análise",
         "label_imposto": "IVA (%)", "label_markup": "Margem de Aumento (%)",
         "btn_analisar": "🚀 INICIAR ANÁLISE DE MERCADO",
-        "invest": "Investimento", "lucro": "Lucro Projetado", "margem": "Margem Média",
+        "invest": "Investimento", "lucro": "Lucro Projetado", "margem": "Margem Médio",
         "download_btn": "Descarregar Resultados em Excel",
         "moeda": "€", "lang": "pt-PT", "domain": "google.pt", "gl": "pt", "loc": "Portugal"
     },
+    "BR": {
+        "label": "🇧🇷 Brasil",
+        "titulo": "🚀 Inteligência de Mercado Brasil + Bling Sync",
+        "label_chave": "SerpApi Key",
+        "help_chave": "Código para pesquisar preços reais no Google Shopping. Obtenha em SerpApi.com.",
+        "btn_confirmar": "Confirmar Chave", "msg_ativado": "Sistema Ativado!",
+        "bling_token": "Token API Bling V3:",
+        "ajuda_header": "📖 Legenda de Situação",
+        "ajuda_corpo": "✅ **Vencendo**: Seu preço é o menor.\n\n⚠️ **Caro**: Acima do mercado.\n\n🟥 **Burn**: Concorrência abaixo do custo.",
+        "suporte_header": "💬 Suporte ao Cliente", "suporte_label": "Como podemos ajudar?",
+        "termos_header": "### ⚖️ Termos de Uso e Instruções",
+        "termos_corpo": "Planilha necessária: **Nome, Custo e Quantidade**. EAN recomendado.",
+        "termos_check": "Eu aceito os Termos de Uso.",
+        "termos_aviso": "👉 Aceite os termos para desbloquear.",
+        "passo1": "1️⃣ Carregamento de Produtos",
+        "btn_excel": "Suba seu arquivo Excel",
+        "mapeamento": "Mapeie as colunas do seu arquivo:",
+        "passo2": "2️⃣ Estratégia e Análise",
+        "label_imposto": "Imposto (%)", "label_markup": "Aumento Padrão (%)",
+        "btn_analisar": "🚀 INICIAR ANÁLISE REAL",
+        "invest": "Investimento", "lucro": "Lucro Projetado", "margem": "Margem Média",
+        "download_btn": "Baixar Resultados em Excel",
+        "sinc_btn": "Aceitar sugestões de preço para o bling",
+        "moeda": "R$", "lang": "pt-BR", "domain": "google.com.br", "gl": "br", "loc": "Brazil"
+    },
     "US": {
-        "bandeira": "🇺🇸", "nome": "USA",
+        "label": "🇺🇸 USA",
         "titulo": "🚀 USA Marketplace Intelligence",
         "label_chave": "SerpApi Key",
         "help_chave": "Code for real-time prices. Get it at SerpApi.com.",
@@ -87,12 +87,12 @@ idiomas = {
     }
 }
 
-# --- DETECÇÃO DE PAÍS POR IP ---
+# --- DETECÇÃO DE PAÍS MELHORADA ---
 @st.cache_data(ttl=3600)
 def detectar_localizacao():
     try:
-        response = requests.get("http://ip-api.com", timeout=3).json()
-        codigo = response.get("countryCode", "BR")
+        res = requests.get("http://ip-api.com", timeout=3).json()
+        codigo = res.get("countryCode", "BR")
         return codigo if codigo in idiomas else "BR"
     except:
         return "BR"
@@ -111,21 +111,23 @@ def enviar_email_log(n, e, m, tipo="SUPORTE"):
         return True
     except: return False
 
-# --- SIDEBAR ---
+# --- SIDEBAR: SELETOR VISUAL ---
 with st.sidebar:
     st.header("🌎 Market Selection")
     
     codigo_detectado = detectar_localizacao()
+    # Seletor usando a bandeira diretamente como parte da string de opção
+    lista_opcoes = list(idiomas.keys())
     pais_key = st.selectbox(
         "Choose Country / Escolha o País:", 
-        options=list(idiomas.keys()),
-        index=list(idiomas.keys()).index(codigo_detectado),
-        format_func=lambda x: f"{idiomas[x]['bandeira']} {idiomas[x]['nome']}"
+        options=lista_opcoes,
+        index=lista_opcoes.index(codigo_detectado),
+        format_func=lambda x: idiomas[x]["label"]
     )
     t = idiomas[pais_key] 
     
     st.divider()
-    st.header("🔑 Activation / Ativação")
+    st.header("🔑 Activation")
     api_key_input = st.text_input(t["label_chave"], type="password", help=t["help_chave"])
     if st.button(t["btn_confirmar"]):
         st.session_state.api_key = api_key_input
@@ -144,10 +146,8 @@ with st.sidebar:
     user_q = st.text_input(t["suporte_label"])
     if user_q:
         with st.form("suporte_form", clear_on_submit=True):
-            n = st.text_input("Nome / Name")
-            e = st.text_input("Email")
-            m = st.text_area("Mensagem", value=user_q)
-            if st.form_submit_button("Enviar / Send"):
+            n, e, m = st.text_input("Nome / Name"), st.text_input("Email"), st.text_area("Mensagem", value=user_q)
+            if st.form_submit_button("Enviar"):
                 if enviar_email_log(n, e, m, "SUPORTE"): st.success("✅ OK!")
 
 # --- CORPO PRINCIPAL ---
@@ -194,9 +194,7 @@ if pais_key == "BR":
             with c4: col_l = st.selectbox("LINHA:", ["Nenhuma"] + cols)
             with c5: col_e = st.selectbox("EAN:", ["Não possuo"] + cols)
             df_base = df_raw.copy().rename(columns={col_n:'Nome', col_c:'Custo', col_q:'Qtde'})
-            df_base['EAN'] = df_raw[col_e] if col_e != "Não possuo" else ""
-            df_base['Linha'] = df_raw[col_l] if col_l != "Nenhuma" else "Geral"
-            df_base['ID'] = 0
+            df_base['EAN'] = df_raw[col_e] if col_e != "Não possuo" else ""; df_base['Linha'] = df_raw[col_l] if col_l != "Nenhuma" else "Geral"; df_base['ID'] = 0
 else:
     uploaded_file = st.file_uploader(t["btn_excel"], type=["xlsx", "xls"])
     if uploaded_file:
@@ -210,9 +208,7 @@ else:
         with c4: col_l = st.selectbox("LINE:", ["None"] + cols)
         with c5: col_e = st.selectbox("EAN:", ["N/A"] + cols)
         df_base = df_raw.copy().rename(columns={col_n:'Nome', col_c:'Custo', col_q:'Qtde'})
-        df_base['EAN'] = df_raw[col_e] if col_e != "N/A" else ""
-        df_base['Linha'] = df_raw[col_l] if col_l != "None" else "General"
-        df_base['ID'] = 0
+        df_base['EAN'] = df_raw[col_e] if col_e != "N/A" else ""; df_base['Linha'] = df_raw[col_l] if col_l != "None" else "General"; df_base['ID'] = 0
 
 # --- PASSO 2: ANÁLISE ---
 if not df_base.empty:
