@@ -22,8 +22,9 @@ idiomas = {
         "aviso_chave": "⚠️ Por favor, confirme sua SerpApi Key na barra lateral antes de prosseguir.",
         "bling_token": "Token API Bling V3",
         "ajuda_header": "Legenda", "ajuda_corpo": "✅ Vencendo\n⚠️ Caro\n🟥 Burn",
-        "termos_header": "### ⚖️ Termos de Uso e Isenção",
-        "termos_corpo": "A planilha deve conter: Nome, Custo e Quantidade. O sistema bloqueia automaticamente lojas de importação sem operação fiscal local.",
+        "suporte_header": "Suporte", "suporte_label": "Como podemos ajudar?",
+        "termos_header": "Termos de Uso e Isenção",
+        "termos_corpo": "A planilha deve conter: Nome, Custo e Quantidade. O uso de dados da internet exige conferência obrigatória.",
         "termos_check": "Eu aceito os Termos de Uso do Brasil.",
         "header_dados": "Carregamento de Produtos", "btn_excel": "Subir Arquivo Excel",
         "mapeamento": "Mapeie as colunas:", "header_analise": "Estratégia e Análise",
@@ -42,8 +43,8 @@ idiomas = {
         "aviso_chave": "⚠️ Por favor, confirme a sua Chave SerpApi na barra lateral antes de continuar.",
         "ajuda_header": "Legenda", "ajuda_corpo": "✅ A Vencer\n⚠️ Caro\n🟥 Crítico",
         "suporte_header": "Suporte", "suporte_label": "Como podemos ajudar?",
-        "termos_header": "### ⚖️ Termos de Utilização",
-        "termos_corpo": "A folha deve conter: Nome, Custo e Quantidade. O sistema valida apenas lojistas com representação fiscal na UE.",
+        "termos_header": "Termos de Utilização",
+        "termos_corpo": "A folha deve conter: Nome, Custo e Quantidade. A conferência dos dados é da responsabilidade do utilizador.",
         "termos_check": "Aceito os Termos de Utilização de Portugal.",
         "header_dados": "Carregamento de Produtos", "btn_excel": "Carregar Ficheiro Excel",
         "mapeamento": "Identifique as colunas:", "header_analise": "Estratégia e Análise",
@@ -62,8 +63,8 @@ idiomas = {
         "aviso_chave": "⚠️ Please confirm your SerpApi Key in the sidebar before proceeding.",
         "ajuda_header": "Legend", "ajuda_corpo": "✅ Winning\n⚠️ Expensive\n🟥 Alert",
         "suporte_header": "Support", "suporte_label": "How can we help?",
-        "termos_header": "### ⚖️ Terms of Use",
-        "termos_corpo": "Sheet required: Name, Cost, and Quantity. Only legitimate US-based businesses are considered.",
+        "termos_header": "Terms of Use",
+        "termos_corpo": "Sheet required: Name, Cost, and Quantity. Internet data must be validated by the user.",
         "termos_check": "I accept the USA Terms of Use.",
         "header_dados": "Product Upload", "btn_excel": "Upload Excel File",
         "mapeamento": "Map Columns:", "header_analise": "Strategy & Analysis",
@@ -102,6 +103,8 @@ with st.sidebar:
 
 # --- CORPO PRINCIPAL ---
 st.title(t["titulo"])
+
+# CORREÇÃO: Removidas as hashtags manuais, usando st.subheader nativo
 st.subheader(t["termos_header"])
 st.info(t["termos_corpo"])
 
@@ -162,15 +165,16 @@ if aceite_atual:
             with cp1: imposto = st.number_input("% Tax", 0, 100, 4) / 100
             with cp2: markup_padrao = st.number_input("% Markup", 0, 500, 70) / 100
             if st.button(t["btn_analisar"]):
-                with st.spinner('Limpando resultados internacionais e fiscais...'):
+                with st.spinner('Filtrando lojistas internacionais e validando fiscalmente...'):
                     df = df_base.copy(); res_m, res_l = [], []
                     loc_f = t["loc"]
                     if pais_sel == "Portugal" and scope_pt == "União Europeia": loc_f = "Western Europe"
                     
+                    # BLACKLIST RIGOROSA CONTRA VENDILOSHOP, KIDINN, ETC.
                     blacklist = [
                         'kidiin', 'kidinn', 'tradeinn', 'fruugo', 'desertcart', 'ubuy', 
                         'tiendamia', 'fishpond', 'grandado', 'vendiloshop', 'vendiilo', 
-                        'temu', 'aliexpress', 'ebay', 'china', 'importação', 'duty free'
+                        'temu', 'aliexpress', 'ebay', 'china', 'duty free'
                     ]
 
                     for idx, row in df.iterrows():
@@ -207,12 +211,11 @@ if aceite_atual:
             st.divider(); st.subheader("Resultados Estratégicos")
             c1, c2, c3 = st.columns(3)
             
-            # --- CORREÇÃO TÉCNICA DO CÁLCULO ---
-            investimento_total = (df['Custo'] * df['Qtde']).sum()
-            lucro_total = df['Lucro Total'].sum()
+            # CÁLCULO DE INVESTIMENTO REAL (Custo x Qtde)
+            investimento_estoque = (df['Custo'] * df['Qtde']).sum()
             
-            c1.metric(t["invest"], f"{t['moeda']} {investimento_total:,.2f}")
-            c2.metric(t["lucro"], f"{t['moeda']} {lucro_total:,.2f}", help=t["help_margem"])
+            c1.metric(t["invest"], f"{t['moeda']} {investimento_estoque:,.2f}")
+            c2.metric(t["lucro"], f"{t['moeda']} {df['Lucro Total'].sum():,.2f}", help=t["help_margem"])
             c3.metric(t["margem"], f"{df['Margem %'].mean():.2f}%", help=t["help_margem"])
             
             st.dataframe(df[['Nome', 'Linha', 'Qtde', 'Custo', 'Seu Preço', 'Mercado', 'Loja Líder', 'Preço Sugerido', 'Margem %', 'Situação', 'Lucro Total']].style.format({'Custo': '{:.2f}', 'Seu Preço': '{:.2f}', 'Mercado': '{:.2f}', 'Preço Sugerido': '{:.2f}', 'Margem %': '{:.2f}', 'Lucro Total': '{:.2f}'}))
