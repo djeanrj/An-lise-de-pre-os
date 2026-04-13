@@ -50,7 +50,7 @@ idiomas = {
         "btn_analisar": "Iniciar Análise de Mercado", 
         "invest": "Investimento em Stock", "lucro": "Lucro Total Projetado", "margem": "Margem s/ Sugerido",
         "grafico_label": "Ver Gráfico por:",
-        "grafico_opcoes": ["Estado (Risco)", "Marketplace (Lojas)", "Linha (Categoria)", "Volume de Stock"],
+        "grafico_opcoes": ["Status (Risco)", "Marketplace (Lojas)", "Linha (Categoria)", "Volume de Stock"],
         "help_margem": "Baseado no Preço Sugerido.",
         "download_btn": "Descarregar Excel"
     },
@@ -128,6 +128,7 @@ else:
             uploaded_file = st.file_uploader(t["btn_excel"], type=["xlsx", "xls"])
             if uploaded_file:
                 df_raw = pd.read_excel(uploaded_file); cols = df_raw.columns.tolist()
+                st.write(t["mapeamento"])
                 c1, c2, c3, c4, c5 = st.columns(5)
                 with c1: col_n = st.selectbox("NOME:", cols)
                 with c2: col_c = st.selectbox("CUSTO:", cols)
@@ -140,6 +141,7 @@ else:
         uploaded_file = st.file_uploader(t["btn_excel"], type=["xlsx", "xls"])
         if uploaded_file:
             df_raw = pd.read_excel(uploaded_file); cols = df_raw.columns.tolist()
+            st.write(t["mapeamento"])
             c1, c2, c3, c4, c5 = st.columns(5)
             with c1: col_n = st.selectbox("NAME:", cols)
             with c2: col_c = st.selectbox("COST:", cols)
@@ -157,15 +159,21 @@ else:
         if st.button(t["btn_analisar"]):
             with st.spinner('Processando...'):
                 df = df_base.copy(); res_m, res_l = [], []
-                loc_f = t["loc"]; blacklist = ['kidiin', 'kidinn', 'tradeinn', 'fruugo', 'desertcart', 'ubuy', 'vendiloshop', 'grandado']
+                loc_f = t["loc"]; 
+                # BLACKLIST REFORÇADA (Incluindo eBay e radical de links)
+                blacklist = ['ebay', 'kidiin', 'kidinn', 'tradeinn', 'fruugo', 'desertcart', 'ubuy', 'vendiloshop', 'grandado', 'aliexpress', 'temu']
+                
                 for idx, row in df.iterrows():
                     search = GoogleSearch({"engine": "google_shopping", "q": f"{row['Nome']} {row['EAN']}", "google_domain": t["domain"], "hl": t["lang"][:2], "gl": t["gl"], "location": loc_f, "api_key": st.session_state.api_key})
                     results = search.get_dict(); best_p, best_l = round(row['Custo']*2.5, 2), "N/A"
                     if "shopping_results" in results:
                         validos = []
                         for it in results['shopping_results']:
-                            src = it.get('source', '').lower()
-                            if any(b in src for b in blacklist) or t["moeda"] not in str(it.get('price','')): continue
+                            source = it.get('source', '').lower()
+                            link = it.get('link', '').lower()
+                            # Bloqueio por Blacklist no Nome ou na URL
+                            if any(b in source for b in blacklist) or any(b in link for b in blacklist): continue
+                            if t["moeda"] not in str(it.get('price','')): continue
                             try:
                                 v = float(re.sub(r'[^\d,.]','',str(it.get('price'))).replace('.','').replace(',','.'))
                                 if v > (row['Custo']*0.15): validos.append({"p": round(v,2), "l": it.get('source')})
@@ -178,7 +186,7 @@ else:
                 df['Preço Sugerido'] = df.apply(lambda x: round(x['Mercado']*0.98, 2) if x['Seu Preço'] > x['Mercado'] else x['Seu Preço'], axis=1)
                 df['Margem %'] = round((((df['Preço Sugerido']*(1-imposto)) - df['Custo']) / df['Preço Sugerido']) * 100, 2)
                 df['Lucro Total'] = round(((df['Preço Sugerido']*(1-imposto)) - df['Custo']) * df['Qtde'], 2)
-                # RESTAURAÇÃO DOS SÍMBOLOS NO STATUS
+                # COLUNA DE STATUS FIXA COM SÍMBOLOS
                 df['Status'] = df.apply(lambda x: "🟥" if x['Mercado'] < x['Custo'] else ("⚠️" if x['Seu Preço'] > x['Mercado'] else "✅"), axis=1)
                 st.session_state.df_final = df
 
@@ -186,14 +194,12 @@ else:
         df = st.session_state.df_final
         st.divider()
         
-        # --- FILTROS DE VISUALIZAÇÃO ---
+        # --- FILTROS ---
         c_f1, c_f2 = st.columns(2)
-        with c_f1:
-            lojas_sel = st.multiselect("Filtrar por Concorrente (Líder):", options=df['Loja Líder'].unique(), default=df['Loja Líder'].unique())
-        with c_f2:
-            linhas_sel = st.multiselect("Filtrar por Linha:", options=df['Linha'].unique(), default=df['Linha'].unique())
+        with c_f1: lojas_sel = st.multiselect("Concorrentes:", options=df['Loja Líder'].unique(), default=df['Loja Líder'].unique())
+        with c_f2: categorias_sel = st.multiselect("Linhas:", options=df['Linha'].unique(), default=df['Linha'].unique())
         
-        df_view = df[(df['Loja Líder'].isin(lojas_sel)) & (df['Linha'].isin(linhas_sel))]
+        df_view = df[(df['Loja Líder'].isin(lojas_sel)) & (df['Linha'].isin(categorias_sel))]
         
         # --- MÉTRICAS ---
         m1, m2, m3 = st.columns(3)
@@ -201,25 +207,23 @@ else:
         m2.metric(t["lucro"], f"{t['moeda']} {df_view['Lucro Total'].sum():,.2f}")
         m3.metric(t["margem"], f"{df_view['Margem %'].mean():.2f}%")
 
-        # --- SELETOR DE GRÁFICO ---
+        # --- GRÁFICOS ---
         st.write("---")
         c_sel, _ = st.columns([0.3, 0.7])
-        with c_sel:
-            modo = st.selectbox(t["grafico_label"], t["grafico_opcoes"])
+        with c_sel: modo = st.selectbox(t["grafico_label"], t["grafico_opcoes"])
         
-        # Lógica de Gráficos Dinâmicos
-        if "Status" in modo:
+        if "Status" in modo or "Estado" in modo:
             fig = px.pie(df_view, names='Status', hole=0.4, color='Status', color_discrete_map={'✅': '#2ecc71', '⚠️': '#f1c40f', '🟥': '#e74c3c'})
-        elif "Marketplace" in modo or "Lojas" in modo:
-            fig = px.bar(df_view.groupby('Loja Líder')['Lucro Total'].sum().reset_index(), x='Loja Líder', y='Lucro Total', color='Loja Líder', title="Lucro Projetado por Concorrente Dominante")
+        elif "Marketplace" in modo:
+            fig = px.bar(df_view.groupby('Loja Líder')['Lucro Total'].sum().reset_index(), x='Loja Líder', y='Lucro Total', title="Lucro Projetado por Lojista Dominante")
         elif "Linha" in modo:
-            fig = px.pie(df_view, names='Linha', values='Lucro Total', hole=0.4, title="Distribuição de Lucro por Categoria")
+            fig = px.pie(df_view, names='Linha', values='Lucro Total', hole=0.4, title="Lucro por Categoria")
         else:
-            fig = px.bar(df_view, x='Nome', y='Qtde', color='Status', title="Volume de Stock por Produto")
+            fig = px.bar(df_view, x='Nome', y='Qtde', color='Status', color_discrete_map={'✅': '#2ecc71', '⚠️': '#f1c40f', '🟥': '#e74c3c'}, title="Volume de Unidades")
 
         st.plotly_chart(fig, use_container_width=True)
         
-        # --- TABELA FINAL ---
+        # TABELA
         st.dataframe(df_view[['Nome', 'Linha', 'Qtde', 'Custo', 'Seu Preço', 'Mercado', 'Loja Líder', 'Preço Sugerido', 'Margem %', 'Status', 'Lucro Total']].style.format({'Custo': '{:.2f}', 'Seu Preço': '{:.2f}', 'Mercado': '{:.2f}', 'Preço Sugerido': '{:.2f}', 'Margem %': '{:.2f}', 'Lucro Total': '{:.2f}'}))
         
         st.divider()
