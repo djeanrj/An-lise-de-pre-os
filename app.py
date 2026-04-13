@@ -11,7 +11,28 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
 # 1. CONFIGURAÇÃO DA INTERFACE
-st.set_page_config(page_title="IA Marketplace Global", layout="wide", page_icon="🌎")
+st.set_page_config(page_title="Global Marketplace Intelligence", layout="wide", page_icon="🌎")
+
+# --- SISTEMA DE PROTEÇÃO (SENHA) ---
+def check_password():
+    def password_entered():
+        if st.session_state["password"] == "123456": # ALTERE SUA SENHA AQUI
+            st.session_state["password_correct"] = True
+            del st.session_state["password"]
+        else:
+            st.session_state["password_correct"] = False
+
+    if "password_correct" not in st.session_state:
+        st.text_input("Password / Senha", type="password", on_change=password_entered, key="password")
+        return False
+    elif not st.session_state["password_correct"]:
+        st.text_input("Password / Senha", type="password", on_change=password_entered, key="password")
+        st.error("😕 Senha incorreta / Incorrect password")
+        return False
+    return True
+
+if not check_password():
+    st.stop()
 
 # --- DICIONÁRIO DE TRADUÇÃO TOTALMENTE ISOLADO ---
 idiomas = {
@@ -125,19 +146,21 @@ else:
         fonte = st.radio("Fonte:", ["Bling (API V3)", "Excel"], horizontal=True)
         if fonte == "Bling (API V3)":
             c_bl, _ = st.columns([0.3, 0.7])
-            with c_bl: bling_token = st.text_input(t["bling_token"], type="password")
+            with c_bl: 
+                bling_token = st.text_input(t["bling_token"], type="password")
             if st.button("📥 Importar Dados"):
                 try:
                     h = {"Authorization": f"Bearer {bling_token}"}
                     r = requests.get("https://bling.com.br", headers=h)
                     if r.status_code == 200:
-                        df_base = pd.DataFrame([{"ID": i['id'], "Nome": i['nome'], "Custo": round(float(i.get('precoCusto',0)), 2), "Qtde": float(i.get('estoque',{}).get('quantidade',1) or 1), "EAN": i.get('codigoBarra',''), "Linha": "Bling"} for i in r.json().get('data', [])])
+                        df_base = pd.DataFrame([{"ID": i['id'], "Nome": i['nome'], "Custo": round(float(i.get('precoCusto',0)), 2), "Qtde": float(i.get('estoque',{}).get('quantidade',1) or 1), "EAN": i.get('codigoBarra',''), "Linha": i.get('categoria',{}).get('nome','Geral')} for i in r.json().get('data', [])])
                         st.success("OK!")
                 except: st.error("Erro")
         else:
             uploaded_file = st.file_uploader(t["btn_excel"], type=["xlsx", "xls"])
             if uploaded_file:
                 df_raw = pd.read_excel(uploaded_file); cols = df_raw.columns.tolist()
+                st.write(t["mapeamento"])
                 c1, c2, c3, c4, c5 = st.columns(5)
                 with c1: col_n = st.selectbox("NOME:", cols)
                 with c2: col_c = st.selectbox("CUSTO:", cols)
@@ -150,8 +173,20 @@ else:
         uploaded_file = st.file_uploader(t["btn_excel"], type=["xlsx", "xls"])
         if uploaded_file:
             df_raw = pd.read_excel(uploaded_file); cols = df_raw.columns.tolist()
+            st.write(t["mapeamento"])
             c1, c2, c3, c4, c5 = st.columns(5)
-            with c1: col_n = st.selectbox("NAME:", cols); with c2: col_c = st.selectbox("COST:", cols); with c3: col_q = st.selectbox("QTY:", cols); with c4: col_l = st.selectbox("LINE:", ["None"] + cols); with c5: col_e = st.selectbox("EAN:", ["N/A"] + cols)
+            # --- CORREÇÃO DO ERRO DE SINTAXE AQUI ---
+            with c1:
+                col_n = st.selectbox("NAME:", cols)
+            with c2:
+                col_c = st.selectbox("COST:", cols)
+            with c3:
+                col_q = st.selectbox("QTY:", cols)
+            with c4:
+                col_l = st.selectbox("LINE:", ["None"] + cols)
+            with c5:
+                col_e = st.selectbox("EAN:", ["N/A"] + cols)
+                
             df_base = df_raw.copy().rename(columns={col_n:'Nome', col_c:'Custo', col_q:'Qtde'})
             df_base['EAN'] = df_raw[col_e] if col_e != "N/A" else ""; df_base['Linha'] = df_raw[col_l] if col_l != "None" else "General"; df_base['ID'] = 0
 
@@ -162,18 +197,20 @@ else:
         with cp1: imposto = st.number_input("% Tax", 0, 100, 4) / 100
         with cp2: markup_padrao = st.number_input("% Markup", 0, 500, 70) / 100
         if st.button(t["btn_analisar"]):
-            with st.spinner('Analisando mercado...'):
+            with st.spinner('Analisando mercado local e fiscal...'):
                 df = df_base.copy(); res_m, res_l = [], []
                 loc_f = t["loc"]
                 if "Portugal" in pais_sel and scope_pt == "União Europeia": loc_f = "Western Europe"
-                blacklist = ['kidiin', 'kidinn', 'tradeinn', 'fruugo', 'desertcart', 'ubuy', 'vendiloshop', 'grandado']
+                blacklist = ['kidiin', 'kidinn', 'tradeinn', 'fruugo', 'desertcart', 'ubuy', 'vendiloshop', 'vendiilo', 'grandado', 'temu']
                 for idx, row in df.iterrows():
                     search = GoogleSearch({"engine": "google_shopping", "q": f"{row['Nome']} {row['EAN']}", "google_domain": t["domain"], "hl": t["lang"][:2], "gl": t["gl"], "location": loc_f, "api_key": st.session_state.api_key})
                     results = search.get_dict(); best_p, best_l = round(row['Custo']*2.5, 2), "N/A"
                     if "shopping_results" in results:
                         validos = []
                         for it in results['shopping_results']:
-                            if any(b in it.get('source', '').lower() for b in blacklist): continue
+                            source = it.get('source', '').lower()
+                            link = it.get('link', '').lower()
+                            if any(b in source for b in blacklist) or any(b in link for b in blacklist): continue
                             if t["moeda"] not in str(it.get('price','')): continue
                             try:
                                 v = float(re.sub(r'[^\d,.]','',str(it.get('price'))).replace('.','').replace(',','.'))
@@ -198,14 +235,12 @@ else:
         c2.metric(t["lucro"], f"{t['moeda']} {df['Lucro Total'].sum():,.2f}")
         c3.metric(t["margem"], f"{df['Margem %'].mean():.2f}%")
         
-        # --- OPÇÕES DE GRÁFICO DINÂMICO ---
-        st.write("---")
         modo = st.selectbox(t["grafico_label"], t["grafico_opcoes"])
-        if modo == t["grafico_opcoes"][0]: # Resumo
+        if modo == t["grafico_opcoes"][0]:
             fig = px.pie(df, names='Status', hole=0.4, color='Status', color_discrete_map={t["status_vencendo"]: '#2ecc71', t["status_caro"]: '#f1c40f', t["status_burn"]: '#e74c3c'})
-        elif modo == t["grafico_opcoes"][1]: # Lucro
+        elif modo == t["grafico_opcoes"][1]:
             fig = px.pie(df, names='Status', values='Lucro Total', hole=0.4, color='Status', color_discrete_map={t["status_vencendo"]: '#2ecc71', t["status_caro"]: '#f1c40f', t["status_burn"]: '#e74c3c'})
-        else: # Volume
+        else:
             fig = px.pie(df, names='Status', values='Qtde', hole=0.4, color='Status', color_discrete_map={t["status_vencendo"]: '#2ecc71', t["status_caro"]: '#f1c40f', t["status_burn"]: '#e74c3c'})
         
         fig.update_traces(textinfo='percent+label')
@@ -213,7 +248,6 @@ else:
         
         st.dataframe(df[['Nome', 'Linha', 'Qtde', 'Custo', 'Seu Preço', 'Mercado', 'Loja Líder', 'Preço Sugerido', 'Margem %', 'Status', 'Lucro Total']].style.format({'Custo': '{:.2f}', 'Seu Preço': '{:.2f}', 'Mercado': '{:.2f}', 'Preço Sugerido': '{:.2f}', 'Margem %': '{:.2f}', 'Lucro Total': '{:.2f}'}))
         
-        st.divider()
         out = io.BytesIO()
         with pd.ExcelWriter(out, engine='xlsxwriter') as wr: df.to_excel(wr, index=False)
         st.download_button(label=t["download_btn"], data=out.getvalue(), file_name="analise.xlsx")
