@@ -13,7 +13,7 @@ from email.mime.multipart import MIMEMultipart
 # 1. CONFIGURAÇÃO DA INTERFACE
 st.set_page_config(page_title="IA Marketplace Global", layout="wide", page_icon="🌎")
 
-# --- DICIONÁRIO DE TRADUÇÃO ---
+# --- DICIONÁRIO DE TRADUÇÃO TOTALMENTE ISOLADO ---
 idiomas = {
     "Brasil 🇧🇷": {
         "id": "BR", "moeda": "R$", "lang": "pt-BR", "domain": "google.com.br", "gl": "br", "loc": "Brazil",
@@ -78,7 +78,7 @@ idiomas = {
     }
 }
 
-# --- FUNÇÕES AUXILIARES ---
+# --- FUNÇÕES ---
 def identificar_coluna(lista_colunas, chaves):
     for c in lista_colunas:
         if any(k in str(c).lower().strip() for k in chaves): return lista_colunas.index(c)
@@ -103,7 +103,6 @@ with st.sidebar:
     st.header("Mercado")
     pais_sel = st.selectbox("Selecione:", list(idiomas.keys()), key="pais_main")
     
-    # RESET DE DADOS SE MUDAR REGIÃO (TERM O ACEITE TAMBÉM RESETARÁ POR LÓGICA DE KEY)
     if "pais_anterior" not in st.session_state: st.session_state.pais_anterior = pais_sel
     if st.session_state.pais_anterior != pais_sel:
         if "df_final" in st.session_state: del st.session_state.df_final
@@ -131,8 +130,6 @@ with st.sidebar:
 st.title(t["titulo"])
 st.subheader(t["termos_header"])
 st.info(t["termos_corpo"])
-
-# Checkbox visível e persistente por região
 aceite_regiao = st.checkbox(t["termos_check"], key=f"check_persist_{pais_sel}")
 
 if aceite_regiao:
@@ -140,10 +137,10 @@ if aceite_regiao:
     if not st.session_state.api_key:
         st.warning(t["aviso_chave"])
     else:
-        # --- CARREGAMENTO ---
         df_base = pd.DataFrame()
         if "Brasil" in pais_sel:
-            fonte = st.radio("Fonte:", ["Bling (API V3)", "Excel"], horizontal=True)
+            # MUDANÇA: Excel agora é a primeira opção (default)
+            fonte = st.radio("Fonte de Dados:", ["Excel", "Bling (API V3)"], horizontal=True)
             if fonte == "Bling (API V3)":
                 c_bl, _ = st.columns([0.3, 0.7])
                 with c_bl: bling_token = st.text_input(t["bling_token"], type="password")
@@ -184,25 +181,20 @@ if aceite_regiao:
                 df_base = df_raw.copy().rename(columns={col_n:'Nome', col_c:'Custo', col_q:'Qtde'})
                 df_base['EAN'], df_base['Linha'], df_base['ID'] = (df_raw[col_e] if col_e != "N/A" else ""), (df_raw[col_l] if col_l != "None" else "General"), 0
 
-        # --- ANÁLISE ---
         if not df_base.empty:
             st.divider(); st.subheader(t["header_analise"])
             cp1, cp2 = st.columns(2)
             with cp1: imposto = st.number_input("% Tax", 0, 100, 4) / 100
             with cp2: markup_padrao = st.number_input("% Markup", 0, 500, 70) / 100
             if st.button(t["btn_analisar"]):
-                with st.spinner('Analisando concorrentes locais...'):
+                with st.spinner('Procurando preços reais no mercado...'):
                     df = df_base.copy(); res_m, res_l = [], []
-                    loc_f = t["loc"]
-                    if "Portugal" in pais_sel and scope_pt == "União Europeia": loc_f = "Western Europe"
-                    
-                    blacklist = ['kidiin', 'kidinn', 'tradeinn', 'fruugo', 'desertcart', 'ubuy', 'vendiloshop', 'grandado', 'aliexpress', 'temu']
+                    loc_f = t["loc"]; blacklist = ['kidiin', 'kidinn', 'tradeinn', 'fruugo', 'desertcart', 'ubuy', 'vendiloshop', 'grandado', 'aliexpress', 'temu']
                     if "USA" not in pais_sel: blacklist.append('ebay')
 
                     for idx, row in df.iterrows():
-                        q_search = f"{row['Nome']} {row['EAN']}"
-                        search = GoogleSearch({"engine": "google_shopping", "q": q_search, "google_domain": t["domain"], "hl": t["lang"][:2], "gl": t["gl"], "location": loc_f, "api_key": st.session_state.api_key})
-                        results = search.get_dict(); best_p, best_l = round(row['Custo']*2.5, 2), "Sem Concorrência"
+                        search = GoogleSearch({"engine": "google_shopping", "q": f"{row['Nome']} {row['EAN']}", "google_domain": t["domain"], "hl": t["lang"][:2], "gl": t["gl"], "location": loc_f, "api_key": st.session_state.api_key})
+                        results = search.get_dict(); best_p, best_l = round(row['Custo']*2.2, 2), "Competitor N/A"
                         
                         if "shopping_results" in results:
                             validos = []
@@ -212,7 +204,7 @@ if aceite_regiao:
                                 if any(b in source.lower() for b in blacklist) or any(b in link for b in blacklist) or t["moeda"] not in price_str: continue
                                 try:
                                     v = float(re.sub(r'[^\d,.]','',price_str).replace('.','').replace(',','.'))
-                                    if v > (row['Custo']*0.15): validos.append({"p": round(v,2), "l": source})
+                                    if v > (row['Custo']*0.1): validos.append({"p": round(v,2), "l": source})
                                 except: continue
                             if validos:
                                 b = min(validos, key=lambda x:x['p']); best_p, best_l = b['p'], b['l']
@@ -230,26 +222,22 @@ if aceite_regiao:
             df = st.session_state.df_final
             st.divider()
             c_f1, c_f2 = st.columns(2)
-            with c_f1: lojas_sel = st.multiselect("Lojas Concorrentes:", options=df['Loja Líder'].unique(), default=df['Loja Líder'].unique())
-            with c_f2: categorias_sel = st.multiselect("Linhas de Produto:", options=df['Linha'].unique(), default=df['Linha'].unique())
+            with c_f1: lojas_sel = st.multiselect("Concorrentes:", options=df['Loja Líder'].unique(), default=df['Loja Líder'].unique())
+            with c_f2: categorias_sel = st.multiselect("Categorias:", options=df['Linha'].unique(), default=df['Linha'].unique())
             df_view = df[(df['Loja Líder'].isin(lojas_sel)) & (df['Linha'].isin(categorias_sel))]
-            
             m1, m2, m3 = st.columns(3)
             m1.metric(t["invest"], f"{t['moeda']} {(df_view['Custo'] * df_view['Qtde']).sum():,.2f}")
             m2.metric(t["lucro"], f"{t['moeda']} {df_view['Lucro Total'].sum():,.2f}")
             m3.metric(t["margem"], f"{df_view['Margem %'].mean():.2f}%")
-
             st.write("---"); c_sel, _ = st.columns([0.25, 0.75])
             with c_sel: modo = st.selectbox(t["grafico_label"], t["grafico_opcoes"])
             color_map = {'✅': '#2ecc71', '⚠️': '#f1c40f', '🟥': '#e74c3c'}
             if "Status" in modo: fig = px.pie(df_view, names='Status', hole=0.4, color='Status', color_discrete_map=color_map)
-            elif "Marketplace" in modo: fig = px.bar(df_view.groupby('Loja Líder')['Lucro Total'].sum().reset_index(), x='Loja Líder', y='Lucro Total', color='Loja Líder', title="Market Profit")
-            elif "Linha" in modo: fig = px.pie(df_view, names='Linha', values='Lucro Total', hole=0.4, title="Line Profit")
-            else: fig = px.bar(df_view, x='Nome', y='Qtde', color='Status', color_discrete_map=color_map, title="Stock Volume")
+            elif "Marketplace" in modo: fig = px.bar(df_view.groupby('Loja Líder')['Lucro Total'].sum().reset_index(), x='Loja Líder', y='Lucro Total', color='Loja Líder', title="Profit per Store")
+            elif "Linha" in modo: fig = px.pie(df_view, names='Linha', values='Lucro Total', hole=0.4, title="Profit per Category")
+            else: fig = px.bar(df_view, x='Nome', y='Qtde', color='Status', color_discrete_map=color_map, title="Inventory Volume")
             st.plotly_chart(fig, use_container_width=True)
-            
             st.dataframe(df_view[['Nome', 'Linha', 'Qtde', 'Custo', 'Seu Preço', 'Mercado', 'Loja Líder', 'Preço Sugerido', 'Margem %', 'Status', 'Lucro Total']].style.format({'Custo': '{:.2f}', 'Seu Preço': '{:.2f}', 'Mercado': '{:.2f}', 'Preço Sugerido': '{:.2f}', 'Margem %': '{:.2f}', 'Lucro Total': '{:.2f}'}))
-            
             out = io.BytesIO(); wr = pd.ExcelWriter(out, engine='xlsxwriter'); df_view.to_excel(wr, index=False); wr.close()
             st.download_button(label=t["download_btn"], data=out.getvalue(), file_name="analise_global.xlsx")
             if "Brasil" in pais_sel and fonte == "Bling (API V3)":
