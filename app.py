@@ -12,33 +12,11 @@ from email.mime.multipart import MIMEMultipart
 # 1. CONFIGURAÇÃO DA INTERFACE
 st.set_page_config(page_title="Global Marketplace Intelligence", layout="wide", page_icon="🌎")
 
-# --- DICIONÁRIO DE TRADUÇÃO E CONFIGURAÇÃO ---
+# --- DICIONÁRIO DE TRADUÇÃO E REGRAS ---
+# Ordenado alfabeticamente pela chave (BR, PT, US)
 idiomas = {
-    "PT": {
-        "label": "🇵🇹 Portugal",
-        "titulo": "🚀 Inteligência de Mercado Portugal & UE",
-        "label_chave": "Chave SerpApi",
-        "help_chave": "Código para pesquisar preços reais no Google Shopping. Obtenha em SerpApi.com.",
-        "btn_confirmar": "Confirmar Chave", "msg_ativado": "Sistema Ativado!",
-        "ajuda_header": "📖 Legenda de Situação",
-        "ajuda_corpo": "✅ **A Vencer**: O seu preço é o mais baixo.\n\n⚠️ **Caro**: Acima do mercado.\n\n🟥 **Crítico**: Mercado abaixo do custo.",
-        "suporte_header": "💬 Suporte ao Utilizador", "suporte_label": "Como podemos ajudar?",
-        "termos_header": "### ⚖️ Termos de Utilização",
-        "termos_corpo": "Folha necessária: **Nome, Custo e Quantidade**.",
-        "termos_check": "Aceito os Termos de Utilização.",
-        "termos_aviso": "👉 Aceite os termos para desbloquear.",
-        "passo1": "1️⃣ Carregamento de Produtos",
-        "btn_excel": "Carregue o seu ficheiro Excel",
-        "mapeamento": "Identifique as colunas do seu ficheiro:",
-        "passo2": "2️⃣ Estratégia e Análise",
-        "label_imposto": "IVA (%)", "label_markup": "Margem de Aumento (%)",
-        "btn_analisar": "🚀 INICIAR ANÁLISE DE MERCADO",
-        "invest": "Investimento", "lucro": "Lucro Projetado", "margem": "Margem Médio",
-        "download_btn": "Descarregar Resultados em Excel",
-        "moeda": "€", "lang": "pt-PT", "domain": "google.pt", "gl": "pt", "loc": "Portugal"
-    },
     "BR": {
-        "label": "🇧🇷 Brasil",
+        "bandeira": "🇧🇷",
         "titulo": "🚀 Inteligência de Mercado Brasil + Bling Sync",
         "label_chave": "SerpApi Key",
         "help_chave": "Código para pesquisar preços reais no Google Shopping. Obtenha em SerpApi.com.",
@@ -48,7 +26,7 @@ idiomas = {
         "ajuda_corpo": "✅ **Vencendo**: Seu preço é o menor.\n\n⚠️ **Caro**: Acima do mercado.\n\n🟥 **Burn**: Concorrência abaixo do custo.",
         "suporte_header": "💬 Suporte ao Cliente", "suporte_label": "Como podemos ajudar?",
         "termos_header": "### ⚖️ Termos de Uso e Instruções",
-        "termos_corpo": "Planilha necessária: **Nome, Custo e Quantidade**. EAN recomendado.",
+        "termos_corpo": "Planilha necessária: Nome, Custo e Quantidade.",
         "termos_check": "Eu aceito os Termos de Uso.",
         "termos_aviso": "👉 Aceite os termos para desbloquear.",
         "passo1": "1️⃣ Carregamento de Produtos",
@@ -62,8 +40,31 @@ idiomas = {
         "sinc_btn": "Aceitar sugestões de preço para o bling",
         "moeda": "R$", "lang": "pt-BR", "domain": "google.com.br", "gl": "br", "loc": "Brazil"
     },
+    "PT": {
+        "bandeira": "🇵🇹",
+        "titulo": "🚀 Inteligência de Mercado Portugal & UE",
+        "label_chave": "Chave SerpApi",
+        "help_chave": "Código para pesquisar preços reais no Google Shopping. Obtenha em SerpApi.com.",
+        "btn_confirmar": "Confirmar Chave", "msg_ativado": "Sistema Ativado!",
+        "ajuda_header": "📖 Legenda de Situação",
+        "ajuda_corpo": "✅ **A Vencer**: O seu preço é o mais baixo.\n\n⚠️ **Caro**: Acima do mercado.\n\n🟥 **Crítico**: Mercado abaixo do custo.",
+        "suporte_header": "💬 Suporte ao Utilizador", "suporte_label": "Como podemos ajudar?",
+        "termos_header": "### ⚖️ Termos de Utilização",
+        "termos_corpo": "Folha necessária: Nome, Custo e Quantidade.",
+        "termos_check": "Aceito os Termos de Utilização.",
+        "termos_aviso": "👉 Aceite os termos para desbloquear.",
+        "passo1": "1️⃣ Carregamento de Produtos",
+        "btn_excel": "Carregue o seu ficheiro Excel",
+        "mapeamento": "Identifique as colunas do seu ficheiro:",
+        "passo2": "2️⃣ Estratégia e Análise",
+        "label_imposto": "IVA (%)", "label_markup": "Margem de Aumento (%)",
+        "btn_analisar": "🚀 INICIAR ANÁLISE DE MERCADO",
+        "invest": "Investimento", "lucro": "Lucro Projetado", "margem": "Margem Média",
+        "download_btn": "Descarregar Resultados em Excel",
+        "moeda": "€", "lang": "pt-PT", "domain": "google.pt", "gl": "pt", "loc": "Portugal"
+    },
     "US": {
-        "label": "🇺🇸 USA",
+        "bandeira": "🇺🇸",
         "titulo": "🚀 USA Marketplace Intelligence",
         "label_chave": "SerpApi Key",
         "help_chave": "Code for real-time prices. Get it at SerpApi.com.",
@@ -72,7 +73,7 @@ idiomas = {
         "ajuda_corpo": "✅ **Winning**: Your price is the lowest.\n\n⚠️ **Expensive**: Above market.\n\n🟥 **Alert**: Market below cost.",
         "suporte_header": "💬 Customer Support", "suporte_label": "How can we help?",
         "termos_header": "### ⚖️ Terms of Use",
-        "termos_corpo": "Sheet required: **Name, Cost, and Quantity**.",
+        "termos_corpo": "Sheet required: Name, Cost, and Quantity.",
         "termos_check": "I accept the Terms of Use.",
         "termos_aviso": "👉 Please accept terms to unlock.",
         "passo1": "1️⃣ Data Upload",
@@ -87,13 +88,16 @@ idiomas = {
     }
 }
 
-# --- DETECÇÃO DE PAÍS MELHORADA ---
+# --- DETECÇÃO FÍSICA POR IP (IGNORA SETTINGS DA MÁQUINA) ---
 @st.cache_data(ttl=3600)
-def detectar_localizacao():
+def detectar_localizacao_fisica():
     try:
-        res = requests.get("http://ip-api.com", timeout=3).json()
-        codigo = res.get("countryCode", "BR")
-        return codigo if codigo in idiomas else "BR"
+        # Busca a localização pelo IP público real
+        res = requests.get("https://ipapi.co", timeout=3).json()
+        cc = res.get("country_code", "BR")
+        if cc == "PT": return "PT"
+        if cc == "US": return "US"
+        return "BR"
     except:
         return "BR"
 
@@ -111,18 +115,19 @@ def enviar_email_log(n, e, m, tipo="SUPORTE"):
         return True
     except: return False
 
-# --- SIDEBAR: SELETOR VISUAL ---
+# --- SIDEBAR: APENAS BANDEIRAS ---
 with st.sidebar:
-    st.header("🌎 Market Selection")
+    st.header("🌍 Market Selection")
     
-    codigo_detectado = detectar_localizacao()
-    # Seletor usando a bandeira diretamente como parte da string de opção
-    lista_opcoes = list(idiomas.keys())
+    local_real = detectar_localizacao_fisica()
+    opcoes_keys = sorted(list(idiomas.keys())) # Ordem Alfabética: BR, PT, US
+    
+    # SELETOR VISUAL APENAS COM BANDEIRAS
     pais_key = st.selectbox(
-        "Choose Country / Escolha o País:", 
-        options=lista_opcoes,
-        index=lista_opcoes.index(codigo_detectado),
-        format_func=lambda x: idiomas[x]["label"]
+        "Select Flag / Escolha a Bandeira:", 
+        options=opcoes_keys,
+        index=opcoes_keys.index(local_real),
+        format_func=lambda x: idiomas[x]["bandeira"]
     )
     t = idiomas[pais_key] 
     
@@ -178,14 +183,13 @@ if pais_key == "BR":
                     h = {"Authorization": f"Bearer {bling_token}"}
                     r = requests.get("https://bling.com.br", headers=h)
                     if r.status_code == 200:
-                        df_base = pd.DataFrame([{"ID": i['id'], "Nome": i['nome'], "Custo": round(float(i.get('precoCusto',0)), 2), "Qtde": float(i.get('estoque',{}).get('quantidade',1) or 1), "EAN": i.get('codigoBarra',''), "Linha": "Bling"} for i in r.json().get('data', [])])
+                        df_base = pd.DataFrame([{"ID": i['id'], "Nome": i['nome'], "Custo": round(float(i.get('precoCusto',0)), 2), "Preço Atual": round(float(i.get('preco',0)), 2), "Qtde": float(i.get('estoque',{}).get('quantidade',1) or 1), "EAN": i.get('codigoBarra',''), "Linha": "Bling"} for i in r.json().get('data', [])])
                         st.success("OK!")
                 except: st.error("Erro")
     else:
         uploaded_file = st.file_uploader(t["btn_excel"], type=["xlsx", "xls"])
         if uploaded_file:
-            df_raw = pd.read_excel(uploaded_file)
-            cols = df_raw.columns.tolist()
+            df_raw = pd.read_excel(uploaded_file); cols = df_raw.columns.tolist()
             st.write(t["mapeamento"])
             c1, c2, c3, c4, c5 = st.columns(5)
             with c1: col_n = st.selectbox("NOME:", cols)
@@ -198,8 +202,7 @@ if pais_key == "BR":
 else:
     uploaded_file = st.file_uploader(t["btn_excel"], type=["xlsx", "xls"])
     if uploaded_file:
-        df_raw = pd.read_excel(uploaded_file)
-        cols = df_raw.columns.tolist()
+        df_raw = pd.read_excel(uploaded_file); cols = df_raw.columns.tolist()
         st.write(t["mapeamento"])
         c1, c2, c3, c4, c5 = st.columns(5)
         with c1: col_n = st.selectbox("NAME:", cols)
@@ -251,7 +254,7 @@ if "df_final" in st.session_state:
     c1, c2, c3 = st.columns(3)
     c1.metric(t["invest"], f"{t['moeda']} {df['Custo'].sum():,.2f}")
     c2.metric(t["lucro"], f"{t['moeda']} {df['Lucro Total'].sum():,.2f}")
-    c3.metric(t["margem"], f"{df['Margem %'].mean():.2f}%")
+    c3.metric(t["margem"], f"{df['Margem %'].mean():.1f}%")
     st.dataframe(df[['Nome', 'Linha', 'Qtde', 'Custo', 'Seu Preço', 'Mercado', 'Loja Líder', 'Preço Sugerido', 'Margem %', 'Situação', 'Lucro Total']].style.format({'Custo': '{:.2f}', 'Seu Preço': '{:.2f}', 'Mercado': '{:.2f}', 'Preço Sugerido': '{:.2f}', 'Margem %': '{:.2f}', 'Lucro Total': '{:.2f}'}))
     
     st.divider()
