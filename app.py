@@ -10,16 +10,17 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
 # 1. CONFIGURAÇÃO DA INTERFACE
-st.set_page_config(page_title="Global Price Intelligence", layout="wide", page_icon="🌎")
+st.set_page_config(page_title="IA Marketplace Global", layout="wide", page_icon="🌎")
 
-# --- DICIONÁRIO DE TRADUÇÃO TOTALMENTE ISOLADO ---
+# --- DICIONÁRIO DE TRADUÇÃO ORIENTADO PELOS SÍMBOLOS DAS BANDEIRAS ---
 idiomas = {
-    "PT": {
-        "bandeira": "🇵🇹",
+    "🇵🇹": {
+        "sigla": "PT",
         "titulo": "🚀 Inteligência de Mercado Portugal & UE",
         "label_chave": "Chave SerpApi",
-        "help_chave": "A SerpApi Key permite pesquisar preços reais no Google Shopping. Obtenha em SerpApi.com.",
+        "help_chave": "Código para pesquisar preços reais no Google. Obtenha em SerpApi.com.",
         "btn_confirmar": "Confirmar Chave",
+        "msg_ativado": "Sistema Ativado!",
         "ajuda_header": "📖 Legenda",
         "ajuda_corpo": "✅ **A Vencer**: Preço ideal.\n\n⚠️ **Caro**: Acima do mercado.\n\n🟥 **Crítico**: Abaixo do custo.",
         "suporte_header": "💬 Suporte",
@@ -38,12 +39,14 @@ idiomas = {
         "download_btn": "Descarregar Excel",
         "moeda": "€", "lang": "pt-PT", "domain": "google.pt", "gl": "pt", "loc": "Portugal"
     },
-    "BR": {
-        "bandeira": "🇧🇷",
+    "🇧🇷": {
+        "sigla": "BR",
         "titulo": "🚀 Inteligência de Mercado Brasil + Bling Sync",
         "label_chave": "SerpApi Key",
-        "help_chave": "Código para pesquisar preços reais no Google Shopping. Obtenha em SerpApi.com.",
+        "help_chave": "Código para pesquisar preços reais no Google. Obtenha em SerpApi.com.",
         "btn_confirmar": "Confirmar Chave",
+        "msg_ativado": "Sistema Ativado!",
+        "bling_token": "Token API Bling V3:",
         "ajuda_header": "📖 Legenda",
         "ajuda_corpo": "✅ **Vencendo**: Preço ideal.\n\n⚠️ **Caro**: Acima do mercado.\n\n🟥 **Burn**: Abaixo do custo.",
         "suporte_header": "💬 Suporte",
@@ -60,15 +63,16 @@ idiomas = {
         "btn_analisar": "🚀 INICIAR ANÁLISE REAL",
         "invest": "Investimento", "lucro": "Lucro Projetado", "margem": "Margem Média",
         "download_btn": "Baixar Excel",
-        "sinc_btn": "Aceitar sugestões de preço para o bling",
+        "sinc_btn": "Aceitar sugestões de preço para o bling e atualizar na plataforma",
         "moeda": "R$", "lang": "pt-BR", "domain": "google.com.br", "gl": "br", "loc": "Brazil"
     },
-    "US": {
-        "bandeira": "🇺🇸",
+    "🇺🇸": {
+        "sigla": "US",
         "titulo": "🚀 USA Marketplace Intelligence",
         "label_chave": "SerpApi Key",
         "help_chave": "Code for real-time prices. Get it at SerpApi.com.",
         "btn_confirmar": "Confirm Key",
+        "msg_ativado": "System Activated!",
         "ajuda_header": "📖 Legend",
         "ajuda_corpo": "✅ **Winning**: Best price.\n\n⚠️ **Expensive**: Above market.\n\n🟥 **Alert**: Below cost.",
         "suporte_header": "💬 Support",
@@ -89,14 +93,16 @@ idiomas = {
     }
 }
 
-# --- DETECÇÃO REAL DE PAÍS POR IP ---
-if "pais_key" not in st.session_state:
+# --- DETECÇÃO FÍSICA POR IP (LISBOA = 🇵🇹) ---
+if "bandeira_ativa" not in st.session_state:
     try:
         res = requests.get("https://ipapi.co", timeout=3).json()
         cc = res.get("country_code", "BR")
-        st.session_state.pais_key = cc if cc in idiomas else "BR"
+        # Mapeia sigla do IP para o símbolo da bandeira
+        mapeamento_ip = {"PT": "🇵🇹", "BR": "🇧🇷", "US": "🇺🇸"}
+        st.session_state.bandeira_ativa = mapeamento_ip.get(cc, "🇧🇷")
     except:
-        st.session_state.pais_key = "BR"
+        st.session_state.bandeira_ativa = "🇧🇷"
 
 # --- FUNÇÃO DE E-MAIL ---
 def enviar_email_log(n, e, m, tipo="SUPORTE"):
@@ -112,27 +118,28 @@ def enviar_email_log(n, e, m, tipo="SUPORTE"):
         return True
     except: return False
 
-# --- SIDEBAR: SELETOR VISUAL POR BOTÕES ---
+# --- SIDEBAR: SELETOR DE BANDEIRAS ---
 with st.sidebar:
-    st.header("🌎 Market / Mercado")
+    st.header("🌎 Market Selection")
     
-    # Criando botões lado a lado para as bandeiras aparecerem grandes e claras
-    col_b1, col_b2, col_b3 = st.columns(3)
-    if col_b1.button("🇧🇷", help="Brasil"): st.session_state.pais_key = "BR"
-    if col_b2.button("🇵🇹", help="Portugal"): st.session_state.pais_key = "PT"
-    if col_b3.button("🇺🇸", help="USA"): st.session_state.pais_key = "US"
-    
-    t = idiomas[st.session_state.pais_key]
-    st.write(f"**{t['bandeira']} {st.session_state.pais_key}**")
+    # O seletor agora exibe apenas os símbolos das bandeiras
+    opcoes_bandeiras = list(idiomas.keys())
+    escolha = st.selectbox(
+        "Select Country / País:",
+        options=opcoes_bandeiras,
+        index=opcoes_bandeiras.index(st.session_state.bandeira_ativa)
+    )
+    st.session_state.bandeira_ativa = escolha
+    t = idiomas[st.session_state.bandeira_ativa]
     
     st.divider()
     st.header("🔑 Activation")
     api_key_input = st.text_input(t["label_chave"], type="password", help=t["help_chave"])
     if st.button(t["btn_confirmar"]):
         st.session_state.api_key = api_key_input
-        st.success("OK!")
+        st.success(t["msg_ativado"])
 
-    if st.session_state.pais_key == "PT":
+    if st.session_state.bandeira_ativa == "🇵🇹":
         st.divider()
         scope_pt = st.radio("Âmbito:", ["Apenas Portugal", "Toda a União Europeia"])
     
@@ -159,10 +166,11 @@ if not aceite:
     st.stop()
 
 st.divider()
+# --- PASSO 1: CARREGAMENTO ---
 st.markdown(f"### {t['passo1']}")
 df_base = pd.DataFrame()
 
-if st.session_state.pais_key == "BR":
+if st.session_state.bandeira_ativa == "🇧🇷":
     fonte = st.radio("Fonte:", ["Bling (API V3)", "Excel (Manual)"], horizontal=True)
     if fonte == "Bling (API V3)":
         bling_token = st.text_input("Bling Token:", type="password")
@@ -177,7 +185,8 @@ if st.session_state.pais_key == "BR":
     else:
         uploaded_file = st.file_uploader(t["btn_excel"], type=["xlsx", "xls"])
         if uploaded_file:
-            df_raw = pd.read_excel(uploaded_file); cols = df_raw.columns.tolist()
+            df_raw = pd.read_excel(uploaded_file)
+            cols = df_raw.columns.tolist()
             st.write(t["mapeamento"])
             c1, c2, c3, c4, c5 = st.columns(5)
             with c1: col_n = st.selectbox("NOME:", cols)
@@ -190,7 +199,8 @@ if st.session_state.pais_key == "BR":
 else:
     uploaded_file = st.file_uploader(t["btn_excel"], type=["xlsx", "xls"])
     if uploaded_file:
-        df_raw = pd.read_excel(uploaded_file); cols = df_raw.columns.tolist()
+        df_raw = pd.read_excel(uploaded_file)
+        cols = df_raw.columns.tolist()
         st.write(t["mapeamento"])
         c1, c2, c3, c4, c5 = st.columns(5)
         with c1: col_n = st.selectbox("NAME:", cols)
@@ -213,7 +223,7 @@ if not df_base.empty:
             with st.spinner('...'):
                 df = df_base.copy(); res_m, res_l = [], []
                 loc_f = t["loc"]
-                if st.session_state.pais_key == "PT" and scope_pt == "Toda a União Europeia": loc_f = "Western Europe"
+                if st.session_state.bandeira_ativa == "🇵🇹" and scope_pt == "Toda a União Europeia": loc_f = "Western Europe"
                 for idx, row in df.iterrows():
                     search = GoogleSearch({"engine": "google_shopping", "q": f"{row['Nome']} {row['EAN']}", "google_domain": t["domain"], "hl": t["lang"][:2], "gl": t["gl"], "location": loc_f, "api_key": st.session_state.api_key})
                     results = search.get_dict(); best_p, best_l = round(row['Custo']*2.5, 2), "N/A"
@@ -250,7 +260,7 @@ if "df_final" in st.session_state:
     with pd.ExcelWriter(out, engine='xlsxwriter') as wr: df.to_excel(wr, index=False)
     st.download_button(label=t["download_btn"], data=out.getvalue(), file_name="analysis.xlsx")
 
-    if st.session_state.pais_key == "BR" and fonte == "Bling (API V3)":
+    if st.session_state.bandeira_ativa == "🇧🇷" and fonte == "Bling (API V3)":
         if st.button(t["sinc_btn"]):
             h = {"Authorization": f"Bearer {bling_token}", "Content-Type": "application/json"}
             for i, (idx, row) in enumerate(df.iterrows()):
