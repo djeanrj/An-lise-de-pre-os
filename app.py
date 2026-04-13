@@ -11,7 +11,7 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
 # 1. CONFIGURAÇÃO DA INTERFACE
-st.set_page_config(page_title="Global Marketplace Intelligence", layout="wide", page_icon="🌎")
+st.set_page_config(page_title="IA Marketplace Global", layout="wide", page_icon="🌎")
 
 # --- DICIONÁRIO DE TRADUÇÃO TOTALMENTE ISOLADO ---
 idiomas = {
@@ -26,15 +26,13 @@ idiomas = {
         "termos_header": "Termos de Uso e Isenção",
         "termos_corpo": "A planilha deve conter: Nome, Custo e Quantidade.",
         "termos_check": "Eu aceito os Termos de Uso do Brasil.",
-        "header_dados": "Carregamento de Produtos", 
-        "btn_excel": "Subir arquivo Excel",
-        "mapeamento": "Mapeie as colunas:", 
-        "header_analise": "Estratégia e Análise",
+        "header_dados": "Carregamento de Produtos", "btn_excel": "Subir arquivo Excel",
+        "mapeamento": "Mapeie as colunas:", "header_analise": "Estratégia e Análise",
         "btn_analisar": "Iniciar Análise Real", 
         "invest": "Investimento em Estoque", "lucro": "Lucro Total Projetado", "margem": "Margem s/ Sugerido",
-        "grafico_label": "Nível de detalhe do gráfico:",
-        "grafico_opcoes": ["Resumo de Status", "Lucro por Categoria", "Volume de Unidades"],
-        "status_vencendo": "✅ Vencendo", "status_caro": "⚠️ Caro", "status_burn": "🟥 Burn",
+        "grafico_label": "Nível de detalhe:",
+        "grafico_opcoes": ["Resumo de Status", "Lucro por Status", "Volume de Unidades"],
+        "status_vencendo": "Vencendo", "status_caro": "Caro", "status_burn": "Burn",
         "help_margem": "Baseado no Preço Sugerido.",
         "download_btn": "Baixar Excel", "sinc_btn": "Sincronizar com Bling"
     },
@@ -48,15 +46,13 @@ idiomas = {
         "termos_header": "Termos de Utilização",
         "termos_corpo": "A folha deve conter: Nome, Custo e Quantidade.",
         "termos_check": "Aceito os Termos de Utilização de Portugal.",
-        "header_dados": "Carregamento de Produtos", 
-        "btn_excel": "Carregar ficheiro Excel",
-        "mapeamento": "Identifique as colunas:", 
-        "header_analise": "Estratégia e Análise",
+        "header_dados": "Carregamento de Produtos", "btn_excel": "Carregar ficheiro Excel",
+        "mapeamento": "Identifique as colunas:", "header_analise": "Estratégia e Análise",
         "btn_analisar": "Iniciar Análise de Mercado", 
         "invest": "Investimento em Stock", "lucro": "Lucro Total Projetado", "margem": "Margem s/ Sugerido",
-        "grafico_label": "Nível de detalhe do gráfico:",
-        "grafico_opcoes": ["Resumo de Estado", "Lucro por Categoria", "Volume de Unidades"],
-        "status_vencendo": "✅ A Vencer", "status_caro": "⚠️ Caro", "status_burn": "🟥 Crítico",
+        "grafico_label": "Nível de detalhe:",
+        "grafico_opcoes": ["Resumo de Estado", "Lucro por Estado", "Volume de Unidades"],
+        "status_vencendo": "A Vencer", "status_caro": "Caro", "status_burn": "Crítico",
         "help_margem": "Baseado no Preço Sugerido.",
         "download_btn": "Descarregar Excel"
     },
@@ -70,15 +66,13 @@ idiomas = {
         "termos_header": "Terms of Use",
         "termos_corpo": "Sheet required: Name, Cost, and Quantity.",
         "termos_check": "I accept the USA Terms of Use.",
-        "header_dados": "Product Upload", 
-        "btn_excel": "Upload Excel file",
-        "mapeamento": "Map Columns:", 
-        "header_analise": "Strategy & Analysis",
+        "header_dados": "Product Upload", "btn_excel": "Upload Excel file",
+        "mapeamento": "Map Columns:", "header_analise": "Strategy & Analysis",
         "btn_analisar": "Start Market Analysis", 
         "invest": "Inventory Investment", "lucro": "Projected Profit", "margem": "Avg Margin",
-        "grafico_label": "Chart detail level:",
-        "grafico_opcoes": ["Status Summary", "Profit by Category", "Unit Volume"],
-        "status_vencendo": "✅ Winning", "status_caro": "⚠️ Expensive", "status_burn": "🟥 Alert",
+        "grafico_label": "Detail level:",
+        "grafico_opcoes": ["Status Summary", "Profit by Status", "Unit Volume"],
+        "status_vencendo": "Winning", "status_caro": "Expensive", "status_burn": "Alert",
         "help_margem": "Based on Suggested Price.",
         "download_btn": "Download Excel"
     }
@@ -162,7 +156,6 @@ else:
             df_base = df_raw.copy().rename(columns={col_n:'Nome', col_c:'Custo', col_q:'Qtde'})
             df_base['EAN'] = df_raw[col_e] if col_e != "N/A" else ""; df_base['Linha'] = df_raw[col_l] if col_l != "None" else "General"; df_base['ID'] = 0
 
-    # --- ANÁLISE ---
     if not df_base.empty:
         st.divider(); st.subheader(t["header_analise"])
         cp1, cp2 = st.columns(2)
@@ -207,19 +200,26 @@ else:
         c2.metric(t["lucro"], f"{t['moeda']} {df['Lucro Total'].sum():,.2f}")
         c3.metric(t["margem"], f"{df['Margem %'].mean():.2f}%")
         
-        modo = st.selectbox(t["grafico_label"], t["grafico_opcoes"])
+        st.write("---")
+        # AJUSTE DO TAMANHO DO SELETOR: Criada coluna de 25% da tela
+        c_sel, _ = st.columns([0.25, 0.75])
+        with c_sel:
+            modo = st.selectbox(t["grafico_label"], t["grafico_opcoes"])
+        
+        color_map = {t["status_vencendo"]: '#2ecc71', t["status_caro"]: '#f1c40f', t["status_burn"]: '#e74c3c'}
         if modo == t["grafico_opcoes"][0]:
-            fig = px.pie(df, names='Status', hole=0.4, color='Status', color_discrete_map={t["status_vencendo"]: '#2ecc71', t["status_caro"]: '#f1c40f', t["status_burn"]: '#e74c3c'})
+            fig = px.pie(df, names='Status', hole=0.4, color='Status', color_discrete_map=color_map)
         elif modo == t["grafico_opcoes"][1]:
-            fig = px.pie(df, names='Status', values='Lucro Total', hole=0.4, color='Status', color_discrete_map={t["status_vencendo"]: '#2ecc71', t["status_caro"]: '#f1c40f', t["status_burn"]: '#e74c3c'})
+            fig = px.pie(df, names='Status', values='Lucro Total', hole=0.4, color='Status', color_discrete_map=color_map)
         else:
-            fig = px.pie(df, names='Status', values='Qtde', hole=0.4, color='Status', color_discrete_map={t["status_vencendo"]: '#2ecc71', t["status_caro"]: '#f1c40f', t["status_burn"]: '#e74c3c'})
+            fig = px.pie(df, names='Status', values='Qtde', hole=0.4, color='Status', color_discrete_map=color_map)
         
         fig.update_traces(textinfo='percent+label')
         st.plotly_chart(fig, use_container_width=True)
         
         st.dataframe(df[['Nome', 'Linha', 'Qtde', 'Custo', 'Seu Preço', 'Mercado', 'Loja Líder', 'Preço Sugerido', 'Margem %', 'Status', 'Lucro Total']].style.format({'Custo': '{:.2f}', 'Seu Preço': '{:.2f}', 'Mercado': '{:.2f}', 'Preço Sugerido': '{:.2f}', 'Margem %': '{:.2f}', 'Lucro Total': '{:.2f}'}))
         
+        st.divider()
         out = io.BytesIO()
         with pd.ExcelWriter(out, engine='xlsxwriter') as wr: df.to_excel(wr, index=False)
         st.download_button(label=t["download_btn"], data=out.getvalue(), file_name="analise.xlsx")
