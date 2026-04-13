@@ -13,21 +13,17 @@ from email.mime.multipart import MIMEMultipart
 st.set_page_config(page_title="Global Marketplace Intelligence", layout="wide", page_icon="🌎")
 
 # --- DICIONÁRIO DE TRADUÇÃO E CONFIGURAÇÃO ---
-# A chave do dicionário é o código do país para facilitar a lógica
 idiomas = {
     "BR": {
-        "bandeira": "🇧🇷",
-        "nome": "Brasil",
+        "bandeira": "🇧🇷", "nome": "Brasil",
         "titulo": "🚀 Inteligência de Mercado Brasil + Bling Sync",
         "label_chave": "SerpApi Key",
         "help_chave": "Código para pesquisar preços reais no Google Shopping. Obtenha em SerpApi.com.",
-        "btn_confirmar": "Confirmar Chave",
-        "msg_ativado": "Sistema Ativado!",
+        "btn_confirmar": "Confirmar Chave", "msg_ativado": "Sistema Ativado!",
         "bling_token": "Token API Bling V3:",
         "ajuda_header": "📖 Legenda",
         "ajuda_corpo": "✅ **Vencendo**: Seu preço é o menor.\n\n⚠️ **Caro**: Acima do mercado.\n\n🟥 **Burn**: Concorrência abaixo do custo.",
-        "suporte_header": "💬 Suporte ao Cliente",
-        "suporte_label": "Como podemos ajudar?",
+        "suporte_header": "💬 Suporte ao Cliente", "suporte_label": "Como podemos ajudar?",
         "termos_header": "### ⚖️ Termos de Uso e Instruções",
         "termos_corpo": "Planilha necessária: **Nome, Custo e Quantidade**. O EAN é recomendado.",
         "termos_check": "Eu aceito os Termos de Uso.",
@@ -36,26 +32,22 @@ idiomas = {
         "btn_excel": "Suba seu arquivo Excel",
         "mapeamento": "Mapeie as colunas do seu arquivo:",
         "passo2": "2️⃣ Estratégia e Análise",
-        "label_imposto": "Imposto (%)",
-        "label_markup": "Aumento Padrão (%)",
+        "label_imposto": "Imposto (%)", "label_markup": "Aumento Padrão (%)",
         "btn_analisar": "🚀 INICIAR ANÁLISE REAL",
         "invest": "Investimento", "lucro": "Lucro Projetado", "margem": "Margem Média",
         "download_btn": "Baixar Resultados em Excel",
-        "sinc_btn": "Aceitar sugestões de preço para o bling",
+        "sinc_btn": "Aceitar sugestões de preço para o bling e atualizar na plataforma",
         "moeda": "R$", "lang": "pt-BR", "domain": "google.com.br", "gl": "br", "loc": "Brazil"
     },
     "PT": {
-        "bandeira": "🇵🇹",
-        "nome": "Portugal",
+        "bandeira": "🇵🇹", "nome": "Portugal",
         "titulo": "🚀 Inteligência de Mercado Portugal & UE",
         "label_chave": "Chave SerpApi",
         "help_chave": "Código para pesquisar preços reais no Google Shopping. Obtenha em SerpApi.com.",
-        "btn_confirmar": "Confirmar Chave",
-        "msg_ativado": "Sistema Ativado!",
+        "btn_confirmar": "Confirmar Chave", "msg_ativado": "Sistema Ativado!",
         "ajuda_header": "📖 Legenda",
         "ajuda_corpo": "✅ **A Vencer**: O seu preço é o mais baixo.\n\n⚠️ **Caro**: Acima do mercado.\n\n🟥 **Crítico**: Mercado abaixo do custo.",
-        "suporte_header": "💬 Suporte ao Utilizador",
-        "suporte_label": "Como podemos ajudar?",
+        "suporte_header": "💬 Suporte ao Utilizador", "suporte_label": "Como podemos ajudar?",
         "termos_header": "### ⚖️ Termos de Utilização",
         "termos_corpo": "Folha necessária: **Nome, Custo e Quantidade**.",
         "termos_check": "Aceito os Termos de Utilização.",
@@ -64,25 +56,21 @@ idiomas = {
         "btn_excel": "Carregue o seu ficheiro Excel",
         "mapeamento": "Identifique as colunas do seu ficheiro:",
         "passo2": "2️⃣ Estratégia e Análise",
-        "label_imposto": "IVA (%)",
-        "label_markup": "Margem de Aumento (%)",
+        "label_imposto": "IVA (%)", "label_markup": "Margem de Aumento (%)",
         "btn_analisar": "🚀 INICIAR ANÁLISE DE MERCADO",
         "invest": "Investimento", "lucro": "Lucro Projetado", "margem": "Margem Média",
         "download_btn": "Descarregar Resultados em Excel",
         "moeda": "€", "lang": "pt-PT", "domain": "google.pt", "gl": "pt", "loc": "Portugal"
     },
     "US": {
-        "bandeira": "🇺🇸",
-        "nome": "USA",
+        "bandeira": "🇺🇸", "nome": "USA",
         "titulo": "🚀 USA Marketplace Intelligence",
         "label_chave": "SerpApi Key",
         "help_chave": "Code for real-time prices. Get it at SerpApi.com.",
-        "btn_confirmar": "Confirm Key",
-        "msg_ativado": "System Activated!",
+        "btn_confirmar": "Confirm Key", "msg_ativado": "System Activated!",
         "ajuda_header": "📖 Legend",
         "ajuda_corpo": "✅ **Winning**: Your price is the lowest.\n\n⚠️ **Expensive**: Above market.\n\n🟥 **Alert**: Market below cost.",
-        "suporte_header": "💬 Customer Support",
-        "suporte_label": "How can we help?",
+        "suporte_header": "💬 Customer Support", "suporte_label": "How can we help?",
         "termos_header": "### ⚖️ Terms of Use",
         "termos_corpo": "Sheet required: **Name, Cost, and Quantity**.",
         "termos_check": "I accept the Terms of Use.",
@@ -91,8 +79,7 @@ idiomas = {
         "btn_excel": "Upload your Excel file",
         "mapeamento": "Map your file columns:",
         "passo2": "2️⃣ Strategy & Analysis",
-        "label_imposto": "Tax (%)",
-        "label_markup": "Standard Markup (%)",
+        "label_imposto": "Tax (%)", "label_markup": "Standard Markup (%)",
         "btn_analisar": "🚀 START MARKET ANALYSIS",
         "invest": "Investment", "lucro": "Projected Profit", "margem": "Avg Margin",
         "download_btn": "Download Results (Excel)",
@@ -104,7 +91,6 @@ idiomas = {
 @st.cache_data(ttl=3600)
 def detectar_localizacao():
     try:
-        # Usa ip-api.com (gratuito e sem necessidade de chave para este volume)
         response = requests.get("http://ip-api.com", timeout=3).json()
         codigo = response.get("countryCode", "BR")
         return codigo if codigo in idiomas else "BR"
@@ -125,13 +111,11 @@ def enviar_email_log(n, e, m, tipo="SUPORTE"):
         return True
     except: return False
 
-# --- SIDEBAR: SELETOR DE BANDEIRAS ---
+# --- SIDEBAR ---
 with st.sidebar:
     st.header("🌎 Market Selection")
     
     codigo_detectado = detectar_localizacao()
-    
-    # Seletor formatado com bandeiras
     pais_key = st.selectbox(
         "Choose Country / Escolha o País:", 
         options=list(idiomas.keys()),
@@ -160,7 +144,9 @@ with st.sidebar:
     user_q = st.text_input(t["suporte_label"])
     if user_q:
         with st.form("suporte_form", clear_on_submit=True):
-            n, e, m = st.text_input("Nome / Name"), st.text_input("Email"), st.text_area("Mensagem", value=user_q)
+            n = st.text_input("Nome / Name")
+            e = st.text_input("Email")
+            m = st.text_area("Mensagem", value=user_q)
             if st.form_submit_button("Enviar / Send"):
                 if enviar_email_log(n, e, m, "SUPORTE"): st.success("✅ OK!")
 
@@ -175,7 +161,7 @@ if not aceite:
     st.stop()
 
 st.divider()
-# [O RESTANTE DO CÓDIGO DE CARREGAMENTO E ANÁLISE SEGUE ABAIXO IGUAL, APENAS COM AS CHAVES TRADUZIDAS]
+
 # --- PASSO 1: CARREGAMENTO ---
 st.markdown(f"### {t['passo1']}")
 df_base = pd.DataFrame()
@@ -198,7 +184,9 @@ if pais_key == "BR":
     else:
         uploaded_file = st.file_uploader(t["btn_excel"], type=["xlsx", "xls"])
         if uploaded_file:
-            df_raw = pd.read_excel(uploaded_file); cols = df_raw.columns.tolist()
+            df_raw = pd.read_excel(uploaded_file)
+            cols = df_raw.columns.tolist()
+            st.write(t["mapeamento"])
             c1, c2, c3, c4, c5 = st.columns(5)
             with c1: col_n = st.selectbox("NOME:", cols)
             with c2: col_c = st.selectbox("CUSTO:", cols)
@@ -206,15 +194,25 @@ if pais_key == "BR":
             with c4: col_l = st.selectbox("LINHA:", ["Nenhuma"] + cols)
             with c5: col_e = st.selectbox("EAN:", ["Não possuo"] + cols)
             df_base = df_raw.copy().rename(columns={col_n:'Nome', col_c:'Custo', col_q:'Qtde'})
-            df_base['EAN'] = df_raw[col_e] if col_e != "Não possuo" else ""; df_base['Linha'] = df_raw[col_l] if col_l != "Nenhuma" else "Geral"; df_base['ID'] = 0
+            df_base['EAN'] = df_raw[col_e] if col_e != "Não possuo" else ""
+            df_base['Linha'] = df_raw[col_l] if col_l != "Nenhuma" else "Geral"
+            df_base['ID'] = 0
 else:
     uploaded_file = st.file_uploader(t["btn_excel"], type=["xlsx", "xls"])
     if uploaded_file:
-        df_raw = pd.read_excel(uploaded_file); cols = df_raw.columns.tolist()
+        df_raw = pd.read_excel(uploaded_file)
+        cols = df_raw.columns.tolist()
+        st.write(t["mapeamento"])
         c1, c2, c3, c4, c5 = st.columns(5)
-        with c1: col_n = st.selectbox("NAME:", cols); with c2: col_c = st.selectbox("COST:", cols); with c3: col_q = st.selectbox("QTY:", cols); with c4: col_l = st.selectbox("LINE:", ["None"] + cols); with c5: col_e = st.selectbox("EAN:", ["N/A"] + cols)
+        with c1: col_n = st.selectbox("NAME:", cols)
+        with c2: col_c = st.selectbox("COST:", cols)
+        with c3: col_q = st.selectbox("QTY:", cols)
+        with c4: col_l = st.selectbox("LINE:", ["None"] + cols)
+        with c5: col_e = st.selectbox("EAN:", ["N/A"] + cols)
         df_base = df_raw.copy().rename(columns={col_n:'Nome', col_c:'Custo', col_q:'Qtde'})
-        df_base['EAN'] = df_raw[col_e] if col_e != "N/A" else ""; df_base['Linha'] = df_raw[col_l] if col_l != "None" else "General"; df_base['ID'] = 0
+        df_base['EAN'] = df_raw[col_e] if col_e != "N/A" else ""
+        df_base['Linha'] = df_raw[col_l] if col_l != "None" else "General"
+        df_base['ID'] = 0
 
 # --- PASSO 2: ANÁLISE ---
 if not df_base.empty:
