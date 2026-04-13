@@ -15,16 +15,16 @@ st.set_page_config(page_title="IA Marketplace Global", layout="wide", page_icon=
 # --- DICIONÁRIO DE TRADUÇÃO TOTALMENTE ISOLADO ---
 idiomas = {
     "Brasil 🇧🇷": {
-        "moeda": "R$", "lang": "pt-BR", "domain": "google.com.br", "gl": "br", "loc": "Brazil",
+        "id": "BR", "moeda": "R$", "lang": "pt-BR", "domain": "google.com.br", "gl": "br", "loc": "Brazil",
         "titulo": "🚀 Inteligência de Mercado Brasil + Bling Sync",
         "label_chave": "SerpApi Key", "help_chave": "Código para pesquisar preços reais. Obtenha em SerpApi.com.",
         "btn_confirmar": "Confirmar Chave", "msg_ativado": "Sistema Ativado!",
         "bling_token": "Token API Bling V3:",
-        "ajuda_header": "📖 Legenda", "ajuda_corpo": "✅ **Vencendo**: Preço ideal.\n\n⚠️ **Caro**: Acima do mercado.\n\n🟥 **Burn**: Abaixo do custo.",
+        "ajuda_header": "📖 Legenda", "ajuda_corpo": "✅ **Vencendo**: Preço ideal.\n\n⚠️ **Caro**: Acima do mercado.\n\n🟥 **Burn**: Concorrência abaixo do custo.",
         "suporte_header": "💬 Suporte", "suporte_label": "Como podemos ajudar?",
         "termos_header": "### ⚖️ Termos de Uso e Isenção",
         "termos_corpo": "A planilha deve conter: Nome, Custo e Quantidade.",
-        "termos_check": "Eu aceito os Termos de Uso e a responsabilidade pelas minhas decisões.",
+        "termos_check": "Eu aceito os Termos de Uso do Brasil.",
         "passo1": "1️⃣ Carregamento de Produtos", "btn_excel": "Subir Arquivo Excel",
         "mapeamento": "Mapeie as colunas do seu arquivo:",
         "passo2": "2️⃣ Estratégia e Análise", "label_imposto": "Imposto (%)", "label_markup": "Aumento Padrão (%)",
@@ -33,15 +33,15 @@ idiomas = {
         "download_btn": "Baixar Excel", "sinc_btn": "Aceitar sugestões de preço para o bling"
     },
     "Portugal 🇵🇹": {
-        "moeda": "€", "lang": "pt-PT", "domain": "google.pt", "gl": "pt", "loc": "Portugal",
+        "id": "PT", "moeda": "€", "lang": "pt-PT", "domain": "google.pt", "gl": "pt", "loc": "Portugal",
         "titulo": "🚀 Inteligência de Mercado Portugal & UE",
         "label_chave": "Chave SerpApi", "help_chave": "Código para pesquisar preços reais. Obtenha em SerpApi.com.",
         "btn_confirmar": "Confirmar Chave", "msg_ativado": "Sistema Ativado!",
-        "ajuda_header": "📖 Legenda", "ajuda_corpo": "✅ **A Vencer**: Preço ideal.\n\n⚠️ **Caro**: Acima do mercado.\n\n🟥 **Crítico**: Abaixo do custo.",
+        "ajuda_header": "📖 Legenda", "ajuda_corpo": "✅ **A Vencer**: O seu preço é o mais baixo.\n\n⚠️ **Caro**: Acima do mercado.\n\n🟥 **Crítico**: Mercado abaixo do custo.",
         "suporte_header": "💬 Suporte", "suporte_label": "Como podemos ajudar?",
         "termos_header": "### ⚖️ Termos de Utilização",
         "termos_corpo": "A folha deve conter: Nome, Custo e Quantidade.",
-        "termos_check": "Aceito os Termos de Utilização e a responsabilidade pelas minhas decisões.",
+        "termos_check": "Aceito os Termos de Utilização de Portugal.",
         "passo1": "1️⃣ Carregamento de Produtos", "btn_excel": "Carregar Ficheiro Excel",
         "mapeamento": "Identifique as colunas do seu ficheiro:",
         "passo2": "2️⃣ Estratégia e Análise", "label_imposto": "IVA (%)", "label_markup": "Margem de Aumento (%)",
@@ -50,15 +50,15 @@ idiomas = {
         "download_btn": "Descarregar Excel"
     },
     "USA 🇺🇸": {
-        "moeda": "$", "lang": "en", "domain": "google.com", "gl": "us", "loc": "United States",
+        "id": "US", "moeda": "$", "lang": "en", "domain": "google.com", "gl": "us", "loc": "United States",
         "titulo": "🚀 USA Marketplace Intelligence",
         "label_chave": "SerpApi Key", "help_chave": "Code for real-time prices. Get it at SerpApi.com.",
         "btn_confirmar": "Confirm Key", "msg_ativado": "System Activated!",
-        "ajuda_header": "📖 Legend", "ajuda_corpo": "✅ **Winning**: Best price.\n\n⚠️ **Expensive**: Above market.\n\n🟥 **Alert**: Below cost.",
+        "ajuda_header": "📖 Legend", "ajuda_corpo": "✅ **Winning**: Best price.\n\n⚠️ **Expensive**: Above market.\n\n🟥 **Alert**: Market below cost.",
         "suporte_header": "💬 Support", "suporte_label": "How can we help?",
         "termos_header": "### ⚖️ Terms of Use",
         "termos_corpo": "Sheet must have: Name, Cost, and Quantity.",
-        "termos_check": "I accept the Terms and take full responsibility.",
+        "termos_check": "I accept the USA Terms of Use.",
         "passo1": "1️⃣ Data Upload", "btn_excel": "Upload Excel file",
         "mapeamento": "Map your columns:",
         "passo2": "2️⃣ Strategy & Analysis", "label_imposto": "Tax (%)", "label_markup": "Markup (%)",
@@ -68,8 +68,9 @@ idiomas = {
     }
 }
 
-# --- ESTADO DA SESSÃO ---
-if "aceitou" not in st.session_state: st.session_state.aceitou = False
+# --- INICIALIZAÇÃO DOS ACEITES (Dicionário de controle por país) ---
+if "aceites_paises" not in st.session_state:
+    st.session_state.aceites_paises = {k: False for k in idiomas.keys()}
 
 # --- FUNÇÃO DE E-MAIL ---
 def enviar_email_log(n, e, m, tipo="SUPORTE"):
@@ -88,8 +89,7 @@ def enviar_email_log(n, e, m, tipo="SUPORTE"):
 # --- SIDEBAR ---
 with st.sidebar:
     st.header("🌎 Região / Region")
-    opcoes_paises = list(idiomas.keys())
-    pais_sel = st.selectbox("Escolha o Mercado:", opcoes_paises)
+    pais_sel = st.selectbox("Escolha o Mercado:", list(idiomas.keys()))
     t = idiomas[pais_sel]
     
     st.divider()
@@ -120,21 +120,27 @@ with st.sidebar:
 st.title(t["titulo"])
 st.markdown(t["termos_header"])
 
-if not st.session_state.aceitou:
+# CONTROLE DE TERMOS INDIVIDUALIZADO POR PAÍS
+if not st.session_state.aceites_paises[pais_sel]:
     st.info(t["termos_corpo"])
-    if st.checkbox(t["termos_check"]):
-        st.session_state.aceitou = True
+    if st.checkbox(t["termos_check"], key=f"check_{pais_sel}"):
+        st.session_state.aceites_paises[pais_sel] = True
         st.rerun()
     st.stop()
 
 st.divider()
+
+# --- PASSO 1: CARREGAMENTO ---
 st.markdown(f"### {t['passo1']}")
 df_base = pd.DataFrame()
 
 if "Brasil" in pais_sel:
     fonte = st.radio("Fonte:", ["Bling (API V3)", "Excel (Manual)"], horizontal=True)
     if fonte == "Bling (API V3)":
-        bling_token = st.text_input("Bling Token:", type="password")
+        # AJUSTE: Usando colunas para diminuir o tamanho do campo do Bling
+        col_bling, _ = st.columns([0.5, 0.5])
+        with col_bling:
+            bling_token = st.text_input("Bling Token:", type="password")
         if st.button("📥 Importar do Bling"):
             try:
                 h = {"Authorization": f"Bearer {bling_token}"}
@@ -170,7 +176,7 @@ else:
         df_base = df_raw.copy().rename(columns={col_n:'Nome', col_c:'Custo', col_q:'Qtde'})
         df_base['EAN'] = df_raw[col_e] if col_e != "N/A" else ""; df_base['Linha'] = df_raw[col_l] if col_l != "None" else "General"; df_base['ID'] = 0
 
-# --- ANÁLISE ---
+# [Restante do código de análise permanece idêntico e preservado]
 if not df_base.empty:
     st.divider(); st.markdown(f"### {t['passo2']}")
     cp1, cp2 = st.columns(2)
@@ -179,7 +185,7 @@ if not df_base.empty:
     if st.button(t["btn_analisar"]):
         if "api_key" not in st.session_state: st.error("API Key!")
         else:
-            with st.spinner('Analysing...'):
+            with st.spinner('...'):
                 df = df_base.copy(); res_m, res_l = [], []
                 loc_f = t["loc"]
                 if "Portugal" in pais_sel and scope_pt == "Toda a União Europeia": loc_f = "Western Europe"
@@ -211,8 +217,8 @@ if "df_final" in st.session_state:
     c1, c2, c3 = st.columns(3)
     c1.metric(t["invest"], f"{t['moeda']} {df['Custo'].sum():,.2f}")
     c2.metric(t["lucro"], f"{t['moeda']} {df['Lucro Total'].sum():,.2f}")
-    c3.metric(t["margem"], f"{df['Margem %'].mean():.1f}%")
-    st.dataframe(df[['Nome', 'Linha', 'Qtde', 'Custo', 'Seu Preço', 'Mercado', 'Loja Líder', 'Preço Sugerido', 'Margem %', 'Situação', 'Lucro Total']].style.format({'Custo': '{:.2f}', 'Seu Preço': '{:.2f}', 'Mercado': '{:.2f}', 'Preço Sugerido': '{:.2f}', 'Margem %': '{:.2f}', 'Lucro Total': '{:.2f}'}))
+    c3.metric(t["margem"], f"{df['Margem %'].mean():.2f}%")
+    st.dataframe(df[['Nome', 'Linha', 'Qtde', 'Custo', 'Seu Preço', 'Mercado', 'Loja Líder', 'Preço Sugerido', 'Margem %', 'Situação', 'Lucro Total']].style.format({'Custo': '{:.2f}', 'Seu Preço': '{:.2f}', 'Market': '{:.2f}', 'Suggest': '{:.2f}', 'Margin %': '{:.2f}', 'Profit': '{:.2f}'}))
     
     st.divider()
     out = io.BytesIO()
