@@ -10,7 +10,7 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
 # 1. CONFIGURAÇÃO DA INTERFACE
-st.set_page_config(page_title="Global Marketplace Intelligence", layout="wide", page_icon="🌎")
+st.set_page_config(page_title="IA Marketplace Global", layout="wide", page_icon="🌎")
 
 # --- DICIONÁRIO DE TRADUÇÃO TOTALMENTE ISOLADO ---
 idiomas = {
@@ -22,14 +22,16 @@ idiomas = {
         "aviso_chave": "⚠️ Por favor, confirme sua SerpApi Key na barra lateral antes de prosseguir.",
         "bling_token": "Token API Bling V3",
         "ajuda_header": "Legenda", "ajuda_corpo": "✅ Vencendo\n⚠️ Caro\n🟥 Burn",
-        "suporte_header": "Suporte", "suporte_label": "Como podemos ajudar?",
         "termos_header": "Termos de Uso e Isenção",
-        "termos_corpo": "A planilha deve conter: Nome, Custo e Quantidade. O uso de dados da internet exige conferência obrigatória.",
+        "termos_corpo": "A planilha deve conter: Nome, Custo e Quantidade. O sistema valida apenas lojistas com operação fiscal local (CNPJ).",
         "termos_check": "Eu aceito os Termos de Uso do Brasil.",
         "header_dados": "Carregamento de Produtos", "btn_excel": "Subir Arquivo Excel",
         "mapeamento": "Mapeie as colunas:", "header_analise": "Estratégia e Análise",
-        "btn_analisar": "Iniciar Análise Real", "invest": "Investimento",
-        "lucro": "Lucro Projetado", "margem": "Margem Média",
+        "btn_analisar": "Iniciar Análise Real", 
+        "invest": "Investimento Total", 
+        "lucro": "Lucro (Preço Sugerido)", 
+        "margem": "Margem s/ Sugerido",
+        "help_margem": "Cálculo baseado no Preço Sugerido após impostos e custos.",
         "download_btn": "Baixar Excel", "sinc_btn": "Aceitar sugestões de preço para o bling"
     },
     "Portugal": {
@@ -41,12 +43,15 @@ idiomas = {
         "ajuda_header": "Legenda", "ajuda_corpo": "✅ A Vencer\n⚠️ Caro\n🟥 Crítico",
         "suporte_header": "Suporte", "suporte_label": "Como podemos ajudar?",
         "termos_header": "Termos de Utilização",
-        "termos_corpo": "A folha deve conter: Nome, Custo e Quantidade. A conferência dos dados é da responsabilidade do utilizador.",
+        "termos_corpo": "A folha deve conter: Nome, Custo e Quantidade. O sistema valida apenas lojistas com representação fiscal na UE (NIPC/IVA).",
         "termos_check": "Aceito os Termos de Utilização de Portugal.",
         "header_dados": "Carregamento de Produtos", "btn_excel": "Carregar Ficheiro Excel",
         "mapeamento": "Identifique as colunas:", "header_analise": "Estratégia e Análise",
-        "btn_analisar": "Iniciar Análise de Mercado", "invest": "Investimento",
-        "lucro": "Lucro Projetado", "margem": "Margem Média",
+        "btn_analisar": "Iniciar Análise de Mercado", 
+        "invest": "Investimento Total", 
+        "lucro": "Lucro (Preço Sugerido)", 
+        "margem": "Margem s/ Sugerido",
+        "help_margem": "Cálculo baseado no Preço Sugerido deduzido de IVA e custos.",
         "download_btn": "Descarregar Excel"
     },
     "USA": {
@@ -58,12 +63,15 @@ idiomas = {
         "ajuda_header": "Legend", "ajuda_corpo": "✅ Winning\n⚠️ Expensive\n🟥 Alert",
         "suporte_header": "Support", "suporte_label": "How can we help?",
         "termos_header": "Terms of Use",
-        "termos_corpo": "Sheet required: Name, Cost, and Quantity. Internet data must be validated by the user.",
+        "termos_corpo": "Sheet required: Name, Cost, and Quantity. Only legitimate US-based businesses are considered.",
         "termos_check": "I accept the USA Terms of Use.",
         "header_dados": "Product Upload", "btn_excel": "Upload Excel File",
         "mapeamento": "Map Columns:", "header_analise": "Strategy & Analysis",
-        "btn_analisar": "Start Market Analysis", "invest": "Investment",
-        "lucro": "Profit", "margem": "Avg Margin",
+        "btn_analisar": "Start Market Analysis", 
+        "invest": "Total Investment", 
+        "lucro": "Profit (Suggested)", 
+        "margem": "Margin s/ Suggested",
+        "help_margem": "Based on Suggested Price after taxes and costs.",
         "download_btn": "Download Excel"
     }
 }
@@ -71,20 +79,6 @@ idiomas = {
 # --- CONTROLE DE SESSÃO ---
 if "api_key" not in st.session_state:
     st.session_state.api_key = None
-
-# --- FUNÇÃO DE E-MAIL ---
-def enviar_email_log(n, e, m, tipo="SUPORTE"):
-    dest = "contato@vembrincarcomagente.com"
-    try:
-        origem = st.secrets["EMAIL_ORIGEM"]
-        senha = st.secrets["SENHA_APP"].replace(" ", "")
-        msg = MIMEMultipart()
-        msg['From'], msg['To'], msg['Subject'] = origem, dest, f"[{tipo}] - {n}"
-        msg.attach(MIMEText(f"Contato: {n}\nEmail: {e}\n\nMsg: {m}", 'plain'))
-        s = smtplib.SMTP("://gmail.com", 587, timeout=10)
-        s.starttls(); s.login(origem, senha); s.sendmail(origem, dest, msg.as_string()); s.quit()
-        return True
-    except: return False
 
 # --- SIDEBAR ---
 with st.sidebar:
@@ -106,36 +100,24 @@ with st.sidebar:
     st.header(t["ajuda_header"])
     st.info(t["ajuda_corpo"])
 
-    st.divider()
-    st.header(t["suporte_header"])
-    user_q = st.text_input(t["suporte_label"])
-    if user_q:
-        with st.form("suporte_form", clear_on_submit=True):
-            n, e, m = st.text_input("Nome"), st.text_input("Email"), st.text_area("Mensagem", value=user_q)
-            if st.form_submit_button("Enviar"):
-                if enviar_email_log(n, e, m, "SUPORTE"): st.success("✅")
-
 # --- CORPO PRINCIPAL ---
 st.title(t["titulo"])
 st.subheader(t["termos_header"])
 st.info(t["termos_corpo"])
 
-# O Checkbox agora permanece visível e controla a exibição do restante do app
 aceite_atual = st.checkbox(t["termos_check"], key=f"check_{pais_sel}")
 
 if aceite_atual:
     st.divider()
-    st.subheader(t["header_dados"])
-    
-    # Trava da Chave SerpApi
     if not st.session_state.api_key:
         st.warning(t["aviso_chave"])
     else:
+        # --- CARREGAMENTO ---
         df_base = pd.DataFrame()
         if pais_sel == "Brasil":
             fonte = st.radio("Fonte:", ["Bling (API V3)", "Excel"], horizontal=True)
             if fonte == "Bling (API V3)":
-                c_bl, _ = st.columns([0.3, 0.7]) # Campo Bling reduzido
+                c_bl, _ = st.columns([0.3, 0.7])
                 with c_bl:
                     bling_token = st.text_input(t["bling_token"], type="password")
                 if st.button("📥 Importar Dados"):
@@ -175,29 +157,45 @@ if aceite_atual:
 
         # --- ANÁLISE ---
         if not df_base.empty:
-            st.divider(); st.subheader(t["header_analise"])
+            st.divider()
             cp1, cp2 = st.columns(2)
             with cp1: imposto = st.number_input("% Tax", 0, 100, 4) / 100
             with cp2: markup_padrao = st.number_input("% Markup", 0, 500, 70) / 100
             if st.button(t["btn_analisar"]):
-                with st.spinner('...'):
+                with st.spinner('Validando mercado local e fiscal...'):
                     df = df_base.copy(); res_m, res_l = [], []
                     loc_f = t["loc"]
                     if pais_sel == "Portugal" and scope_pt == "União Europeia": loc_f = "Western Europe"
+                    
+                    # BLACKLIST GLOBAL DE SITES DE "DROPSHIPPING" INTERNACIONAL
+                    blacklist = ['kidiin', 'fruugo', 'desertcart', 'ubuy', 'tiendamia', 'fishpond', 'grandado', 'vendiloshop', 'vendiilo', 'temu', 'aliexpress', 'ebay']
+
                     for idx, row in df.iterrows():
                         search = GoogleSearch({"engine": "google_shopping", "q": f"{row['Nome']} {row['EAN']}", "google_domain": t["domain"], "hl": t["lang"][:2], "gl": t["gl"], "location": loc_f, "api_key": st.session_state.api_key})
                         results = search.get_dict(); best_p, best_l = round(row['Custo']*2.5, 2), "N/A"
+                        
                         if "shopping_results" in results:
                             validos = []
                             for it in results['shopping_results']:
-                                if any(x in it.get('title','').lower() for x in ['peça','manual','spare']): continue
-                                if t["moeda"] not in str(it.get('price','')): continue
+                                source = it.get('source', '').lower()
+                                price_str = str(it.get('price',''))
+                                
+                                # 1. Validação Fiscal por Origem (Blacklist de não-fiscais locais)
+                                if any(b in source for b in blacklist): continue
+                                
+                                # 2. Validação Geográfica e de Moeda
+                                if t["moeda"] not in price_str: continue
+                                
                                 try:
-                                    v = float(re.sub(r'[^\d,.]','',str(it.get('price'))).replace('.','').replace(',','.'))
-                                    if v > (row['Custo']*0.15): validos.append({"p": round(v,2), "l":it.get('source')})
+                                    v = float(re.sub(r'[^\d,.]','',price_str).replace('.','').replace(',','.'))
+                                    # 3. Filtro de sanidade e competitividade real
+                                    if v > (row['Custo']*0.15): validos.append({"p": round(v,2), "l": it.get('source')})
                                 except: continue
-                            if validos: b = min(validos, key=lambda x:x['p']); best_p, best_l = b['p'], b['l']
+                            if validos:
+                                b = min(validos, key=lambda x:x['p'])
+                                best_p, best_l = b['p'], b['l']
                         res_m.append(best_p); res_l.append(best_l)
+                    
                     df['Mercado'], df['Loja Líder'] = res_m, res_l
                     df['Seu Preço'] = round(df['Custo'] * (1 + markup_padrao), 2)
                     df['Preço Sugerido'] = df.apply(lambda x: round(x['Mercado']*0.98, 2) if x['Seu Preço'] > x['Mercado'] else x['Seu Preço'], axis=1)
@@ -208,11 +206,12 @@ if aceite_atual:
 
         if "df_final" in st.session_state:
             df = st.session_state.df_final
-            st.divider(); st.subheader("Resultados")
+            st.divider(); st.subheader("Resultados Estratégicos")
             c1, c2, c3 = st.columns(3)
             c1.metric(t["invest"], f"{t['moeda']} {df['Custo'].sum():,.2f}")
-            c2.metric(t["lucro"], f"{t['moeda']} {df['Lucro Total'].sum():,.2f}")
-            c3.metric(t["margem"], f"{df['Margem %'].mean():.2f}%")
+            c2.metric(t["lucro"], f"{t['moeda']} {df['Lucro Total'].sum():,.2f}", help=t["help_margem"])
+            c3.metric(t["margem"], f"{df['Margem %'].mean():.2f}%", help=t["help_margem"])
+            
             st.dataframe(df[['Nome', 'Linha', 'Qtde', 'Custo', 'Seu Preço', 'Mercado', 'Loja Líder', 'Preço Sugerido', 'Margem %', 'Situação', 'Lucro Total']].style.format({'Custo': '{:.2f}', 'Seu Preço': '{:.2f}', 'Mercado': '{:.2f}', 'Preço Sugerido': '{:.2f}', 'Margem %': '{:.2f}', 'Lucro Total': '{:.2f}'}))
             
             st.divider()
@@ -226,5 +225,3 @@ if aceite_atual:
                     for i, (idx, row) in enumerate(df.iterrows()):
                         requests.put(f"https://bling.com.br{row['ID']}", json={"preco": round(row['Preço Sugerido'], 2)}, headers=h)
                     st.success("Sincronizado!")
-else:
-    st.warning(t["termos_check"])
