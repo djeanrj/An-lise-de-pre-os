@@ -13,27 +13,6 @@ from email.mime.multipart import MIMEMultipart
 # 1. CONFIGURAÇÃO DA INTERFACE
 st.set_page_config(page_title="Global Marketplace Intelligence", layout="wide", page_icon="🌎")
 
-# --- SISTEMA DE PROTEÇÃO (SENHA) ---
-def check_password():
-    def password_entered():
-        if st.session_state["password"] == "123456": # ALTERE SUA SENHA AQUI
-            st.session_state["password_correct"] = True
-            del st.session_state["password"]
-        else:
-            st.session_state["password_correct"] = False
-
-    if "password_correct" not in st.session_state:
-        st.text_input("Password / Senha", type="password", on_change=password_entered, key="password")
-        return False
-    elif not st.session_state["password_correct"]:
-        st.text_input("Password / Senha", type="password", on_change=password_entered, key="password")
-        st.error("😕 Senha incorreta / Incorrect password")
-        return False
-    return True
-
-if not check_password():
-    st.stop()
-
 # --- DICIONÁRIO DE TRADUÇÃO TOTALMENTE ISOLADO ---
 idiomas = {
     "Brasil 🇧🇷": {
@@ -175,18 +154,11 @@ else:
             df_raw = pd.read_excel(uploaded_file); cols = df_raw.columns.tolist()
             st.write(t["mapeamento"])
             c1, c2, c3, c4, c5 = st.columns(5)
-            # --- CORREÇÃO DO ERRO DE SINTAXE AQUI ---
-            with c1:
-                col_n = st.selectbox("NAME:", cols)
-            with c2:
-                col_c = st.selectbox("COST:", cols)
-            with c3:
-                col_q = st.selectbox("QTY:", cols)
-            with c4:
-                col_l = st.selectbox("LINE:", ["None"] + cols)
-            with c5:
-                col_e = st.selectbox("EAN:", ["N/A"] + cols)
-                
+            with c1: col_n = st.selectbox("NAME:", cols)
+            with c2: col_c = st.selectbox("COST:", cols)
+            with c3: col_q = st.selectbox("QTY:", cols)
+            with c4: col_l = st.selectbox("LINE:", ["None"] + cols)
+            with c5: col_e = st.selectbox("EAN:", ["N/A"] + cols)
             df_base = df_raw.copy().rename(columns={col_n:'Nome', col_c:'Custo', col_q:'Qtde'})
             df_base['EAN'] = df_raw[col_e] if col_e != "N/A" else ""; df_base['Linha'] = df_raw[col_l] if col_l != "None" else "General"; df_base['ID'] = 0
 
@@ -197,7 +169,7 @@ else:
         with cp1: imposto = st.number_input("% Tax", 0, 100, 4) / 100
         with cp2: markup_padrao = st.number_input("% Markup", 0, 500, 70) / 100
         if st.button(t["btn_analisar"]):
-            with st.spinner('Analisando mercado local e fiscal...'):
+            with st.spinner('Analisando...'):
                 df = df_base.copy(); res_m, res_l = [], []
                 loc_f = t["loc"]
                 if "Portugal" in pais_sel and scope_pt == "União Europeia": loc_f = "Western Europe"
