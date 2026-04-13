@@ -22,16 +22,16 @@ idiomas = {
         "aviso_chave": "⚠️ Por favor, confirme sua SerpApi Key na barra lateral antes de prosseguir.",
         "bling_token": "Token API Bling V3",
         "ajuda_header": "Legenda", "ajuda_corpo": "✅ Vencendo\n⚠️ Caro\n🟥 Burn",
-        "termos_header": "Termos de Uso e Isenção",
-        "termos_corpo": "A planilha deve conter: Nome, Custo e Quantidade. O sistema valida apenas lojistas com operação fiscal local (CNPJ).",
+        "termos_header": "### ⚖️ Termos de Uso e Isenção",
+        "termos_corpo": "A planilha deve conter: Nome, Custo e Quantidade. O sistema bloqueia automaticamente lojas de importação sem operação fiscal local.",
         "termos_check": "Eu aceito os Termos de Uso do Brasil.",
         "header_dados": "Carregamento de Produtos", "btn_excel": "Subir Arquivo Excel",
         "mapeamento": "Mapeie as colunas:", "header_analise": "Estratégia e Análise",
         "btn_analisar": "Iniciar Análise Real", 
-        "invest": "Investimento Total", 
-        "lucro": "Lucro (Preço Sugerido)", 
+        "invest": "Investimento em Estoque", 
+        "lucro": "Lucro Total Projetado", 
         "margem": "Margem s/ Sugerido",
-        "help_margem": "Cálculo baseado no Preço Sugerido após impostos e custos.",
+        "help_margem": "Cálculo baseado no Preço Sugerido após impostos e custos sobre o estoque total.",
         "download_btn": "Baixar Excel", "sinc_btn": "Aceitar sugestões de preço para o bling"
     },
     "Portugal": {
@@ -42,16 +42,16 @@ idiomas = {
         "aviso_chave": "⚠️ Por favor, confirme a sua Chave SerpApi na barra lateral antes de continuar.",
         "ajuda_header": "Legenda", "ajuda_corpo": "✅ A Vencer\n⚠️ Caro\n🟥 Crítico",
         "suporte_header": "Suporte", "suporte_label": "Como podemos ajudar?",
-        "termos_header": "Termos de Utilização",
-        "termos_corpo": "A folha deve conter: Nome, Custo e Quantidade. O sistema valida apenas lojistas com representação fiscal na UE (NIPC/IVA).",
+        "termos_header": "### ⚖️ Termos de Utilização",
+        "termos_corpo": "A folha deve conter: Nome, Custo e Quantidade. O sistema valida apenas lojistas com representação fiscal na UE.",
         "termos_check": "Aceito os Termos de Utilização de Portugal.",
         "header_dados": "Carregamento de Produtos", "btn_excel": "Carregar Ficheiro Excel",
         "mapeamento": "Identifique as colunas:", "header_analise": "Estratégia e Análise",
         "btn_analisar": "Iniciar Análise de Mercado", 
-        "invest": "Investimento Total", 
-        "lucro": "Lucro (Preço Sugerido)", 
+        "invest": "Investimento em Stock", 
+        "lucro": "Lucro Total Projetado", 
         "margem": "Margem s/ Sugerido",
-        "help_margem": "Cálculo baseado no Preço Sugerido deduzido de IVA e custos.",
+        "help_margem": "Cálculo baseado no Preço Sugerido deduzido de IVA e custos sobre o stock total.",
         "download_btn": "Descarregar Excel"
     },
     "USA": {
@@ -62,16 +62,16 @@ idiomas = {
         "aviso_chave": "⚠️ Please confirm your SerpApi Key in the sidebar before proceeding.",
         "ajuda_header": "Legend", "ajuda_corpo": "✅ Winning\n⚠️ Expensive\n🟥 Alert",
         "suporte_header": "Support", "suporte_label": "How can we help?",
-        "termos_header": "Terms of Use",
+        "termos_header": "### ⚖️ Terms of Use",
         "termos_corpo": "Sheet required: Name, Cost, and Quantity. Only legitimate US-based businesses are considered.",
         "termos_check": "I accept the USA Terms of Use.",
         "header_dados": "Product Upload", "btn_excel": "Upload Excel File",
         "mapeamento": "Map Columns:", "header_analise": "Strategy & Analysis",
         "btn_analisar": "Start Market Analysis", 
-        "invest": "Total Investment", 
-        "lucro": "Profit (Suggested)", 
+        "invest": "Total Inventory Investment", 
+        "lucro": "Projected Total Profit", 
         "margem": "Margin s/ Suggested",
-        "help_margem": "Based on Suggested Price after taxes and costs.",
+        "help_margem": "Based on Suggested Price after taxes and costs over total inventory.",
         "download_btn": "Download Excel"
     }
 }
@@ -162,13 +162,16 @@ if aceite_atual:
             with cp1: imposto = st.number_input("% Tax", 0, 100, 4) / 100
             with cp2: markup_padrao = st.number_input("% Markup", 0, 500, 70) / 100
             if st.button(t["btn_analisar"]):
-                with st.spinner('Validando mercado local e fiscal...'):
+                with st.spinner('Limpando resultados internacionais e fiscais...'):
                     df = df_base.copy(); res_m, res_l = [], []
                     loc_f = t["loc"]
                     if pais_sel == "Portugal" and scope_pt == "União Europeia": loc_f = "Western Europe"
                     
-                    # BLACKLIST GLOBAL DE SITES DE "DROPSHIPPING" INTERNACIONAL
-                    blacklist = ['kidiin', 'fruugo', 'desertcart', 'ubuy', 'tiendamia', 'fishpond', 'grandado', 'vendiloshop', 'vendiilo', 'temu', 'aliexpress', 'ebay']
+                    blacklist = [
+                        'kidiin', 'kidinn', 'tradeinn', 'fruugo', 'desertcart', 'ubuy', 
+                        'tiendamia', 'fishpond', 'grandado', 'vendiloshop', 'vendiilo', 
+                        'temu', 'aliexpress', 'ebay', 'china', 'importação', 'duty free'
+                    ]
 
                     for idx, row in df.iterrows():
                         search = GoogleSearch({"engine": "google_shopping", "q": f"{row['Nome']} {row['EAN']}", "google_domain": t["domain"], "hl": t["lang"][:2], "gl": t["gl"], "location": loc_f, "api_key": st.session_state.api_key})
@@ -178,17 +181,12 @@ if aceite_atual:
                             validos = []
                             for it in results['shopping_results']:
                                 source = it.get('source', '').lower()
+                                link = it.get('link', '').lower()
                                 price_str = str(it.get('price',''))
-                                
-                                # 1. Validação Fiscal por Origem (Blacklist de não-fiscais locais)
-                                if any(b in source for b in blacklist): continue
-                                
-                                # 2. Validação Geográfica e de Moeda
+                                if any(b in source for b in blacklist) or any(b in link for b in blacklist): continue
                                 if t["moeda"] not in price_str: continue
-                                
                                 try:
                                     v = float(re.sub(r'[^\d,.]','',price_str).replace('.','').replace(',','.'))
-                                    # 3. Filtro de sanidade e competitividade real
                                     if v > (row['Custo']*0.15): validos.append({"p": round(v,2), "l": it.get('source')})
                                 except: continue
                             if validos:
@@ -208,8 +206,13 @@ if aceite_atual:
             df = st.session_state.df_final
             st.divider(); st.subheader("Resultados Estratégicos")
             c1, c2, c3 = st.columns(3)
-            c1.metric(t["invest"], f"{t['moeda']} {df['Custo'].sum():,.2f}")
-            c2.metric(t["lucro"], f"{t['moeda']} {df['Lucro Total'].sum():,.2f}", help=t["help_margem"])
+            
+            # --- CORREÇÃO TÉCNICA DO CÁLCULO ---
+            investimento_total = (df['Custo'] * df['Qtde']).sum()
+            lucro_total = df['Lucro Total'].sum()
+            
+            c1.metric(t["invest"], f"{t['moeda']} {investimento_total:,.2f}")
+            c2.metric(t["lucro"], f"{t['moeda']} {lucro_total:,.2f}", help=t["help_margem"])
             c3.metric(t["margem"], f"{df['Margem %'].mean():.2f}%", help=t["help_margem"])
             
             st.dataframe(df[['Nome', 'Linha', 'Qtde', 'Custo', 'Seu Preço', 'Mercado', 'Loja Líder', 'Preço Sugerido', 'Margem %', 'Situação', 'Lucro Total']].style.format({'Custo': '{:.2f}', 'Seu Preço': '{:.2f}', 'Mercado': '{:.2f}', 'Preço Sugerido': '{:.2f}', 'Margem %': '{:.2f}', 'Lucro Total': '{:.2f}'}))
