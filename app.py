@@ -18,10 +18,13 @@ idiomas = {
         "id": "BR", "moeda": "R$", "lang": "pt-BR", "domain": "google.com.br", "gl": "br", "loc": "Brazil",
         "titulo": "Inteligência de Mercado Brasil + Bling Sync",
         "label_chave": "SerpApi Key", "btn_confirmar": "Confirmar Chave",
-        "ajuda_header": "Situação", 
-        "ajuda_corpo": "✅ Vencendo\n\n⚠️ Caro\n\n🟥 Burn",
-        "trend_header": "Tendência", 
-        "trend_corpo": "📈 Ascendente\n\n➡️ Flat\n\n📉 Decrescente",
+        "legenda_html": """
+            <div style='font-size: 0.9rem;'>
+                <b>Situação</b><br>
+                ✅ Vencendo<br>⚠️ Caro<br>🟥 Burn<br><br>
+                <b>Tendência</b><br>
+                📈 Ascendente<br>➡️ Flat<br>📉 Decrescente
+            </div>""",
         "termos_header": "Termos de Uso e Isenção", "termos_check": "Eu aceito os Termos de Uso do Brasil.",
         "header_dados": "Carregamento de Produtos", "btn_excel": "Subir planilha",
         "mapeamento": "Mapeamento Sugerido:", "btn_analisar": "Iniciar Análise Real", 
@@ -33,10 +36,13 @@ idiomas = {
         "titulo": "Inteligência de Mercado Portugal & UE",
         "label_chave": "Chave SerpApi", "help_chave": "Obtenha em SerpApi.com.",
         "btn_confirmar": "Confirmar Chave", "msg_ativado": "Sistema Ativado!",
-        "ajuda_header": "Situação", 
-        "ajuda_corpo": "✅ A Vencer\n\n⚠️ Caro\n\n🟥 Crítico",
-        "trend_header": "Tendência", 
-        "trend_corpo": "📈 Ascendente\n\n➡️ Flat\n\n📉 Decrescente",
+        "legenda_html": """
+            <div style='font-size: 0.9rem;'>
+                <b>Situação</b><br>
+                ✅ A Vencer<br>⚠️ Caro<br>🟥 Crítico<br><br>
+                <b>Tendência</b><br>
+                📈 Ascendente<br>➡️ Flat<br>📉 Decrescente
+            </div>""",
         "termos_header": "Termos de Utilização", "termos_check": "Aceito os Termos de Utilização de Portugal.",
         "header_dados": "Carregamento de Produtos", "btn_excel": "Carregar folha de cálculo",
         "mapeamento": "Mapeamento Sugerido:", "btn_analisar": "Analisar Mercado Ibérico/UE", 
@@ -47,10 +53,13 @@ idiomas = {
         "id": "US", "moeda": "$", "lang": "en", "domain": "google.com", "gl": "us", "loc": "United States",
         "titulo": "USA Marketplace Intelligence",
         "label_chave": "SerpApi Key", "btn_confirmar": "Confirm Key",
-        "ajuda_header": "Risk Status", 
-        "ajuda_corpo": "✅ Winning\n\n⚠️ Expensive\n\n🟥 Alert",
-        "trend_header": "Trend", 
-        "trend_corpo": "📈 Rising\n\n➡️ Flat\n\n📉 Falling",
+        "legenda_html": """
+            <div style='font-size: 0.9rem;'>
+                <b>Risk Status</b><br>
+                ✅ Winning<br>⚠️ Expensive<br>🟥 Alert<br><br>
+                <b>Trend</b><br>
+                📈 Rising<br>➡️ Flat<br>📉 Falling
+            </div>""",
         "termos_header": "Terms of Use", "termos_check": "I accept the USA Terms.",
         "header_dados": "Product Upload", "btn_excel": "Upload Spreadsheet",
         "mapeamento": "Suggested Mapping:", "btn_analisar": "Start Market Analysis", 
@@ -58,7 +67,7 @@ idiomas = {
         "download_btn": "Download Sheet", "hist_titulo": "📜 Search History"
     }
 }
-# --- FUNÇÕES ---
+# --- FUNÇÕES AUXILIARES ---
 def identificar_coluna(lista_colunas, chaves):
     for c in lista_colunas:
         if any(k in str(c).lower().strip() for k in chaves): return lista_colunas.index(c)
@@ -82,7 +91,7 @@ if "historico_global" not in st.session_state: st.session_state.historico_global
 
 # --- SIDEBAR ---
 with st.sidebar:
-    st.header("Região / Region")
+    st.header("Mercado")
     pais_sel = st.selectbox("Região:", list(idiomas.keys()), key="pais_main")
     
     if "pais_anterior" not in st.session_state: st.session_state.pais_anterior = pais_sel
@@ -98,17 +107,12 @@ with st.sidebar:
         st.session_state.api_key = api_key_input
         st.success("OK!")
     
-    scope_pt = "Apenas Portugal"
     if "Portugal" in pais_sel:
         scope_pt = st.radio("Âmbito:", ["Apenas Portugal", "União Europeia"])
     
     st.divider()
-    st.header(t["ajuda_header"])
-    st.info(t["ajuda_corpo"])
-    
-    # LEGENDA DE TENDÊNCIA EM LINHAS SEPARADAS
-    st.header(t["trend_header"])
-    st.info(t["trend_corpo"])
+    # RENDERIZAÇÃO DAS LEGENDAS ALINHADAS
+    st.markdown(t["legenda_html"], unsafe_allow_html=True)
     
     st.divider()
     st.header("Suporte")
@@ -151,7 +155,6 @@ else:
             df_raw = pd.read_excel(uploaded_file) if not uploaded_file.name.endswith('.csv') else pd.read_csv(uploaded_file)
             cols = df_raw.columns.tolist()
             st.write(f"**{t['mapeamento']}**")
-            
             c1, c2, c3, c4, c5 = st.columns(5)
             with c1:
                 idx_n = identificar_coluna(cols, ['produto', 'nome', 'item', 'name'])
@@ -168,7 +171,6 @@ else:
             with c5:
                 idx_e = identificar_coluna(cols, ['ean', 'barra', 'upc'])
                 col_e = st.selectbox("EAN:", ["N/A"] + cols, index=identificar_coluna(cols, ['ean', 'barra'])+1 if identificar_coluna(cols, ['ean', 'barra']) >= 0 else 0)
-            
             df_base = df_raw.copy().rename(columns={col_n:'Nome', col_c:'Custo', col_q:'Qtde'})
             df_base['EAN'] = df_raw[col_e] if col_e != "N/A" else ""
             df_base['Linha'] = df_raw[col_l] if col_l != "Geral" else "Geral"
@@ -180,9 +182,8 @@ else:
             imposto = st.number_input("% Tax", 0, 100, 4) / 100
         with cp2:
             markup_v = st.number_input("% Markup", 0, 500, 70) / 100
-            
         if st.button(t["btn_analisar"]):
-            with st.spinner('Processando...'):
+            with st.spinner('Analisando...'):
                 df = df_base.copy(); res_m, res_l, res_trend, res_vol = [], [], [], []
                 base_bl = ['tiendamia', 'fishpond', 'grandado', 'fruugo', 'desertcart', 'ubuy']
                 if "Brasil" in pais_sel: blacklist = base_bl + ['ebay', 'kidiin', 'kidinn', 'tradeinn', 'vendiloshop', 'aliexpress', 'temu']
@@ -220,12 +221,14 @@ else:
         m2.metric("Lucro Sugerido", f"{t['moeda']} {df_v['Lucro Total'].sum():,.2f}")
         m3.metric("Margem Média", f"{( ( (df_v['Preço Sugerido']*(1-imposto)) - df_v['Custo'] ) / df_v['Preço Sugerido'] ).mean()*100:.1f}%")
         modo = st.selectbox("Gráfico:", t["grafico_opcoes"])
-        color_map = {'✅':'#2ecc71','⚠️':'#f1c40f','🟥':'#e74c3c'}
-        if "Status" in modo: fig = px.pie(df_v, names='Status', hole=0.4, color='Status', color_discrete_map=color_map)
-        elif "Matriz" in modo: fig = px.scatter(df_v, x='Mercado', y='Lucro Total', size='Qtde', color='Status', color_discrete_map=color_map, hover_name='Nome')
-        else: fig = px.bar(df_v, x='Nome', y='Lucro Total', color='Status', color_discrete_map=color_map)
+        color_map = {'✅':'#2ecc71', '⚠️':'#f1c40f', '🟥':'#e74c3c'}
+        if "Status" in modo:
+            fig = px.pie(df_v, names='Status', hole=0.4, color='Status', color_discrete_map=color_map)
+        elif "Matriz" in modo:
+            fig = px.scatter(df_v, x='Mercado', y='Lucro Total', size='Qtde', color='Status', hover_name='Nome', color_discrete_map=color_map)
+        else:
+            fig = px.bar(df_v, x='Nome', y='Lucro Total', color='Status', color_discrete_map=color_map)
         st.plotly_chart(fig, use_container_width=True)
         st.dataframe(df_v[['Nome', 'Linha', 'Qtde', 'Custo', 'Mercado', 'Loja Líder', 'Preço Sugerido', 'Status', 'Tendência', 'Procura']])
-        
         out = io.BytesIO(); wr = pd.ExcelWriter(out, engine='xlsxwriter'); df_v.to_excel(wr, index=False); wr.close()
         st.download_button(label=t["download_btn"], data=out.getvalue(), file_name="analise.xlsx")
