@@ -27,14 +27,15 @@ idiomas = {
         "termos_header": "Termos de Uso e Isenção",
         "termos_corpo": "A planilha deve conter: Nome, Custo e Quantidade. O uso de dados da internet exige conferência obrigatória.",
         "termos_check": "Eu aceito os Termos de Uso do Brasil.",
-        "header_dados": "Carregamento de Produtos", "btn_excel": "Subir arquivo Excel",
+        "header_dados": "Carregamento de Produtos", 
+        "btn_excel": "Subir planilha (Excel/CSV)",
         "mapeamento": "Mapeamento Sugerido (Confira as Colunas):", 
         "header_analise": "Estratégia e Análise", "btn_analisar": "Iniciar Análise Real", 
         "invest": "Investimento em Estoque", "lucro": "Lucro Total Projetado", "margem": "Margem s/ Sugerido",
         "grafico_label": "Ver Gráfico por:",
         "grafico_opcoes": ["Status (Risco)", "Marketplace (Concorrentes)", "Linha (Categoria)", "Volume de Unidades"],
         "help_margem": "Baseado no Preço Sugerido.",
-        "download_btn": "Baixar Excel", "sinc_btn": "Sincronizar com Bling"
+        "download_btn": "Baixar Planilha", "sinc_btn": "Sincronizar com Bling"
     },
     "Portugal 🇵🇹": {
         "id": "PT", "moeda": "€", "lang": "pt-PT", "domain": "google.pt", "gl": "pt", "loc": "Portugal",
@@ -45,40 +46,42 @@ idiomas = {
         "ajuda_header": "Legenda de Situação", "ajuda_corpo": "✅ A Vencer\n⚠️ Caro\n🟥 Crítico",
         "suporte_header": "💬 Suporte ao Utilizador", "suporte_label": "Como podemos ajudar?",
         "termos_header": "Termos de Utilização",
-        "termos_corpo": "A folha deve conter: Nome, Custo e Quantidade. A conferência dos dados é da responsabilidade do utilizador.",
+        "termos_corpo": "A folha de cálculo deve conter: Nome, Custo e Quantidade. A conferência dos dados é da responsabilidade do utilizador.",
         "termos_check": "Aceito os Termos de Utilização de Portugal.",
-        "header_dados": "Carregamento de Produtos", "btn_excel": "Carregar ficheiro Excel",
+        "header_dados": "Carregamento de Produtos", 
+        "btn_excel": "Carregar folha de cálculo",
         "mapeamento": "Mapeamento Sugerido (Valide as Colunas):",
         "header_analise": "Estratégia e Análise", "btn_analisar": "Iniciar Análise de Mercado", 
         "invest": "Investimento em Stock", "lucro": "Lucro Total Projetado", "margem": "Margem s/ Sugerido",
         "grafico_label": "Ver Gráfico por:",
         "grafico_opcoes": ["Status (Risco)", "Marketplace (Lojas)", "Linha (Categoria)", "Volume de Stock"],
         "help_margem": "Baseado no Preço Sugerido.",
-        "download_btn": "Descarregar Excel"
+        "download_btn": "Descarregar Folha"
     },
     "USA 🇺🇸": {
         "id": "US", "moeda": "$", "lang": "en", "domain": "google.com", "gl": "us", "loc": "United States",
         "titulo": "USA Marketplace Intelligence",
         "label_chave": "SerpApi Key", "help_chave": "Search code from SerpApi.com.",
         "btn_confirmar": "Confirm Key", "msg_ativado": "Activated!",
-        "aviso_chave": "⚠️ Confirm your SerpApi Key in the sidebar.",
+        "aviso_chave": "⚠️ Please confirm your SerpApi Key in the sidebar.",
         "ajuda_header": "Legend", "ajuda_corpo": "✅ Winning\n⚠️ Expensive\n🟥 Alert",
         "suporte_header": "💬 Support", "suporte_label": "How can we help?",
         "termos_header": "Terms of Use",
-        "termos_corpo": "Sheet required: Name, Cost, and Quantity. Data must be validated by the user.",
+        "termos_corpo": "Spreadsheet required: Name, Cost, and Quantity. Data must be validated by the user.",
         "termos_check": "I accept the USA Terms of Use.",
-        "header_dados": "Product Upload", "btn_excel": "Upload Excel file",
+        "header_dados": "Product Upload", 
+        "btn_excel": "Upload Spreadsheet",
         "mapeamento": "Smart Mapping (Please Verify):",
         "header_analise": "Strategy & Analysis", "btn_analisar": "Start Market Analysis", 
         "invest": "Inventory Investment", "lucro": "Projected Profit", "margem": "Avg Margin",
         "grafico_label": "View Chart by:",
         "grafico_opcoes": ["Status (Risk)", "Marketplace (Stores)", "Line (Category)", "Unit Volume"],
         "help_margem": "Based on Suggested Price.",
-        "download_btn": "Download Excel"
+        "download_btn": "Download Sheet"
     }
 }
 
-# --- FUNÇÕES ---
+# --- FUNÇÕES AUXILIARES ---
 def identificar_coluna(lista_colunas, chaves):
     for c in lista_colunas:
         if any(k in str(c).lower().strip() for k in chaves): return lista_colunas.index(c)
@@ -95,12 +98,12 @@ def enviar_email_log(n, e, m):
         return True
     except: return False
 
-# --- SESSÃO ---
+# --- CONTROLE DE SESSÃO ---
 if "api_key" not in st.session_state: st.session_state.api_key = None
 
 with st.sidebar:
-    st.header("Mercado")
-    pais_sel = st.selectbox("Selecione:", list(idiomas.keys()), key="pais_main")
+    st.header("Região / Region")
+    pais_sel = st.selectbox("Mercado:", list(idiomas.keys()), key="pais_main")
     
     if "pais_anterior" not in st.session_state:
         st.session_state.pais_anterior = pais_sel
@@ -129,26 +132,24 @@ with st.sidebar:
 
 # --- CORPO PRINCIPAL ---
 st.title(t["titulo"])
-
-# TRAVA DE TERMOS FIXA: O título e o Checkbox SEMPRE aparecem.
 st.subheader(t["termos_header"])
 st.info(t["termos_corpo"])
-# A chave (key) inclui o pais_sel para resetar quando muda de região
+
+# Checkbox visível e persistente por região
 aceite_regiao = st.checkbox(t["termos_check"], key=f"aceite_{pais_sel}")
 
 if not aceite_regiao:
     st.warning("Aguardando aceite dos termos...")
     st.stop()
 
-# TUDO ABAIXO SÓ APARECE SE O ACEITE FOR TRUE
-st.divider()
-st.subheader(t["header_dados"])
+st.divider(); st.subheader(t["header_dados"])
 
 if not st.session_state.api_key:
     st.warning(t["aviso_chave"])
 else:
     df_base = pd.DataFrame()
-    fonte = st.radio("Fonte:", ["Excel", "Bling (API V3)"] if "Brasil" in pais_sel else ["Excel"], horizontal=True)
+    # Padrão Brasil: Excel (agora Planilha). Padrão Global: Spreadsheet / Folha de Cálculo
+    fonte = st.radio("Fonte:", ["Arquivo", "Bling (API V3)"] if "Brasil" in pais_sel else ["File"], horizontal=True)
 
     if fonte == "Bling (API V3)":
         c_bl, _ = st.columns([0.3, 0.7])
@@ -162,16 +163,12 @@ else:
                     st.success("OK!")
             except: st.error("Erro")
     else:
-        uploaded_file = st.file_uploader(t["btn_excel"], type=["xlsx", "xls"])
+        uploaded_file = st.file_uploader(t["btn_excel"], type=["xlsx", "xls", "csv"])
         if uploaded_file:
-            df_raw = pd.read_excel(uploaded_file); cols = df_raw.columns.tolist()
+            df_raw = pd.read_excel(uploaded_file) if not uploaded_file.name.endswith('.csv') else pd.read_csv(uploaded_file)
+            cols = df_raw.columns.tolist()
             st.write(f"**{t['mapeamento']}**")
-            # Unificação de termos para Mapeamento Global
-            idx_n = identificar_coluna(cols, ['produto', 'nome', 'item', 'name', 'product'])
-            idx_c = identificar_coluna(cols, ['custo', 'compra', 'cost', 'price', 'preço c'])
-            idx_q = identificar_coluna(cols, ['qtd', 'quantidade', 'estoque', 'stock', 'qty'])
-            idx_l = identificar_coluna(cols, ['linha', 'categoria', 'line', 'category'])
-            idx_e = identificar_coluna(cols, ['ean', 'barra', 'gtin', 'upc', 'code'])
+            idx_n, idx_c, idx_q, idx_l, idx_e = identificar_coluna(cols, ['produto', 'nome', 'item', 'name', 'product']), identificar_coluna(cols, ['custo', 'compra', 'cost', 'price']), identificar_coluna(cols, ['qtd', 'quantidade', 'estoque', 'stock', 'qty']), identificar_coluna(cols, ['linha', 'categoria', 'line', 'category']), identificar_coluna(cols, ['ean', 'barra', 'gtin', 'upc', 'code'])
             
             c1, c2, c3, c4, c5 = st.columns(5)
             with c1: col_n = st.selectbox("NOME / NAME:", cols, index=idx_n)
@@ -180,11 +177,8 @@ else:
             with c4: col_l = st.selectbox("LINHA / LINE:", ["Geral/None"] + cols, index=idx_l+1 if idx_l >= 0 else 0)
             with c5: col_e = st.selectbox("EAN / CODE:", ["N/A"] + cols, index=idx_e+1 if idx_e >= 0 else 0)
             
-            # UNIFICAÇÃO TÉCNICA (Nomes fixos para o engine)
             df_base = df_raw.copy().rename(columns={col_n:'Nome', col_c:'Custo', col_q:'Qtde'})
-            df_base['EAN'] = df_raw[col_e] if col_e != "N/A" else ""
-            df_base['Linha'] = df_raw[col_l] if col_l != "Geral/None" else "Geral"
-            df_base['ID'] = 0
+            df_base['EAN'], df_base['Linha'], df_base['ID'] = (df_raw[col_e] if col_e != "N/A" else ""), (df_raw[col_l] if col_l != "Geral/None" else "Geral"), 0
 
     if not df_base.empty:
         st.divider(); st.subheader(t["header_analise"])
@@ -192,7 +186,7 @@ else:
         with cp1: imposto = st.number_input("% Tax", 0, 100, 4) / 100
         with cp2: markup_padrao = st.number_input("% Markup", 0, 500, 70) / 100
         if st.button(t["btn_analisar"]):
-            with st.spinner('Analisando concorrentes...'):
+            with st.spinner('Analisando mercado...'):
                 df = df_base.copy(); res_m, res_l = [], []
                 loc_f = t["loc"]; blacklist = ['kidiin', 'kidinn', 'tradeinn', 'fruugo', 'desertcart', 'ubuy', 'vendiloshop', 'grandado', 'aliexpress', 'temu']
                 if "USA" not in pais_sel: blacklist.append('ebay')
@@ -211,7 +205,7 @@ else:
                             except: continue
                         if validos: b = min(validos, key=lambda x:x['p']); best_p, best_l = b['p'], b['l']
                     res_m.append(best_p); res_l.append(best_l)
-                df['Mercado'], df['Loja Líder'] = res_m, res_l
+                df['Mercado'], df['Loja Líder'], df['Status'] = res_m, res_l, ""
                 df['Seu Preço'] = round(df['Custo'] * (1 + markup_padrao), 2)
                 df['Preço Sugerido'] = df.apply(lambda x: round(x['Mercado']*0.98, 2) if x['Seu Preço'] > x['Mercado'] else x['Seu Preço'], axis=1)
                 df['Margem %'] = round((((df['Preço Sugerido']*(1-imposto)) - df['Custo']) / df['Preço Sugerido']) * 100, 2)
@@ -223,8 +217,8 @@ else:
         df = st.session_state.df_final
         st.divider()
         c_f1, c_f2 = st.columns(2)
-        with c_f1: lojas_sel = st.multiselect("Lojas:", options=df['Loja Líder'].unique(), default=df['Loja Líder'].unique())
-        with c_f2: categorias_sel = st.multiselect("Linhas:", options=df['Linha'].unique(), default=df['Linha'].unique())
+        with c_f1: lojas_sel = st.multiselect("Filtro Lojas:", options=df['Loja Líder'].unique(), default=df['Loja Líder'].unique())
+        with c_f2: categorias_sel = st.multiselect("Filtro Categorias:", options=df['Linha'].unique(), default=df['Linha'].unique())
         df_view = df[(df['Loja Líder'].isin(lojas_sel)) & (df['Linha'].isin(categorias_sel))]
         
         m1, m2, m3 = st.columns(3)
@@ -240,10 +234,9 @@ else:
         elif "Linha" in modo: fig = px.pie(df_view, names='Linha', values='Lucro Total', hole=0.4, title="Profit per Category")
         else: fig = px.bar(df_view, x='Nome', y='Qtde', color='Status', color_discrete_map=color_map, title="Volume")
         st.plotly_chart(fig, use_container_width=True)
-        
         st.dataframe(df_view[['Nome', 'Linha', 'Qtde', 'Custo', 'Seu Preço', 'Mercado', 'Loja Líder', 'Preço Sugerido', 'Margem %', 'Status', 'Lucro Total']].style.format({'Custo': '{:.2f}', 'Seu Preço': '{:.2f}', 'Mercado': '{:.2f}', 'Preço Sugerido': '{:.2f}', 'Margem %': '{:.2f}', 'Lucro Total': '{:.2f}'}))
         out = io.BytesIO(); wr = pd.ExcelWriter(out, engine='xlsxwriter'); df_view.to_excel(wr, index=False); wr.close()
-        st.download_button(label=t["download_btn"], data=out.getvalue(), file_name="analise_global.xlsx")
+        st.download_button(label=t["download_btn"], data=out.getvalue(), file_name="analysis_global.xlsx")
         if "Brasil" in pais_sel and fonte == "Bling (API V3)":
             if st.button(t["sinc_btn"]):
                 h = {"Authorization": f"Bearer {bling_token}", "Content-Type": "application/json"}
