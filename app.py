@@ -25,10 +25,11 @@ idiomas = {
         "ajuda_header": "Legenda de Situação", "ajuda_corpo": "✅ Vencendo\n⚠️ Caro\n🟥 Burn",
         "suporte_header": "💬 Suporte ao Cliente", "suporte_label": "Como podemos ajudar?",
         "termos_header": "Termos de Uso e Isenção",
-        "termos_corpo": "A planilha deve conter: Nome, Custo e Quantidade. O uso de dados da internet exige conferência obrigatória.",
+        "termos_corpo": "A planilha deve conter: Nome, Custo e Quantidade. Uso de dados exige conferência.",
         "termos_check": "Eu aceito os Termos de Uso do Brasil.",
         "header_dados": "Carregamento de Produtos", 
-        "btn_excel": "Subir planilha (Excel/CSV)",
+        "btn_excel": "Subir planilha",
+        "fonte_label": "Fonte de Dados:", "fonte_opcoes": ["Planilha", "Bling (API V3)"],
         "mapeamento": "Mapeamento Sugerido (Confira as Colunas):", 
         "header_analise": "Estratégia e Análise", "btn_analisar": "Iniciar Análise Real", 
         "invest": "Investimento em Estoque", "lucro": "Lucro Total Projetado", "margem": "Margem s/ Sugerido",
@@ -46,10 +47,11 @@ idiomas = {
         "ajuda_header": "Legenda de Situação", "ajuda_corpo": "✅ A Vencer\n⚠️ Caro\n🟥 Crítico",
         "suporte_header": "💬 Suporte ao Utilizador", "suporte_label": "Como podemos ajudar?",
         "termos_header": "Termos de Utilização",
-        "termos_corpo": "A folha de cálculo deve conter: Nome, Custo e Quantidade. A conferência dos dados é da responsabilidade do utilizador.",
+        "termos_corpo": "A folha de cálculo deve conter: Nome, Custo e Quantidade. Conferência obrigatória pelo utilizador.",
         "termos_check": "Aceito os Termos de Utilização de Portugal.",
         "header_dados": "Carregamento de Produtos", 
         "btn_excel": "Carregar folha de cálculo",
+        "fonte_label": "Origem dos Dados:", "fonte_opcoes": ["Folha de cálculo"],
         "mapeamento": "Mapeamento Sugerido (Valide as Colunas):",
         "header_analise": "Estratégia e Análise", "btn_analisar": "Iniciar Análise de Mercado", 
         "invest": "Investimento em Stock", "lucro": "Lucro Total Projetado", "margem": "Margem s/ Sugerido",
@@ -63,7 +65,7 @@ idiomas = {
         "titulo": "USA Marketplace Intelligence",
         "label_chave": "SerpApi Key", "help_chave": "Search code from SerpApi.com.",
         "btn_confirmar": "Confirm Key", "msg_ativado": "Activated!",
-        "aviso_chave": "⚠️ Please confirm your SerpApi Key in the sidebar.",
+        "aviso_chave": "⚠️ Confirm your SerpApi Key in the sidebar.",
         "ajuda_header": "Legend", "ajuda_corpo": "✅ Winning\n⚠️ Expensive\n🟥 Alert",
         "suporte_header": "💬 Support", "suporte_label": "How can we help?",
         "termos_header": "Terms of Use",
@@ -71,6 +73,7 @@ idiomas = {
         "termos_check": "I accept the USA Terms of Use.",
         "header_dados": "Product Upload", 
         "btn_excel": "Upload Spreadsheet",
+        "fonte_label": "Data Source:", "fonte_opcoes": ["Spreadsheet"],
         "mapeamento": "Smart Mapping (Please Verify):",
         "header_analise": "Strategy & Analysis", "btn_analisar": "Start Market Analysis", 
         "invest": "Inventory Investment", "lucro": "Projected Profit", "margem": "Avg Margin",
@@ -134,8 +137,6 @@ with st.sidebar:
 st.title(t["titulo"])
 st.subheader(t["termos_header"])
 st.info(t["termos_corpo"])
-
-# Checkbox visível e persistente por região
 aceite_regiao = st.checkbox(t["termos_check"], key=f"aceite_{pais_sel}")
 
 if not aceite_regiao:
@@ -148,10 +149,10 @@ if not st.session_state.api_key:
     st.warning(t["aviso_chave"])
 else:
     df_base = pd.DataFrame()
-    # Padrão Brasil: Excel (agora Planilha). Padrão Global: Spreadsheet / Folha de Cálculo
-    fonte = st.radio("Fonte:", ["Arquivo", "Bling (API V3)"] if "Brasil" in pais_sel else ["File"], horizontal=True)
+    # Seletor de Fonte com Termos Corrigidos
+    fonte = st.radio(t["fonte_label"], t["fonte_opcoes"], horizontal=True)
 
-    if fonte == "Bling (API V3)":
+    if "Bling" in fonte:
         c_bl, _ = st.columns([0.3, 0.7])
         with c_bl: bling_token = st.text_input(t["bling_token"], type="password")
         if st.button("📥 Importar Dados"):
@@ -171,11 +172,11 @@ else:
             idx_n, idx_c, idx_q, idx_l, idx_e = identificar_coluna(cols, ['produto', 'nome', 'item', 'name', 'product']), identificar_coluna(cols, ['custo', 'compra', 'cost', 'price']), identificar_coluna(cols, ['qtd', 'quantidade', 'estoque', 'stock', 'qty']), identificar_coluna(cols, ['linha', 'categoria', 'line', 'category']), identificar_coluna(cols, ['ean', 'barra', 'gtin', 'upc', 'code'])
             
             c1, c2, c3, c4, c5 = st.columns(5)
-            with c1: col_n = st.selectbox("NOME / NAME:", cols, index=idx_n)
-            with c2: col_c = st.selectbox("CUSTO / COST:", cols, index=idx_c)
-            with c3: col_q = st.selectbox("QTDE / QTY:", cols, index=idx_q)
-            with c4: col_l = st.selectbox("LINHA / LINE:", ["Geral/None"] + cols, index=idx_l+1 if idx_l >= 0 else 0)
-            with c5: col_e = st.selectbox("EAN / CODE:", ["N/A"] + cols, index=idx_e+1 if idx_e >= 0 else 0)
+            with c1: col_n = st.selectbox("PRODUTO:", cols, index=idx_n)
+            with c2: col_c = st.selectbox("CUSTO:", cols, index=idx_c)
+            with c3: col_q = st.selectbox("QTDE:", cols, index=idx_q)
+            with c4: col_l = st.selectbox("LINHA:", ["Geral/None"] + cols, index=idx_l+1 if idx_l >= 0 else 0)
+            with c5: col_e = st.selectbox("EAN:", ["N/A"] + cols, index=idx_e+1 if idx_e >= 0 else 0)
             
             df_base = df_raw.copy().rename(columns={col_n:'Nome', col_c:'Custo', col_q:'Qtde'})
             df_base['EAN'], df_base['Linha'], df_base['ID'] = (df_raw[col_e] if col_e != "N/A" else ""), (df_raw[col_l] if col_l != "Geral/None" else "Geral"), 0
@@ -205,7 +206,7 @@ else:
                             except: continue
                         if validos: b = min(validos, key=lambda x:x['p']); best_p, best_l = b['p'], b['l']
                     res_m.append(best_p); res_l.append(best_l)
-                df['Mercado'], df['Loja Líder'], df['Status'] = res_m, res_l, ""
+                df['Mercado'], df['Loja Líder'] = res_m, res_l
                 df['Seu Preço'] = round(df['Custo'] * (1 + markup_padrao), 2)
                 df['Preço Sugerido'] = df.apply(lambda x: round(x['Mercado']*0.98, 2) if x['Seu Preço'] > x['Mercado'] else x['Seu Preço'], axis=1)
                 df['Margem %'] = round((((df['Preço Sugerido']*(1-imposto)) - df['Custo']) / df['Preço Sugerido']) * 100, 2)
@@ -217,8 +218,8 @@ else:
         df = st.session_state.df_final
         st.divider()
         c_f1, c_f2 = st.columns(2)
-        with c_f1: lojas_sel = st.multiselect("Filtro Lojas:", options=df['Loja Líder'].unique(), default=df['Loja Líder'].unique())
-        with c_f2: categorias_sel = st.multiselect("Filtro Categorias:", options=df['Linha'].unique(), default=df['Linha'].unique())
+        with c_f1: lojas_sel = st.multiselect("Lojas:", options=df['Loja Líder'].unique(), default=df['Loja Líder'].unique())
+        with c_f2: categorias_sel = st.multiselect("Categorias:", options=df['Linha'].unique(), default=df['Linha'].unique())
         df_view = df[(df['Loja Líder'].isin(lojas_sel)) & (df['Linha'].isin(categorias_sel))]
         
         m1, m2, m3 = st.columns(3)
@@ -232,12 +233,12 @@ else:
         if "Status" in modo: fig = px.pie(df_view, names='Status', hole=0.4, color='Status', color_discrete_map=color_map)
         elif "Marketplace" in modo: fig = px.bar(df_view.groupby('Loja Líder')['Lucro Total'].sum().reset_index(), x='Loja Líder', y='Lucro Total', color='Loja Líder', title="Profit per Marketplace")
         elif "Linha" in modo: fig = px.pie(df_view, names='Linha', values='Lucro Total', hole=0.4, title="Profit per Category")
-        else: fig = px.bar(df_view, x='Nome', y='Qtde', color='Status', color_discrete_map=color_map, title="Volume")
+        else: fig = px.bar(df_view, x='Nome', y='Qtde', color='Status', color_discrete_map=color_map, title="Inventory Volume")
         st.plotly_chart(fig, use_container_width=True)
         st.dataframe(df_view[['Nome', 'Linha', 'Qtde', 'Custo', 'Seu Preço', 'Mercado', 'Loja Líder', 'Preço Sugerido', 'Margem %', 'Status', 'Lucro Total']].style.format({'Custo': '{:.2f}', 'Seu Preço': '{:.2f}', 'Mercado': '{:.2f}', 'Preço Sugerido': '{:.2f}', 'Margem %': '{:.2f}', 'Lucro Total': '{:.2f}'}))
         out = io.BytesIO(); wr = pd.ExcelWriter(out, engine='xlsxwriter'); df_view.to_excel(wr, index=False); wr.close()
-        st.download_button(label=t["download_btn"], data=out.getvalue(), file_name="analysis_global.xlsx")
-        if "Brasil" in pais_sel and fonte == "Bling (API V3)":
+        st.download_button(label=t["download_btn"], data=out.getvalue(), file_name="analise_global.xlsx")
+        if "Brasil" in pais_sel and "Bling" in fonte:
             if st.button(t["sinc_btn"]):
                 h = {"Authorization": f"Bearer {bling_token}", "Content-Type": "application/json"}
                 for i, row in df_view.iterrows(): requests.put(f"https://bling.com.br{row['ID']}", json={"preco": round(row['Preço Sugerido'], 2)}, headers=h)
