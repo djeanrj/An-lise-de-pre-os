@@ -264,14 +264,34 @@ def ranking_produtos_analisados(regiao, dias=90):
 # 5. FUNÇÕES UTILITÁRIAS
 # =============================================================================
 def identificar_coluna(lista_cols, chaves, default=-1):
+    """Encontra a coluna mais provável com base numa lista de palavras-chave (ordem = prioridade).
+    1) Match exato com a chave inteira; 2) Match por substring respeitando a ordem das chaves."""
     lista_lower = [str(c).lower().strip() for c in lista_cols]
-    for i, c in enumerate(lista_lower):
-        if c in chaves:
-            return i
-    for i, c in enumerate(lista_lower):
-        if any(k in c for k in chaves):
-            return i
+    # Match exato
+    for chave in chaves:
+        for i, c in enumerate(lista_lower):
+            if c == chave:
+                return i
+    # Match por substring, respeitando a prioridade da lista de chaves
+    for chave in chaves:
+        for i, c in enumerate(lista_lower):
+            if chave in c:
+                return i
     return default
+
+
+def limpar_custo(serie):
+    """Aceita custo como número ou como texto formatado em pt-BR/pt-PT (R$ 1.234,56 / 1.234,56 €).
+    Devolve uma Series numérica."""
+    if pd.api.types.is_numeric_dtype(serie):
+        return pd.to_numeric(serie, errors="coerce")
+    # Texto: remover tudo o que não é dígito, vírgula, ponto ou sinal
+    s = serie.astype(str).str.replace(r"[^\d,.\-]", "", regex=True)
+    # Heurística: se tem vírgula, assumir formato BR/EU (ponto = milhar, vírgula = decimal)
+    tem_virgula = s.str.contains(",", na=False).any()
+    if tem_virgula:
+        s = s.str.replace(".", "", regex=False).str.replace(",", ".", regex=False)
+    return pd.to_numeric(s, errors="coerce")
 
 
 def parse_preco(valor_raw, formato="BR"):
@@ -328,13 +348,30 @@ def classificar_vendedor(item, whitelist, blacklist):
     return "confiavel"
 
 
-def buscar_serpapi(produto, ean, regiao_cfg, whitelist, blacklist, api_key):
-    """Devolve dois conjuntos: concorrentes confiáveis + ofertas da loja própria."""
+def buscar_serpapi(produto, ean, sku, regiao_cfg, whitelist, blacklist, api_key):
+    """Devolve dois conjuntos: concorrentes confiáveis + ofertas da loja própria.
+    Estratégia em cascata, do mais preciso para o mais genérico:
+    1) EAN (13 dígitos universais)
+    2) SKU do fabricante (ex: 10281 para LEGO Bonsai — usado globalmente)
+    3) Nome do produto
+    Para por aqui assim que encontra resultados confiáveis."""
     concorrentes = []
     proprias = []
     consultas = []
-    if ean and str(ean).strip() and str(ean).strip().lower() != "nan":
-        consultas.append(f"{ean}")
+
+    def _valido(v):
+        return v is not None and str(v).strip() and str(v).strip().lower() != "nan"
+
+    if _valido(ean):
+        consultas.append(str(ean).strip())
+    if _valido(sku) and str(sku).strip() != str(ean).strip():
+        # SKU isolado costuma trazer ruído; juntar uma palavra-chave do nome ajuda
+        # Para LEGO, "10281 LEGO" é muito mais preciso que só "10281"
+        primeira_palavra = str(produto).split("-")[0].strip().split()[0] if produto else ""
+        if primeira_palavra and primeira_palavra.lower() != str(sku).strip().lower():
+            consultas.append(f"{sku} {primeira_palavra}")
+        else:
+            consultas.append(str(sku).strip())
     consultas.append(f"{produto}")
 
     for q in consultas:
@@ -491,16 +528,16 @@ def recomendacao_investimento(status_codigo, score_procura, qtde_atual):
 
 def gerar_planilha_exemplo():
     exemplo = pd.DataFrame([
-        {"EAN": "7891000100103", "Produto": "Headset Gamer HyperX Cloud II", "Categoria": "Periféricos", "Custo": 320.00, "Estoque": 12},
-        {"EAN": "7898912345678", "Produto": "Cadeira Gamer DT3 Elise", "Categoria": "Móveis", "Custo": 850.00, "Estoque": 5},
-        {"EAN": "7896543210987", "Produto": "Teclado Mecânico Logitech G Pro", "Categoria": "Periféricos", "Custo": 410.00, "Estoque": 8},
-        {"EAN": "7891234567890", "Produto": "Monitor LG UltraGear 27\" 144Hz", "Categoria": "Monitores", "Custo": 1450.00, "Estoque": 3},
-        {"EAN": "7890000111222", "Produto": "Mouse Razer DeathAdder V3", "Categoria": "Periféricos", "Custo": 280.00, "Estoque": 20},
-        {"EAN": "7894561237894", "Produto": "Webcam Logitech C920 Full HD", "Categoria": "Periféricos", "Custo": 360.00, "Estoque": 7},
-        {"EAN": "7898765432109", "Produto": "SSD Kingston NV2 1TB NVMe", "Categoria": "Armazenamento", "Custo": 380.00, "Estoque": 15},
-        {"EAN": "7891111222233", "Produto": "Memória RAM Corsair Vengeance 16GB DDR4", "Categoria": "Memórias", "Custo": 220.00, "Estoque": 25},
-        {"EAN": "7892222333344", "Produto": "Placa de Vídeo RTX 4060 8GB", "Categoria": "Hardware", "Custo": 1850.00, "Estoque": 4},
-        {"EAN": "7893333444455", "Produto": "Fonte Corsair RM750e 80 Plus Gold", "Categoria": "Hardware", "Custo": 540.00, "Estoque": 6},
+        {"SKU": "10281", "EAN": "5702016667967", "Produto": "LEGO Icons Bonsai", "Categoria": "Lego Icons", "Custo": 256.83, "Estoque": 2},
+        {"SKU": "10280", "EAN": "5702016912388", "Produto": "LEGO Icons Buquê de Flores", "Categoria": "Lego Icons", "Custo": 308.19, "Estoque": 1},
+        {"SKU": "31151", "EAN": "5702017415925", "Produto": "LEGO Creator T. rex", "Categoria": "Lego Creator", "Custo": 288.59, "Estoque": 1},
+        {"SKU": "75392", "EAN": "5702017592664", "Produto": "LEGO Star Wars Construtor de Droid", "Categoria": "Star Wars", "Custo": 494.73, "Estoque": 1},
+        {"SKU": "60408", "EAN": "5702017583266", "Produto": "LEGO City Caminhão-cegonha com Carros Esportivos", "Categoria": "Lego City", "Custo": 494.73, "Estoque": 1},
+        {"SKU": "21357", "EAN": "5702017583815", "Produto": "LEGO Ideias Disney Pixar Luxo Jr.", "Categoria": "Ideias", "Custo": 364.58, "Estoque": 1},
+        {"SKU": "31201", "EAN": "5702017153957", "Produto": "LEGO Art Harry Potter Hogwarts Brasões", "Categoria": "Art", "Custo": 655.73, "Estoque": 1},
+        {"SKU": "76295", "EAN": "5702017583617", "Produto": "LEGO Marvel O Helicarrier dos Vingadores", "Categoria": "Super Heroes", "Custo": 412.27, "Estoque": 2},
+        {"SKU": "75389", "EAN": "5702017462066", "Produto": "LEGO Star Wars A Dark Falcon", "Categoria": "Star Wars", "Custo": 927.63, "Estoque": 1},
+        {"SKU": "10989", "EAN": "5702017384207", "Produto": "LEGO Duplo Parque Aquático", "Categoria": "DUPLO", "Custo": 208.33, "Estoque": 2},
     ])
     buf = io.BytesIO()
     with pd.ExcelWriter(buf, engine="openpyxl") as writer:
@@ -663,6 +700,7 @@ with tab_analise:
                             "Custo": round(float(i.get("precoCusto", 0) or 0), 2),
                             "Qtde": float(i.get("estoque", {}).get("quantidade", 1) or 1),
                             "EAN": i.get("codigoBarra", ""),
+                            "SKU": i.get("codigo", ""),
                             "Linha": (i.get("categoria") or {}).get("nome", "Geral"),
                             "ID": i.get("id", 0),
                         } for i in dados])
@@ -690,13 +728,14 @@ with tab_analise:
                     st.dataframe(df_raw.head(10))
 
                 st.markdown("**🤖 Mapeamento automático das colunas (corrija se necessário):**")
-                c1, c2, c3, c4, c5 = st.columns(5)
+                c1, c2, c3, c4, c5, c6 = st.columns(6)
 
-                idx_n = identificar_coluna(cols, ["produto", "nome", "item", "name", "descrição", "descricao"])
-                idx_c = identificar_coluna(cols, ["custo", "compra", "cost", "preço de custo", "preco custo"])
-                idx_q = identificar_coluna(cols, ["qtd", "quantidade", "stock", "estoque", "qty"])
+                idx_n = identificar_coluna(cols, ["nome produto", "descrição", "descricao", "produto", "nome", "item", "name"])
+                idx_c = identificar_coluna(cols, ["preço de custo", "preco custo", "custo", "compra", "cost"])
+                idx_q = identificar_coluna(cols, ["quantidade", "estoque", "stock", "qtd", "qty"])
                 idx_l = identificar_coluna(cols, ["linha", "categoria", "category", "tipo", "departamento"])
-                idx_e = identificar_coluna(cols, ["ean", "barra", "barras", "upc", "gtin", "código"])
+                idx_e = identificar_coluna(cols, ["código de barras", "codigo de barras", "ean", "gtin", "upc", "barras", "barra"])
+                idx_s = identificar_coluna(cols, ["sku", "código produto", "codigo produto", "ref", "referência", "referencia", "model", "modelo", "código", "codigo"])
 
                 with c1:
                     col_n = st.selectbox("PRODUTO:", cols, index=max(idx_n, 0))
@@ -710,13 +749,23 @@ with tab_analise:
                 with c5:
                     opcoes_e = ["(Sem EAN)"] + cols
                     col_e = st.selectbox("EAN/CÓD. BARRAS:", opcoes_e, index=(idx_e + 1) if idx_e >= 0 else 0)
+                with c6:
+                    opcoes_s = ["(Sem SKU)"] + cols
+                    col_s = st.selectbox("SKU/REF:", opcoes_s, index=(idx_s + 1) if idx_s >= 0 else 0)
+
+                st.caption(
+                    "💡 **SKU/REF** é o código do fabricante (ex: LEGO `10281`, Playmobil `70980`). "
+                    "Quando preenchido, melhora muito a precisão da busca em mercados estrangeiros, "
+                    "porque o nome muda entre idiomas mas o SKU é universal."
+                )
 
                 df_base = df_raw.copy().rename(columns={col_n: "Nome", col_c: "Custo", col_q: "Qtde"})
                 df_base["EAN"] = df_raw[col_e] if col_e != "(Sem EAN)" else ""
+                df_base["SKU"] = df_raw[col_s].astype(str) if col_s != "(Sem SKU)" else ""
                 df_base["Linha"] = df_raw[col_l] if col_l != "(Sem categoria)" else "Geral"
                 df_base["ID"] = 0
 
-                df_base["Custo"] = pd.to_numeric(df_base["Custo"], errors="coerce")
+                df_base["Custo"] = limpar_custo(df_base["Custo"])
                 df_base["Qtde"] = pd.to_numeric(df_base["Qtde"], errors="coerce").fillna(0)
                 n_invalid = df_base["Custo"].isna().sum()
                 df_base = df_base.dropna(subset=["Custo"])
@@ -769,6 +818,7 @@ with tab_analise:
                     concorrentes, proprias = buscar_serpapi(
                         produto=row["Nome"],
                         ean=row.get("EAN", ""),
+                        sku=row.get("SKU", ""),
                         regiao_cfg=t,
                         whitelist=whitelist,
                         blacklist=blacklist,
