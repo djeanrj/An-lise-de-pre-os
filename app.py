@@ -124,6 +124,41 @@ BLACKLIST_REGIONAL = {
 # Domínios da loja própria — separados dos concorrentes para análise honesta
 LOJA_PROPRIA = ["vembrincarcomagente.com", "vembrincarcomagente.com.br"]
 
+# Palavras-chave que indicam produto usado, incompleto ou peça avulsa.
+# Qualquer match faz o resultado ser rejeitado.
+KEYWORDS_NAO_NOVO = [
+    # PT-BR
+    "usado", "seminovo", "semi-novo", "semi novo", "peças", "pecas",
+    "incompleto", "avulso", "avulsa", "sem caixa", "sem manual", "recondicionado",
+    "outlet", "vitrine", "mostruário", "mostruario", "danificado",
+    # PT-PT
+    "em segunda mão", "segunda mao", "como novo", "reembalado",
+    # EN
+    "used", "pre-owned", "preowned", "open box", "open-box", "openbox",
+    "refurbished", "loose", "no box", "incomplete", "missing pieces",
+    "missing parts", "bricklink", "spare", "replacement parts",
+    # IT
+    "usato", "ricondizionato",
+    # DE
+    "gebraucht", "generalüberholt",
+    # FR / ES
+    "occasion", "reacondicionado", "segunda mano",
+]
+
+
+def parece_produto_novo(item):
+    """Devolve False se houver indícios de produto usado/incompleto/avulso."""
+    blob = " ".join([
+        str(item.get("title", "")),
+        str(item.get("snippet", "")),
+        str(item.get("extensions", "")),
+        str(item.get("source", "")),
+    ]).lower()
+    for kw in KEYWORDS_NAO_NOVO:
+        if kw in blob:
+            return False
+    return True
+
 
 # =============================================================================
 # 4. CLIENTE SUPABASE (lazy-loaded e cacheado)
@@ -352,15 +387,18 @@ def classificar_vendedor(item, whitelist, blacklist):
     return "confiavel"
 
 
-def buscar_serpapi(produto, ean, sku, regiao_cfg, whitelist, blacklist, api_key):
+def buscar_serpapi(produto, ean, sku, custo, regiao_cfg, whitelist, blacklist, api_key,
+                    apenas_novos=True, preco_minimo_pct_custo=0.40):
     """Devolve dois conjuntos: concorrentes confiáveis + ofertas da loja própria.
-    Estratégia em cascata, do mais preciso para o mais genérico:
-    1) EAN (13 dígitos universais)
-    2) SKU do fabricante (ex: 10281 para LEGO Bonsai — usado globalmente)
-    3) Nome do produto
-    Para por aqui assim que encontra resultados confiáveis."""
+    Estratégia em cascata: EAN > SKU+marca > Nome.
+    Filtros aplicados:
+    - Vendedor confiável da região (whitelist) e fora da blacklist
+    - Produto novo (rejeita 'usado', 'open box', 'peças avulsas', etc.) se apenas_novos=True
+    - Outlier de preço: rejeita preço abaixo de `preco_minimo_pct_custo` × custo
+      (default 40%: se compraste a R$ 100, ignora resultados abaixo de R$ 40)"""
     concorrentes = []
     proprias = []
+    rejeitados_log = {"usado": 0, "outlier_baixo": 0, "outlier_alto": 0}
     consultas = []
 
     def _valido(v):
@@ -368,15 +406,17 @@ def buscar_serpapi(produto, ean, sku, regiao_cfg, whitelist, blacklist, api_key)
 
     if _valido(ean):
         consultas.append(str(ean).strip())
-    if _valido(sku) and str(sku).strip() != str(ean).strip():
-        # SKU isolado costuma trazer ruído; juntar uma palavra-chave do nome ajuda
-        # Para LEGO, "10281 LEGO" é muito mais preciso que só "10281"
+    if _valido(sku) and (not _valido(ean) or str(sku).strip() != str(ean).strip()):
         primeira_palavra = str(produto).split("-")[0].strip().split()[0] if produto else ""
         if primeira_palavra and primeira_palavra.lower() != str(sku).strip().lower():
             consultas.append(f"{sku} {primeira_palavra}")
         else:
             consultas.append(str(sku).strip())
     consultas.append(f"{produto}")
+
+    # Limites de outlier baseados no custo
+    preco_min_aceitavel = custo * preco_minimo_pct_custo if custo else 0
+    preco_max_aceitavel = custo * 10 if custo else float("inf")  # 10× custo é claramente outlier alto
 
     for q in consultas:
         try:
@@ -405,11 +445,25 @@ def buscar_serpapi(produto, ean, sku, regiao_cfg, whitelist, blacklist, api_key)
             if categoria == "rejeitado":
                 continue
 
+            # Filtro de condição: só produtos novos
+            if apenas_novos and not parece_produto_novo(item):
+                rejeitados_log["usado"] += 1
+                continue
+
             preco = item.get("extracted_price")
             if preco is None:
                 preco = parse_preco(item.get("price"), regiao_cfg["currency_format"])
             if preco is None or preco <= 0:
                 continue
+
+            # Filtro de outlier de preço (só para concorrentes; loja própria sempre passa)
+            if categoria == "confiavel" and custo:
+                if preco < preco_min_aceitavel:
+                    rejeitados_log["outlier_baixo"] += 1
+                    continue
+                if preco > preco_max_aceitavel:
+                    rejeitados_log["outlier_alto"] += 1
+                    continue
 
             registo = {
                 "preco": float(preco),
@@ -429,7 +483,7 @@ def buscar_serpapi(produto, ean, sku, regiao_cfg, whitelist, blacklist, api_key)
 
         time.sleep(0.3)
 
-    return concorrentes, proprias
+    return concorrentes, proprias, rejeitados_log
 
 
 def calcular_score_procura(itens):
@@ -794,6 +848,24 @@ with tab_analise:
                 "O imposto é descontado do preço de venda na hora de calcular o lucro real."
             )
 
+            with st.expander("🎛️ Filtros avançados de qualidade"):
+                cf_a, cf_b = st.columns(2)
+                with cf_a:
+                    apenas_novos = st.checkbox(
+                        "Aceitar apenas produtos NOVOS",
+                        value=True,
+                        help="Rejeita resultados marcados como usado, seminovo, open box, peças avulsas, "
+                             "incompleto, recondicionado, etc. Recomendado manter ativado.",
+                    )
+                with cf_b:
+                    preco_min_pct = st.slider(
+                        "Filtro de outlier de preço (% do custo)",
+                        min_value=10, max_value=80, value=40, step=5,
+                        help="Rejeita resultados cujo preço seja inferior a esta percentagem do seu custo de aquisição. "
+                             "Default 40%: se compra a R$ 100, ignora resultados abaixo de R$ 40 (provavelmente são "
+                             "peças avulsas, fraude, ou erro de scraping).",
+                    ) / 100
+
             if st.button(t["btn_analisar"], type="primary"):
                 if "Brasil" in pais_sel:
                     whitelist = WHITELIST["BR"]
@@ -816,18 +888,24 @@ with tab_analise:
                 progress = st.progress(0.0, text="A analisar produtos...")
                 registos = []
                 total = len(df_base)
+                rejeitados_total = {"usado": 0, "outlier_baixo": 0, "outlier_alto": 0}
 
                 for idx, (_, row) in enumerate(df_base.iterrows()):
                     progress.progress((idx + 1) / total, text=f"Analisando {idx + 1}/{total}: {row['Nome'][:50]}")
-                    concorrentes, proprias = buscar_serpapi(
+                    concorrentes, proprias, rej = buscar_serpapi(
                         produto=row["Nome"],
                         ean=row.get("EAN", ""),
                         sku=row.get("SKU", ""),
+                        custo=row["Custo"],
                         regiao_cfg=t,
                         whitelist=whitelist,
                         blacklist=blacklist,
                         api_key=st.session_state.api_key,
+                        apenas_novos=apenas_novos,
+                        preco_minimo_pct_custo=preco_min_pct,
                     )
+                    for k, v in rej.items():
+                        rejeitados_total[k] += v
 
                     precos_conc = [it["preco"] for it in concorrentes]
                     estrategias = calcular_estrategias_preco(
@@ -908,6 +986,18 @@ with tab_analise:
                 st.session_state.df_final.attrs["markup"] = markup
                 st.session_state.df_final.attrs["margem_minima"] = margem_minima
                 st.session_state.df_final.attrs["regiao"] = regiao_id
+                st.session_state.df_final.attrs["rejeitados"] = rejeitados_total
+
+                # Resumo dos filtros aplicados
+                if any(rejeitados_total.values()):
+                    msgs = []
+                    if rejeitados_total["usado"]:
+                        msgs.append(f"🧹 {rejeitados_total['usado']} resultados rejeitados (produto não novo)")
+                    if rejeitados_total["outlier_baixo"]:
+                        msgs.append(f"📉 {rejeitados_total['outlier_baixo']} preços rejeitados (muito baixos — peças/avulsos)")
+                    if rejeitados_total["outlier_alto"]:
+                        msgs.append(f"📈 {rejeitados_total['outlier_alto']} preços rejeitados (outliers altos)")
+                    st.info(" · ".join(msgs))
 
                 # Gravar histórico no Supabase
                 if supabase_ativo():
