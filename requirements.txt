@@ -1,6 +1,7 @@
 streamlit
 pandas
+numpy
 plotly
+requests
 google-search-results
-xlsxwriter
 openpyxl
