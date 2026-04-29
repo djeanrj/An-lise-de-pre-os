@@ -179,6 +179,7 @@ def gravar_historico_supabase(df_resultado, regiao, scope, imposto, markup, marg
         registos.append({
             "analise_id": analise_id,
             "ean": str(row.get("EAN", "")) if pd.notna(row.get("EAN")) else "",
+            "sku": str(row.get("SKU", "")) if pd.notna(row.get("SKU")) else "",
             "nome": str(row["Nome"]),
             "regiao": regiao,
             "custo": float(row["Custo"]) if pd.notna(row["Custo"]) else None,
@@ -217,8 +218,9 @@ def carregar_analises_recentes(limite=50):
 
 
 @st.cache_data(ttl=60)
-def carregar_historico_produto(ean, nome, regiao, dias=180):
-    """Devolve histórico de preços de um produto (por EAN se existir, senão por nome)."""
+def carregar_historico_produto(ean, sku, nome, regiao, dias=180):
+    """Devolve histórico de preços de um produto.
+    Estratégia: filtra por EAN (mais preciso) > SKU (universal do fabricante) > nome (fallback)."""
     sb = get_supabase_client()
     if sb is None:
         return pd.DataFrame()
@@ -227,6 +229,8 @@ def carregar_historico_produto(ean, nome, regiao, dias=180):
         query = sb.table("historico_precos").select("*").eq("regiao", regiao).gte("criado_em", data_limite)
         if ean and str(ean).strip():
             query = query.eq("ean", str(ean).strip())
+        elif sku and str(sku).strip():
+            query = query.eq("sku", str(sku).strip())
         else:
             query = query.eq("nome", nome)
         resp = query.order("criado_em", desc=False).execute()
@@ -244,11 +248,11 @@ def ranking_produtos_analisados(regiao, dias=90):
         return pd.DataFrame()
     try:
         data_limite = (datetime.utcnow() - timedelta(days=dias)).isoformat()
-        resp = sb.table("historico_precos").select("nome, ean, menor_concorrente, score_procura, status, criado_em").eq("regiao", regiao).gte("criado_em", data_limite).execute()
+        resp = sb.table("historico_precos").select("nome, ean, sku, menor_concorrente, score_procura, status, criado_em").eq("regiao", regiao).gte("criado_em", data_limite).execute()
         df = pd.DataFrame(resp.data)
         if df.empty:
             return df
-        agg = df.groupby(["nome", "ean"]).agg(
+        agg = df.groupby(["nome", "ean", "sku"], dropna=False).agg(
             n_analises=("criado_em", "count"),
             ultimo_preco=("menor_concorrente", "last"),
             score_medio=("score_procura", "mean"),
@@ -1151,10 +1155,12 @@ with tab_historico:
     else:
         opcoes_produtos = df_rank["nome"].head(50).tolist()
         produto_sel = st.selectbox("Escolha um produto:", opcoes_produtos)
-        ean_sel = df_rank[df_rank["nome"] == produto_sel]["ean"].iloc[0]
+        linha_sel = df_rank[df_rank["nome"] == produto_sel].iloc[0]
+        ean_sel = linha_sel["ean"]
+        sku_sel = linha_sel["sku"] if "sku" in linha_sel.index else ""
         dias_sel = st.slider("Janela de tempo (dias):", 7, 365, 90)
 
-        df_tend = carregar_historico_produto(ean_sel, produto_sel, regiao_id, dias=dias_sel)
+        df_tend = carregar_historico_produto(ean_sel, sku_sel, produto_sel, regiao_id, dias=dias_sel)
         if df_tend.empty or len(df_tend) < 2:
             st.info("São necessárias pelo menos 2 análises do mesmo produto para mostrar tendência. Continue a correr análises ao longo do tempo.")
         else:
