@@ -1183,36 +1183,89 @@ with tab_analise:
             if not concorrentes_lista:
                 st.info("Sem concorrentes confiáveis encontrados para este produto.")
             else:
-                # Construir tabela de concorrentes; se link vier vazio, fallback para
-                # busca no Google Shopping da região correta (não global)
+                # Construir tabela de concorrentes; fallback inteligente quando o link directo
+                # não vem da SerpAPI:
+                # 1) Se a loja for um marketplace conhecido, vai directo à busca interna do marketplace
+                # 2) Senão, recorre ao Google Shopping da região (com ncr para evitar geo-redirect)
+                MARKETPLACE_SEARCH_URL = {
+                    # Brasil
+                    "amazon.com.br": "https://www.amazon.com.br/s?k={q}",
+                    "mercadolivre.com.br": "https://lista.mercadolivre.com.br/{q}",
+                    "magazineluiza.com.br": "https://www.magazineluiza.com.br/busca/{q}/",
+                    "magalu": "https://www.magazineluiza.com.br/busca/{q}/",
+                    "americanas.com.br": "https://www.americanas.com.br/busca/{q}",
+                    "submarino.com.br": "https://www.submarino.com.br/busca/{q}",
+                    "shoptime.com.br": "https://www.shoptime.com.br/busca/{q}",
+                    "casasbahia.com.br": "https://www.casasbahia.com.br/{q}/b",
+                    "pontofrio.com.br": "https://www.pontofrio.com.br/{q}/b",
+                    "carrefour.com.br": "https://www.carrefour.com.br/busca/{q}",
+                    "fastshop.com.br": "https://www.fastshop.com.br/web/s/{q}",
+                    "kabum.com.br": "https://www.kabum.com.br/busca/{q}",
+                    "centauro.com.br": "https://www.centauro.com.br/busca?Ntt={q}",
+                    "ribrinquedos.com.br": "https://www.ribrinquedos.com.br/busca?busca={q}",
+                    "rihappy.com.br": "https://www.rihappy.com.br/{q}",
+                    "shopee.com.br": "https://shopee.com.br/search?keyword={q}",
+                    # Portugal
+                    "worten.pt": "https://www.worten.pt/search?query={q}",
+                    "fnac.pt": "https://www.fnac.pt/SearchResult/ResultList.aspx?SCat=0!1&Search={q}",
+                    "elcorteingles.pt": "https://www.elcorteingles.pt/search/?s={q}",
+                    "pcdiga.com": "https://www.pcdiga.com/catalogsearch/result/?q={q}",
+                    "mediamarkt.pt": "https://mediamarkt.pt/pages/search-results-page?q={q}",
+                    "auchan.pt": "https://www.auchan.pt/pt/pesquisa?q={q}",
+                    "kuantokusta.pt": "https://www.kuantokusta.pt/search?q={q}",
+                    # UE
+                    "amazon.es": "https://www.amazon.es/s?k={q}",
+                    "amazon.de": "https://www.amazon.de/s?k={q}",
+                    "amazon.it": "https://www.amazon.it/s?k={q}",
+                    "amazon.fr": "https://www.amazon.fr/s?k={q}",
+                    "amazon.nl": "https://www.amazon.nl/s?k={q}",
+                    "tradeinn.com": "https://www.tradeinn.com/searchresults?keywords={q}",
+                    "kidinn.com": "https://www.kidinn.com/searchresults?keywords={q}",
+                    "bol.com": "https://www.bol.com/nl/nl/s/?searchtext={q}",
+                    "cdiscount.com": "https://www.cdiscount.com/search/10/{q}.html",
+                    "fnac.com": "https://www.fnac.com/SearchResult/ResultList.aspx?Search={q}",
+                    # USA
+                    "amazon.com": "https://www.amazon.com/s?k={q}",
+                    "ebay.com": "https://www.ebay.com/sch/i.html?_nkw={q}",
+                    "walmart.com": "https://www.walmart.com/search?q={q}",
+                    "target.com": "https://www.target.com/s?searchTerm={q}",
+                    "bestbuy.com": "https://www.bestbuy.com/site/searchpage.jsp?st={q}",
+                    "newegg.com": "https://www.newegg.com/p/pl?d={q}",
+                }
+
                 def _link_ou_fallback(c, nome_produto):
                     link_real = c.get("link") or ""
                     if link_real:
-                        return link_real
-                    loja = c.get("loja", "")
-                    query = f"{nome_produto} {loja}" if loja else nome_produto
-                    # Usar o domínio Google regional + gl/hl da configuração da região
-                    # para forçar o Google Shopping a apresentar resultados da região correta
+                        return link_real, "directo"
+
+                    # Identificar o marketplace pelo source ou pelo source URL parcial
+                    fonte = (c.get("loja") or "").lower()
+                    for dominio, template in MARKETPLACE_SEARCH_URL.items():
+                        if dominio in fonte:
+                            return template.format(q=quote_plus(nome_produto)), "marketplace"
+
+                    # Último recurso: Google Shopping da região + ncr (no country redirect)
                     domain = t.get("domain", "google.com")
                     gl = t.get("gl", "us")
                     hl = (t.get("lang") or "en")[:2]
                     return (
-                        f"https://www.{domain}/search"
-                        f"?tbm=shop&q={quote_plus(query)}&gl={gl}&hl={hl}"
-                    )
+                        f"https://www.{domain}/search?tbm=shop"
+                        f"&q={quote_plus(nome_produto)}&gl={gl}&hl={hl}&ncr=1"
+                    ), "google"
 
-                df_conc = pd.DataFrame([
-                    {
+                rows = []
+                for i, c in enumerate(concorrentes_lista):
+                    link, tipo = _link_ou_fallback(c, produto_inspect)
+                    rows.append({
                         "Posição": f"#{i+1}",
                         "Loja": c["loja"],
                         "Preço": c["preco"],
                         "Rating": c.get("rating"),
                         "Reviews": c.get("reviews", 0),
-                        "Link": _link_ou_fallback(c, produto_inspect),
-                        "Link directo?": "✅" if c.get("link") else "🔍 busca",
-                    }
-                    for i, c in enumerate(concorrentes_lista)
-                ])
+                        "Link": link,
+                        "Tipo": {"directo": "✅ directo", "marketplace": "🛒 marketplace", "google": "🔍 Google"}[tipo],
+                    })
+                df_conc = pd.DataFrame(rows)
 
                 st.dataframe(
                     df_conc,
@@ -1225,14 +1278,19 @@ with tab_analise:
                         "Link": st.column_config.LinkColumn(
                             "🔗 Anúncio",
                             display_text="abrir",
-                            help="Abre o anúncio. Se a SerpAPI não devolveu link directo "
-                                 "(comum para Amazon Buy Box), abre uma busca no Google Shopping "
-                                 "com o produto e a loja.",
+                            help="Abre o anúncio. Quando a SerpAPI não devolve link directo "
+                                 "(comum em Amazon Buy Box), redireciona para a busca interna "
+                                 "do marketplace ou, em último recurso, para o Google Shopping da região.",
                         ),
-                        "Link directo?": st.column_config.TextColumn(
+                        "Tipo": st.column_config.TextColumn(
                             "Tipo",
-                            help="✅ = link directo do anúncio; 🔍 busca = não havia link, "
-                                 "abre uma busca no Google Shopping com produto+loja",
+                            help=(
+                                "✅ directo = link directo do anúncio na SerpAPI; "
+                                "🛒 marketplace = sem link directo, abre busca interna do próprio marketplace "
+                                "(mais fiável); "
+                                "🔍 Google = sem link nem marketplace conhecido, abre busca no Google Shopping "
+                                "regional."
+                            ),
                         ),
                     },
                 )
