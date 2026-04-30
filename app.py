@@ -210,21 +210,34 @@ def gravar_historico_supabase(df_resultado, regiao, scope, imposto, markup, marg
     # Bulk insert do histórico de preços
     registos = []
     for _, row in df_resultado.iterrows():
+        def _f(col):
+            """Float seguro: devolve None se coluna ausente ou valor inválido."""
+            v = row.get(col)
+            return float(v) if v is not None and pd.notna(v) else None
+
+        def _s(col, default=""):
+            v = row.get(col)
+            return str(v) if v is not None and pd.notna(v) else default
+
+        def _i(col, default=0):
+            v = row.get(col)
+            return int(v) if v is not None and pd.notna(v) else default
+
         registos.append({
             "analise_id": analise_id,
-            "ean": str(row.get("EAN", "")) if pd.notna(row.get("EAN")) else "",
-            "sku": str(row.get("SKU", "")) if pd.notna(row.get("SKU")) else "",
-            "nome": str(row["Nome"]),
+            "ean": _s("EAN"),
+            "sku": _s("SKU"),
+            "nome": _s("Nome"),
             "regiao": regiao,
-            "custo": float(row["Custo"]) if pd.notna(row["Custo"]) else None,
-            "menor_concorrente": float(row["Menor Concorrente"]) if pd.notna(row["Menor Concorrente"]) else None,
-            "mediana_mercado": float(row["_mediana_mercado"]) if "_mediana_mercado" in row and pd.notna(row["_mediana_mercado"]) else None,
-            "loja_lider": str(row["Loja Líder"]),
-            "n_concorrentes": int(row["N Concorrentes"]),
-            "score_procura": int(row["Score Procura"]),
-            "status": str(row["Status"]),
-            "preco_sugerido": float(row["Preço Sugerido"]) if pd.notna(row["Preço Sugerido"]) else None,
-            "recomendacao": str(row["Recomendação"]),
+            "custo": _f("Custo"),
+            "menor_concorrente": _f("Menor Concorrente"),
+            "mediana_mercado": _f("_mediana_mercado"),
+            "loja_lider": _s("_loja_lider"),
+            "n_concorrentes": _i("N Concorrentes"),
+            "score_procura": _i("Score Procura"),
+            "status": _s("Status"),
+            "preco_sugerido": _f("Preço Sugerido"),
+            "recomendacao": _s("Recomendação"),
         })
 
     try:
@@ -1060,7 +1073,8 @@ with tab_analise:
                          color_discrete_map=color_map,
                          title="Como estão os preços face ao mercado")
         elif grafico.startswith("2"):
-            agg = df_v.groupby("Loja Líder")["Lucro Total"].sum().reset_index().sort_values("Lucro Total", ascending=False)
+            agg = df_v.groupby("_loja_lider")["Lucro Total"].sum().reset_index().sort_values("Lucro Total", ascending=False)
+            agg = agg.rename(columns={"_loja_lider": "Loja Líder"})
             fig = px.bar(agg, x="Loja Líder", y="Lucro Total", color="Loja Líder",
                          title="Lucro projetado por marketplace líder")
         elif grafico.startswith("3"):
