@@ -112,6 +112,8 @@ WHITELIST = {
 BLACKLIST_GLOBAL = [
     "aliexpress.com", "temu.com", "wish.com", "tiendamia", "fishpond",
     "grandado", "fruugo", "desertcart", "ubuy", "joom",
+    # Loja própria: não deve contar como concorrente
+    "vembrincarcomagente.com", "vembrincarcomagente.com.br",
 ]
 
 BLACKLIST_REGIONAL = {
@@ -120,9 +122,6 @@ BLACKLIST_REGIONAL = {
     "EU": BLACKLIST_GLOBAL + ["ebay"],
     "US": BLACKLIST_GLOBAL,
 }
-
-# Domínios da loja própria — separados dos concorrentes para análise honesta
-LOJA_PROPRIA = ["vembrincarcomagente.com", "vembrincarcomagente.com.br"]
 
 # Palavras-chave que indicam produto usado, incompleto ou peça avulsa.
 # Qualquer match faz o resultado ser rejeitado.
@@ -219,7 +218,7 @@ def gravar_historico_supabase(df_resultado, regiao, scope, imposto, markup, marg
             "regiao": regiao,
             "custo": float(row["Custo"]) if pd.notna(row["Custo"]) else None,
             "menor_concorrente": float(row["Menor Concorrente"]) if pd.notna(row["Menor Concorrente"]) else None,
-            "mediana_mercado": float(row["Mediana Mercado"]) if pd.notna(row["Mediana Mercado"]) else None,
+            "mediana_mercado": float(row["_mediana_mercado"]) if "_mediana_mercado" in row and pd.notna(row["_mediana_mercado"]) else None,
             "loja_lider": str(row["Loja Líder"]),
             "n_concorrentes": int(row["N Concorrentes"]),
             "score_procura": int(row["Score Procura"]),
@@ -354,12 +353,8 @@ def parse_preco(valor_raw, formato="BR"):
         return None
 
 
-def classificar_vendedor(item, whitelist, blacklist):
-    """Classifica um item em: 'propria', 'confiavel', 'rejeitado'.
-    'propria' = pertence ao utilizador (LOJA_PROPRIA)
-    'confiavel' = vendedor da whitelist regional, fora da blacklist
-    'rejeitado' = blacklistado ou fora da whitelist
-    """
+def vendedor_confiavel(item, whitelist, blacklist):
+    """True se o item é de um vendedor confiável da região (whitelist) e não está na blacklist."""
     fonte = str(item.get("source", "")).lower()
     link = str(item.get("link", "")).lower()
     try:
@@ -369,27 +364,19 @@ def classificar_vendedor(item, whitelist, blacklist):
 
     blob = f"{fonte} {link} {dominio}"
 
-    # Loja própria primeiro
-    for d in LOJA_PROPRIA:
-        if d.lower() in blob:
-            return "propria"
-
-    # Blacklist sobrepõe whitelist
+    # Blacklist sobrepõe whitelist (inclui já a loja própria, que não conta como concorrente)
     for b in blacklist:
         if b.lower() in blob:
-            return "rejeitado"
+            return False
 
     if whitelist:
-        for w in whitelist:
-            if w.lower() in blob:
-                return "confiavel"
-        return "rejeitado"
-    return "confiavel"
+        return any(w.lower() in blob for w in whitelist)
+    return True
 
 
 def buscar_serpapi(produto, ean, sku, custo, regiao_cfg, whitelist, blacklist, api_key,
                     apenas_novos=True, preco_minimo_pct_custo=0.40):
-    """Devolve dois conjuntos: concorrentes confiáveis + ofertas da loja própria.
+    """Devolve concorrentes confiáveis + log de rejeitados.
     Estratégia em cascata: EAN > SKU+marca > Nome.
     Filtros aplicados:
     - Vendedor confiável da região (whitelist) e fora da blacklist
@@ -397,7 +384,6 @@ def buscar_serpapi(produto, ean, sku, custo, regiao_cfg, whitelist, blacklist, a
     - Outlier de preço: rejeita preço abaixo de `preco_minimo_pct_custo` × custo
       (default 40%: se compraste a R$ 100, ignora resultados abaixo de R$ 40)"""
     concorrentes = []
-    proprias = []
     rejeitados_log = {"usado": 0, "outlier_baixo": 0, "outlier_alto": 0}
     consultas = []
 
@@ -416,7 +402,7 @@ def buscar_serpapi(produto, ean, sku, custo, regiao_cfg, whitelist, blacklist, a
 
     # Limites de outlier baseados no custo
     preco_min_aceitavel = custo * preco_minimo_pct_custo if custo else 0
-    preco_max_aceitavel = custo * 10 if custo else float("inf")  # 10× custo é claramente outlier alto
+    preco_max_aceitavel = custo * 10 if custo else float("inf")
 
     for q in consultas:
         try:
@@ -441,11 +427,9 @@ def buscar_serpapi(produto, ean, sku, custo, regiao_cfg, whitelist, blacklist, a
             continue
 
         for item in results.get("shopping_results", []):
-            categoria = classificar_vendedor(item, whitelist, blacklist)
-            if categoria == "rejeitado":
+            if not vendedor_confiavel(item, whitelist, blacklist):
                 continue
 
-            # Filtro de condição: só produtos novos
             if apenas_novos and not parece_produto_novo(item):
                 rejeitados_log["usado"] += 1
                 continue
@@ -456,8 +440,7 @@ def buscar_serpapi(produto, ean, sku, custo, regiao_cfg, whitelist, blacklist, a
             if preco is None or preco <= 0:
                 continue
 
-            # Filtro de outlier de preço (só para concorrentes; loja própria sempre passa)
-            if categoria == "confiavel" and custo:
+            if custo:
                 if preco < preco_min_aceitavel:
                     rejeitados_log["outlier_baixo"] += 1
                     continue
@@ -465,25 +448,21 @@ def buscar_serpapi(produto, ean, sku, custo, regiao_cfg, whitelist, blacklist, a
                     rejeitados_log["outlier_alto"] += 1
                     continue
 
-            registo = {
+            concorrentes.append({
                 "preco": float(preco),
                 "loja": item.get("source", "Desconhecido"),
                 "link": item.get("link", ""),
                 "rating": item.get("rating"),
                 "reviews": item.get("reviews", 0) or 0,
                 "tag": str(item.get("extensions", "")).lower() + " " + str(item).lower(),
-            }
-            if categoria == "propria":
-                proprias.append(registo)
-            else:
-                concorrentes.append(registo)
+            })
 
-        if concorrentes or proprias:
+        if concorrentes:
             break
 
         time.sleep(0.3)
 
-    return concorrentes, proprias, rejeitados_log
+    return concorrentes, rejeitados_log
 
 
 def calcular_score_procura(itens):
@@ -524,9 +503,10 @@ def calcular_estrategias_preco(custo, imposto, markup, margem_minima, precos_con
             "preco_minimo": preco_minimo,
             "preco_competitivo": preco_alvo,
             "preco_otimo": preco_alvo,
-            "preco_mediana": preco_alvo,
+            "preco_mercado": preco_alvo,
             "preco_alvo_markup": preco_alvo,
             "menor_concorrente": None,
+            "mercado_competitivo": None,
             "mediana_mercado": None,
         }
 
@@ -535,18 +515,24 @@ def calcular_estrategias_preco(custo, imposto, markup, margem_minima, precos_con
     segundo = precos_ord[1] if len(precos_ord) >= 2 else menor
     mediana = statistics.median(precos_ord)
 
+    # Mercado Competitivo = média dos top 3 mais baratos (ou todos se houver < 3)
+    # Representa o "cluster de concorrentes que o cliente vai realmente comparar"
+    top_n = min(3, len(precos_ord))
+    mercado_competitivo = round(sum(precos_ord[:top_n]) / top_n, 2)
+
     preco_competitivo = max(round(menor * 0.98, 2), preco_minimo)
     preco_otimo = max(round(segundo * 0.98, 2), preco_minimo)
-    preco_mediana = max(round(mediana, 2), preco_minimo)
+    preco_mercado = max(round(mercado_competitivo, 2), preco_minimo)
 
     return {
         "preco_minimo": preco_minimo,
         "preco_competitivo": preco_competitivo,
         "preco_otimo": preco_otimo,
-        "preco_mediana": preco_mediana,
+        "preco_mercado": preco_mercado,
         "preco_alvo_markup": preco_alvo,
         "menor_concorrente": menor,
-        "mediana_mercado": mediana,
+        "mercado_competitivo": mercado_competitivo,
+        "mediana_mercado": mediana,  # mantida internamente para o histórico Supabase
     }
 
 
@@ -892,7 +878,7 @@ with tab_analise:
 
                 for idx, (_, row) in enumerate(df_base.iterrows()):
                     progress.progress((idx + 1) / total, text=f"Analisando {idx + 1}/{total}: {row['Nome'][:50]}")
-                    concorrentes, proprias, rej = buscar_serpapi(
+                    concorrentes, rej = buscar_serpapi(
                         produto=row["Nome"],
                         ean=row.get("EAN", ""),
                         sku=row.get("SKU", ""),
@@ -932,42 +918,32 @@ with tab_analise:
                     lucro_total = round(lucro_unitario * row["Qtde"], 2)
                     margem_real = (lucro_unitario / preco_sugerido * 100) if preco_sugerido > 0 else 0
 
-                    if concorrentes:
-                        item_menor = min(concorrentes, key=lambda x: x["preco"])
-                        loja_lider = item_menor["loja"]
-                    else:
-                        loja_lider = "Sem dados"
+                    concorrentes_ordenados = sorted(concorrentes, key=lambda x: x["preco"]) if concorrentes else []
+                    loja_lider = concorrentes_ordenados[0]["loja"] if concorrentes_ordenados else "Sem dados"
 
-                    # Dados da loja própria (se aparecer)
-                    meu_preco_atual = None
-                    minha_posicao = None
-                    if proprias:
-                        meu_preco_atual = min(p["preco"] for p in proprias)
-                        if estrategias["menor_concorrente"] is not None:
-                            diff = (meu_preco_atual - estrategias["menor_concorrente"]) / estrategias["menor_concorrente"]
-                            if diff < -0.02:
-                                minha_posicao = "🏆 + barato"
-                            elif diff > 0.05:
-                                minha_posicao = "💸 + caro"
-                            else:
-                                minha_posicao = "⚖️ alinhado"
+                    diff_vs_mercado = None
+                    if estrategias["mercado_competitivo"] and preco_sugerido:
+                        diff_vs_mercado = round(
+                            (preco_sugerido - estrategias["mercado_competitivo"]) / estrategias["mercado_competitivo"] * 100, 1
+                        )
 
                     registos.append({
                         "Nome": row["Nome"],
                         "Linha": row.get("Linha", "Geral"),
                         "EAN": str(row.get("EAN", "")),
+                        "SKU": str(row.get("SKU", "")),
                         "Qtde": row["Qtde"],
                         "Custo": row["Custo"],
-                        "Meu Preço Atual": meu_preco_atual,
-                        "Minha Posição": minha_posicao,
+                        "Preço Markup": estrategias["preco_alvo_markup"],
                         "Menor Concorrente": estrategias["menor_concorrente"],
-                        "Mediana Mercado": estrategias["mediana_mercado"],
-                        "Loja Líder": loja_lider,
+                        "Mercado Competitivo": estrategias["mercado_competitivo"],
+                        "Diff vs Mercado %": diff_vs_mercado,
+                        "_concorrentes": concorrentes_ordenados,
                         "N Concorrentes": len(concorrentes),
                         "Preço Mínimo": estrategias["preco_minimo"],
                         "Preço Competitivo": estrategias["preco_competitivo"],
                         "Preço Óptimo": estrategias["preco_otimo"],
-                        "Preço Mediana": estrategias["preco_mediana"],
+                        "Preço Mercado": estrategias["preco_mercado"],
                         "Preço Sugerido": preco_sugerido,
                         "Margem Real %": round(margem_real, 1),
                         "Lucro Unitário": round(lucro_unitario, 2),
@@ -977,6 +953,8 @@ with tab_analise:
                         "Score Procura": score,
                         "Procura": rotulo_procura,
                         "Recomendação": recomendacao,
+                        "_loja_lider": loja_lider,
+                        "_mediana_mercado": estrategias["mediana_mercado"],
                     })
 
                 progress.empty()
@@ -1025,9 +1003,9 @@ with tab_analise:
 
         cf1, cf2, cf3 = st.columns(3)
         with cf1:
-            sel_lojas = st.multiselect("🏪 Marketplaces:",
-                                        options=sorted(df["Loja Líder"].dropna().unique()),
-                                        default=sorted(df["Loja Líder"].dropna().unique()))
+            sel_lojas = st.multiselect("🏪 Marketplace líder (🥇):",
+                                        options=sorted(df["_loja_lider"].dropna().unique()),
+                                        default=sorted(df["_loja_lider"].dropna().unique()))
         with cf2:
             sel_linhas = st.multiselect("📦 Categorias:",
                                          options=sorted(df["Linha"].dropna().unique()),
@@ -1038,7 +1016,7 @@ with tab_analise:
                                          default=sorted(df["Status"].unique()))
 
         df_v = df[
-            (df["Loja Líder"].isin(sel_lojas))
+            (df["_loja_lider"].isin(sel_lojas))
             & (df["Linha"].isin(sel_linhas))
             & (df["Status"].isin(sel_status))
         ]
@@ -1057,21 +1035,6 @@ with tab_analise:
         m2.metric("📈 Lucro Projetado", f"{moeda} {lucro_proj:,.2f}")
         m3.metric("🎯 ROI", f"{roi:.1f}%")
         m4.metric("📐 Margem Média", f"{margem_media:.1f}%")
-
-        # Resumo da loja própria, se houver dados
-        com_loja_propria = df_v[df_v["Meu Preço Atual"].notna()]
-        if not com_loja_propria.empty:
-            st.divider()
-            st.subheader("🏬 Posicionamento da Sua Loja")
-            n_total = len(com_loja_propria)
-            n_barato = (com_loja_propria["Minha Posição"] == "🏆 + barato").sum()
-            n_alinhado = (com_loja_propria["Minha Posição"] == "⚖️ alinhado").sum()
-            n_caro = (com_loja_propria["Minha Posição"] == "💸 + caro").sum()
-            cl1, cl2, cl3, cl4 = st.columns(4)
-            cl1.metric("Produtos seus na busca", n_total)
-            cl2.metric("🏆 Mais baratos", n_barato)
-            cl3.metric("⚖️ Alinhados", n_alinhado)
-            cl4.metric("💸 Mais caros", n_caro)
 
         st.divider()
         st.subheader("📉 Análise Visual")
@@ -1126,11 +1089,7 @@ with tab_analise:
             fig = go.Figure()
             fig.add_trace(go.Bar(name="Preço Sugerido", x=amostra["Nome"], y=amostra["Preço Sugerido"], marker_color="#3498db"))
             fig.add_trace(go.Bar(name="Menor Concorrente", x=amostra["Nome"], y=amostra["Menor Concorrente"], marker_color="#e74c3c"))
-            fig.add_trace(go.Bar(name="Mediana Mercado", x=amostra["Nome"], y=amostra["Mediana Mercado"], marker_color="#95a5a6"))
-            # Adicionar o meu preço se houver
-            if amostra["Meu Preço Atual"].notna().any():
-                fig.add_trace(go.Bar(name="Meu Preço Atual", x=amostra["Nome"],
-                                      y=amostra["Meu Preço Atual"], marker_color="#9b59b6"))
+            fig.add_trace(go.Bar(name="Mercado Competitivo (top 3)", x=amostra["Nome"], y=amostra["Mercado Competitivo"], marker_color="#95a5a6"))
             fig.update_layout(barmode="group", title="Posicionamento de preço (até 15 produtos)",
                               xaxis_tickangle=-45, height=550)
         else:
@@ -1144,19 +1103,108 @@ with tab_analise:
         st.subheader("📋 Tabela Detalhada")
 
         colunas_show = [
-            "Nome", "Linha", "Qtde", "Custo",
-            "Meu Preço Atual", "Minha Posição",
-            "Menor Concorrente", "Mediana Mercado",
-            "Loja Líder", "N Concorrentes",
-            "Preço Mínimo", "Preço Competitivo", "Preço Óptimo", "Preço Sugerido",
-            "Margem Real %", "Lucro Total",
+            "Nome", "Linha", "Qtde",
+            "Custo", "Preço Markup",
+            "Menor Concorrente", "Mercado Competitivo", "Diff vs Mercado %",
+            "Preço Sugerido", "Margem Real %", "Lucro Total",
             "Status", "Procura", "Recomendação",
+            "N Concorrentes",
         ]
-        # Esconder colunas da loja própria se não houver nenhum dado
-        if df_v["Meu Preço Atual"].notna().sum() == 0:
-            colunas_show = [c for c in colunas_show if c not in ("Meu Preço Atual", "Minha Posição")]
 
-        st.dataframe(df_v[colunas_show], use_container_width=True, hide_index=True)
+        st.dataframe(
+            df_v[colunas_show],
+            use_container_width=True,
+            hide_index=True,
+            column_config={
+                "Custo": st.column_config.NumberColumn(format=f"{moeda} %.2f"),
+                "Preço Markup": st.column_config.NumberColumn(
+                    format=f"{moeda} %.2f",
+                    help="Preço calculado pela sua margem (markup) configurada, "
+                         "ignorando o mercado. Fórmula: custo × (1 + markup) / (1 - imposto). "
+                         "Compare com o Preço Sugerido para ver se o mercado o obriga a baixar.",
+                ),
+                "Menor Concorrente": st.column_config.NumberColumn(format=f"{moeda} %.2f"),
+                "Mercado Competitivo": st.column_config.NumberColumn(
+                    format=f"{moeda} %.2f",
+                    help="Média dos 3 concorrentes mais baratos confiáveis",
+                ),
+                "Diff vs Mercado %": st.column_config.NumberColumn(
+                    "Δ vs Mercado", format="%+.1f %%",
+                    help="Diferença do Preço Sugerido face ao Mercado Competitivo",
+                ),
+                "Preço Sugerido": st.column_config.NumberColumn(
+                    format=f"{moeda} %.2f",
+                    help="O que o algoritmo recomenda face ao mercado e ao status",
+                ),
+                "Margem Real %": st.column_config.NumberColumn(format="%.1f %%"),
+                "Lucro Total": st.column_config.NumberColumn(format=f"{moeda} %.2f"),
+            },
+        )
+
+        # ---------- PAINEL DE VERIFICAÇÃO ----------
+        st.divider()
+        st.subheader("🔍 Painel de Verificação de Concorrentes")
+        st.caption(
+            "Escolha um produto para inspecionar todos os concorrentes confiáveis encontrados, "
+            "com nome comercial completo, preço, avaliação e link para o anúncio."
+        )
+
+        produto_inspect = st.selectbox(
+            "Produto a inspecionar:",
+            options=df_v["Nome"].tolist(),
+            key="produto_inspect",
+        )
+
+        if produto_inspect:
+            linha_inspect = df_v[df_v["Nome"] == produto_inspect].iloc[0]
+            concorrentes_lista = linha_inspect.get("_concorrentes", []) or []
+
+            # Cabeçalho de contexto
+            ci1, ci2, ci3, ci4 = st.columns(4)
+            ci1.metric("Custo", f"{moeda} {linha_inspect['Custo']:,.2f}")
+            ci2.metric("Preço Markup", f"{moeda} {linha_inspect['Preço Markup']:,.2f}")
+            ci3.metric("Preço Sugerido", f"{moeda} {linha_inspect['Preço Sugerido']:,.2f}")
+            ci4.metric("Concorrentes encontrados", len(concorrentes_lista))
+
+            if not concorrentes_lista:
+                st.info("Sem concorrentes confiáveis encontrados para este produto.")
+            else:
+                # Construir tabela de concorrentes
+                df_conc = pd.DataFrame([
+                    {
+                        "Posição": f"#{i+1}",
+                        "Loja": c["loja"],
+                        "Preço": c["preco"],
+                        "Rating": c.get("rating"),
+                        "Reviews": c.get("reviews", 0),
+                        "Link": c.get("link", ""),
+                    }
+                    for i, c in enumerate(concorrentes_lista)
+                ])
+
+                st.dataframe(
+                    df_conc,
+                    use_container_width=True,
+                    hide_index=True,
+                    column_config={
+                        "Preço": st.column_config.NumberColumn(format=f"{moeda} %.2f"),
+                        "Rating": st.column_config.NumberColumn(format="⭐ %.1f"),
+                        "Reviews": st.column_config.NumberColumn(format="%d"),
+                        "Link": st.column_config.LinkColumn(
+                            "🔗 Anúncio",
+                            display_text="abrir",
+                            help="Abre o anúncio em nova aba para verificação",
+                        ),
+                    },
+                )
+
+                # Aviso se houver apenas 1 ou 2 concorrentes
+                if len(concorrentes_lista) <= 2:
+                    st.warning(
+                        f"⚠️ Apenas {len(concorrentes_lista)} concorrente(s) encontrado(s). "
+                        "Poucos resultados podem indicar produto pouco distribuído ou que os filtros "
+                        "rejeitaram resultados (consulte o resumo no topo da análise)."
+                    )
 
         cd1, cd2 = st.columns(2)
         with cd1:
