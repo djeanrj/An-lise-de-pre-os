@@ -1184,14 +1184,22 @@ with tab_analise:
                 st.info("Sem concorrentes confiáveis encontrados para este produto.")
             else:
                 # Construir tabela de concorrentes; se link vier vazio, fallback para
-                # busca no Google Shopping com nome da loja + nome do produto
+                # busca no Google Shopping da região correta (não global)
                 def _link_ou_fallback(c, nome_produto):
                     link_real = c.get("link") or ""
                     if link_real:
                         return link_real
                     loja = c.get("loja", "")
-                    query = f'"{nome_produto}" "{loja}"' if loja else nome_produto
-                    return f"https://www.google.com/search?tbm=shop&q={quote_plus(query)}"
+                    query = f"{nome_produto} {loja}" if loja else nome_produto
+                    # Usar o domínio Google regional + gl/hl da configuração da região
+                    # para forçar o Google Shopping a apresentar resultados da região correta
+                    domain = t.get("domain", "google.com")
+                    gl = t.get("gl", "us")
+                    hl = (t.get("lang") or "en")[:2]
+                    return (
+                        f"https://www.{domain}/search"
+                        f"?tbm=shop&q={quote_plus(query)}&gl={gl}&hl={hl}"
+                    )
 
                 df_conc = pd.DataFrame([
                     {
