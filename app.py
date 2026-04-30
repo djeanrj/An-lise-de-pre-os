@@ -159,6 +159,64 @@ def parece_produto_novo(item):
     return True
 
 
+# Palavras-chave genéricas/ruidosas que não devem contar como "match" entre títulos
+STOPWORDS_RELEVANCIA = {
+    # Artigos/preposições/conjunções PT
+    "de", "do", "da", "dos", "das", "e", "o", "a", "os", "as", "um", "uma",
+    "para", "com", "em", "no", "na", "nos", "nas", "por", "ou",
+    # Marcadores comerciais que aparecem em qualquer anúncio
+    "novo", "nova", "lacrado", "lacrada", "original", "oficial",
+    "frete", "gratis", "grátis", "promoção", "promocao", "oferta",
+    "envio", "imediato", "garantia", "kit", "combo",
+    # EN
+    "new", "the", "a", "an", "and", "or", "for", "with", "of",
+    "free", "shipping", "official", "original",
+}
+
+
+def titulo_relevante(item, nome_produto, sku):
+    """Verifica se o título do produto retornado tem relação com o produto pesquisado.
+    Devolve True se houver match suficiente de palavras-chave significativas, False senão.
+    Estratégia:
+    1) Se o SKU aparece no título do resultado → match imediato (caso forte)
+    2) Senão, calcular interseção de palavras significativas (≥ 3 chars, fora de stopwords)
+       Exigir pelo menos 50% das palavras significativas do nome esperado no título retornado,
+       OU pelo menos 2 palavras se o nome tiver poucas
+    """
+    titulo = str(item.get("title", "")).lower().strip()
+    if not titulo:
+        return False
+
+    # Match por SKU (mais forte)
+    if sku and str(sku).strip():
+        sku_str = str(sku).strip().lower()
+        # Match com palavra completa para evitar "10" matching em "1023"
+        if re.search(rf"\b{re.escape(sku_str)}\b", titulo):
+            return True
+
+    if not nome_produto:
+        return True  # Sem referência, aceita
+
+    def _tokens(s):
+        # Tokenizar: minúsculas, manter alfanuméricos, remover stopwords
+        s = re.sub(r"[^\w\s]", " ", s.lower())
+        return {w for w in s.split() if len(w) >= 3 and w not in STOPWORDS_RELEVANCIA}
+
+    tokens_esperados = _tokens(nome_produto)
+    if not tokens_esperados:
+        return True
+
+    tokens_titulo = _tokens(titulo)
+    intersecao = tokens_esperados & tokens_titulo
+
+    # Critérios:
+    # - Se nome tem ≤3 palavras significativas, exigir pelo menos 1 em comum
+    # - Senão exigir pelo menos 50% das palavras esperadas presentes
+    if len(tokens_esperados) <= 3:
+        return len(intersecao) >= 1
+    return len(intersecao) / len(tokens_esperados) >= 0.5
+
+
 # =============================================================================
 # 4. CLIENTE SUPABASE (lazy-loaded e cacheado)
 # =============================================================================
@@ -397,7 +455,7 @@ def buscar_serpapi(produto, ean, sku, custo, regiao_cfg, whitelist, blacklist, a
     - Outlier de preço: rejeita preço abaixo de `preco_minimo_pct_custo` × custo
       (default 40%: se compraste a R$ 100, ignora resultados abaixo de R$ 40)"""
     concorrentes = []
-    rejeitados_log = {"usado": 0, "outlier_baixo": 0, "outlier_alto": 0}
+    rejeitados_log = {"usado": 0, "outlier_baixo": 0, "outlier_alto": 0, "irrelevante": 0}
     consultas = []
 
     def _valido(v):
@@ -441,6 +499,13 @@ def buscar_serpapi(produto, ean, sku, custo, regiao_cfg, whitelist, blacklist, a
 
         for item in results.get("shopping_results", []):
             if not vendedor_confiavel(item, whitelist, blacklist):
+                continue
+
+            # Verificar relevância: o título do resultado deve ter relação com o produto pesquisado
+            # Crucial porque a SerpAPI às vezes devolve produtos não relacionados quando o EAN
+            # não está bem indexado para a região
+            if not titulo_relevante(item, produto, sku):
+                rejeitados_log["irrelevante"] += 1
                 continue
 
             if apenas_novos and not parece_produto_novo(item):
@@ -887,7 +952,7 @@ with tab_analise:
                 progress = st.progress(0.0, text="A analisar produtos...")
                 registos = []
                 total = len(df_base)
-                rejeitados_total = {"usado": 0, "outlier_baixo": 0, "outlier_alto": 0}
+                rejeitados_total = {"usado": 0, "outlier_baixo": 0, "outlier_alto": 0, "irrelevante": 0}
 
                 for idx, (_, row) in enumerate(df_base.iterrows()):
                     progress.progress((idx + 1) / total, text=f"Analisando {idx + 1}/{total}: {row['Nome'][:50]}")
@@ -982,6 +1047,8 @@ with tab_analise:
                 # Resumo dos filtros aplicados
                 if any(rejeitados_total.values()):
                     msgs = []
+                    if rejeitados_total["irrelevante"]:
+                        msgs.append(f"🎯 {rejeitados_total['irrelevante']} resultados rejeitados (produto sem relação com o pesquisado)")
                     if rejeitados_total["usado"]:
                         msgs.append(f"🧹 {rejeitados_total['usado']} resultados rejeitados (produto não novo)")
                     if rejeitados_total["outlier_baixo"]:
@@ -1158,15 +1225,16 @@ with tab_analise:
         # ---------- PAINEL DE VERIFICAÇÃO ----------
         st.divider()
         st.subheader("🔍 Painel de Verificação de Concorrentes")
-        st.caption(
-            "Escolha um produto para inspecionar todos os concorrentes confiáveis encontrados, "
-            "com nome comercial completo, preço, avaliação e link para o anúncio."
+        st.markdown(
+            "**👇 Escolha um produto na lista abaixo** para inspecionar todos os concorrentes "
+            "confiáveis encontrados, com nome da loja, preço, avaliação e link para o anúncio."
         )
 
         produto_inspect = st.selectbox(
-            "Produto a inspecionar:",
+            "📦 Produto a inspecionar (clique para abrir a lista):",
             options=df_v["Nome"].tolist(),
             key="produto_inspect",
+            help="Clique nesta caixa para ver todos os produtos analisados e escolher um.",
         )
 
         if produto_inspect:
@@ -1233,18 +1301,31 @@ with tab_analise:
                     "newegg.com": "https://www.newegg.com/p/pl?d={q}",
                 }
 
+                def _e_link_agregador_google(url):
+                    """Detecta páginas de comparação do Google Shopping (frágeis, expiram)
+                    em vez de links directos para o anúncio do vendedor."""
+                    if not url:
+                        return False
+                    u = url.lower()
+                    # Padrões típicos: google.com/shopping/, ?ibp=oshop, /aclk?, &prds=
+                    return (
+                        ("google." in u and ("/shopping/" in u or "ibp=oshop" in u or "tbm=shop" in u))
+                        or "/aclk?" in u
+                    )
+
                 def _link_ou_fallback(c, nome_produto):
                     link_real = c.get("link") or ""
-                    if link_real:
+                    # Se o "link directo" é uma página agregadora do Google, é frágil — ignorar
+                    if link_real and not _e_link_agregador_google(link_real):
                         return link_real, "directo"
 
-                    # Identificar o marketplace pelo source ou pelo source URL parcial
+                    # Identificar marketplace pelo nome da loja
                     fonte = (c.get("loja") or "").lower()
                     for dominio, template in MARKETPLACE_SEARCH_URL.items():
                         if dominio in fonte:
                             return template.format(q=quote_plus(nome_produto)), "marketplace"
 
-                    # Último recurso: Google Shopping da região + ncr (no country redirect)
+                    # Último recurso: Google Shopping da região
                     domain = t.get("domain", "google.com")
                     gl = t.get("gl", "us")
                     hl = (t.get("lang") or "en")[:2]
