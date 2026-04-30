@@ -22,7 +22,7 @@ import statistics
 from datetime import datetime, timedelta
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
-from urllib.parse import urlparse
+from urllib.parse import urlparse, quote_plus
 
 # Supabase é opcional — se não estiver configurado, a app continua a funcionar sem histórico
 try:
@@ -464,7 +464,7 @@ def buscar_serpapi(produto, ean, sku, custo, regiao_cfg, whitelist, blacklist, a
             concorrentes.append({
                 "preco": float(preco),
                 "loja": item.get("source", "Desconhecido"),
-                "link": item.get("link", ""),
+                "link": item.get("link") or item.get("product_link") or "",
                 "rating": item.get("rating"),
                 "reviews": item.get("reviews", 0) or 0,
                 "tag": str(item.get("extensions", "")).lower() + " " + str(item).lower(),
@@ -1183,7 +1183,16 @@ with tab_analise:
             if not concorrentes_lista:
                 st.info("Sem concorrentes confiáveis encontrados para este produto.")
             else:
-                # Construir tabela de concorrentes
+                # Construir tabela de concorrentes; se link vier vazio, fallback para
+                # busca no Google Shopping com nome da loja + nome do produto
+                def _link_ou_fallback(c, nome_produto):
+                    link_real = c.get("link") or ""
+                    if link_real:
+                        return link_real
+                    loja = c.get("loja", "")
+                    query = f'"{nome_produto}" "{loja}"' if loja else nome_produto
+                    return f"https://www.google.com/search?tbm=shop&q={quote_plus(query)}"
+
                 df_conc = pd.DataFrame([
                     {
                         "Posição": f"#{i+1}",
@@ -1191,7 +1200,8 @@ with tab_analise:
                         "Preço": c["preco"],
                         "Rating": c.get("rating"),
                         "Reviews": c.get("reviews", 0),
-                        "Link": c.get("link", ""),
+                        "Link": _link_ou_fallback(c, produto_inspect),
+                        "Link directo?": "✅" if c.get("link") else "🔍 busca",
                     }
                     for i, c in enumerate(concorrentes_lista)
                 ])
@@ -1207,12 +1217,18 @@ with tab_analise:
                         "Link": st.column_config.LinkColumn(
                             "🔗 Anúncio",
                             display_text="abrir",
-                            help="Abre o anúncio em nova aba para verificação",
+                            help="Abre o anúncio. Se a SerpAPI não devolveu link directo "
+                                 "(comum para Amazon Buy Box), abre uma busca no Google Shopping "
+                                 "com o produto e a loja.",
+                        ),
+                        "Link directo?": st.column_config.TextColumn(
+                            "Tipo",
+                            help="✅ = link directo do anúncio; 🔍 busca = não havia link, "
+                                 "abre uma busca no Google Shopping com produto+loja",
                         ),
                     },
                 )
 
-                # Aviso se houver apenas 1 ou 2 concorrentes
                 if len(concorrentes_lista) <= 2:
                     st.warning(
                         f"⚠️ Apenas {len(concorrentes_lista)} concorrente(s) encontrado(s). "
