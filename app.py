@@ -433,32 +433,53 @@ def renderizar_pagina_login():
                 "e que `SUPABASE_URL` e `SUPABASE_ANON_KEY` estão nos Secrets."
             )
         else:
-            # Mostrar a URL gerada (debug temporário, ajuda a perceber problemas)
-            with st.expander("🔧 Debug — URL de login gerada"):
-                st.code(url_google, language="text")
-                st.caption("Pode copiar esta URL e abrir manualmente no navegador para testar.")
-
-            # Forma 1: link nativo do Streamlit (abre nova aba)
-            st.link_button(
-                "🔐 Entrar com Google (nova aba)",
-                url_google,
-                type="primary",
-                use_container_width=False,
-            )
-
-            # Forma 2: link HTML com target=_top (mesma aba, força sair do iframe)
-            st.markdown(
+            # O Streamlit Cloud bloqueia navegação cross-origin via st.button/st.link_button.
+            # A solução que funciona é injectar um link <a> com target="_top" + JavaScript
+            # que força window.top.location, mais um botão de fallback "abrir manualmente".
+            import streamlit.components.v1 as components
+            components.html(
                 f"""
-                <p style="margin-top: 0.5rem;">
-                Ou: <a href="{url_google}" target="_top" style="
-                    color: #FF4B4B;
-                    font-weight: 500;
-                    text-decoration: underline;
-                ">entrar na mesma aba</a>
-                </p>
+                <html><body style="margin:0;padding:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
+                <a id="google-login-btn"
+                   href="{url_google}"
+                   target="_top"
+                   style="
+                       display: inline-block;
+                       padding: 0.5rem 1.2rem;
+                       background-color: #FF4B4B;
+                       color: white;
+                       text-decoration: none;
+                       border-radius: 0.5rem;
+                       font-size: 0.95rem;
+                       border: 1px solid #FF4B4B;
+                       cursor: pointer;
+                   ">
+                   🔐 Entrar com Google
+                </a>
+                <script>
+                  // Forçar a navegação a sair do iframe do Streamlit Cloud
+                  document.getElementById('google-login-btn').addEventListener('click', function(e) {{
+                      e.preventDefault();
+                      try {{
+                          window.top.location.href = "{url_google}";
+                      }} catch (err) {{
+                          // Fallback: abrir em nova janela top-level
+                          window.open("{url_google}", "_top");
+                      }}
+                  }});
+                </script>
+                </body></html>
                 """,
-                unsafe_allow_html=True,
+                height=60,
             )
+
+            st.caption(
+                "Se o botão acima não funcionar, copie a URL do debug e cole numa nova aba do navegador."
+            )
+
+            # Manter o expander de debug para fallback manual
+            with st.expander("🔧 Não funciona? Copie esta URL e cole no navegador"):
+                st.code(url_google, language="text")
         st.caption(
             "Ao entrar, aceita os Termos de Utilização e a Política de Privacidade. "
             "Os seus dados (catálogo, análises) ficam isolados — só você os vê."
