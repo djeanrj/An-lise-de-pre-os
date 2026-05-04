@@ -976,8 +976,8 @@ for k, v in {
 # 7. SIDEBAR
 # =============================================================================
 with st.sidebar:
-    st.markdown("### 🌎 Região")
-    pais_sel = st.selectbox("Selecione:", list(idiomas.keys()), key="pais_main", label_visibility="collapsed")
+    st.header("🌎 Região")
+    pais_sel = st.selectbox("Selecione:", list(idiomas.keys()), key="pais_main")
 
     if st.session_state.pais_anterior != pais_sel:
         st.session_state.df_final = None
@@ -987,26 +987,24 @@ with st.sidebar:
 
     scope_pt = "Apenas Portugal"
     if "Portugal" in pais_sel:
-        scope_pt = st.radio("Âmbito:", ["Apenas Portugal", "União Europeia"], horizontal=True, label_visibility="collapsed")
+        scope_pt = st.radio("Âmbito:", ["Apenas Portugal", "União Europeia"])
 
-    st.markdown("### 🔑 Chave SerpAPI")
-    api_key_input = st.text_input(
-        t["label_chave"], type="password",
-        value=st.session_state.api_key or "",
-        label_visibility="collapsed",
-    )
-    if st.button(t["btn_confirmar"], use_container_width=True):
+    st.divider()
+    st.header("🔑 Chave API")
+    api_key_input = st.text_input(t["label_chave"], type="password", value=st.session_state.api_key or "")
+    if st.button(t["btn_confirmar"]):
         st.session_state.api_key = api_key_input.strip() or None
         if st.session_state.api_key:
-            st.success("Chave ativada!", icon="✅")
+            st.success("Chave ativada!")
         else:
-            st.error("Chave vazia.", icon="❌")
+            st.error("Chave vazia.")
 
-    # Status do Supabase + Bling em uma linha (mais compacto)
+    st.divider()
+    # Status do Supabase + Bling
     if supabase_ativo():
-        st.caption("📚 Histórico ativo")
+        st.success("📚 Histórico ativo (Supabase)")
     else:
-        st.caption("📚 Histórico desativado")
+        st.info("📚 Histórico desativado\n(configure SUPABASE_URL/KEY)")
     if bling_credenciais_disponiveis():
         if bling_conectado():
             st.caption("🛒 Bling conectado")
@@ -1015,32 +1013,31 @@ with st.sidebar:
     else:
         st.caption("🛒 Bling não configurado")
 
-    # Suporte primeiro (acima da dobra) — utilizador chega imediatamente
+    st.divider()
+    st.markdown("""
+    <div style='font-size: 0.85rem;'>
+    <b>Status</b><br>
+    ✅ Vencendo &nbsp; 🟡 Risco<br>
+    ⚠️ Caro &nbsp; 🟧 Chão acima<br>
+    🟥 Burn<br><br>
+    <b>Procura</b><br>
+    🔥 Muito Alta &nbsp; 📈 Alta<br>
+    ➡️ Média &nbsp; 📉 Baixa<br><br>
+    <b>Atratividade</b> = Procura × Margem ÷ 100
+    </div>
+    """, unsafe_allow_html=True)
+
+    st.divider()
     with st.expander("✉️ Suporte"):
         with st.form("suporte_form", clear_on_submit=True):
             sn = st.text_input("Nome")
             se = st.text_input("Email")
-            sm = st.text_area("Mensagem", height=80)
-            if st.form_submit_button("Enviar", use_container_width=True):
+            sm = st.text_area("Mensagem")
+            if st.form_submit_button("Enviar"):
                 if sm.strip() and enviar_email_log(sn, se, sm):
                     st.success("✅ Enviado")
                 else:
                     st.error("❌ Falha no envio ou mensagem vazia")
-
-    # Legenda no fim (referência menos crítica, abaixo da dobra é aceitável)
-    with st.expander("ℹ️ Legenda dos sinais"):
-        st.markdown("""
-**Status**
-✅ Vencendo · 🟡 Risco
-⚠️ Caro · 🟧 Chão acima
-🟥 Burn
-
-**Procura**
-🔥 Muito Alta · 📈 Alta
-➡️ Média · 📉 Baixa
-
-**Atratividade** = Procura × Margem ÷ 100
-""")
 
 
 # =============================================================================
