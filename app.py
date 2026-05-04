@@ -19,7 +19,8 @@ import re
 import time
 import smtplib
 import statistics
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
+import base64
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from urllib.parse import urlparse, quote_plus
@@ -36,6 +37,32 @@ except ImportError:
 # 1. CONFIGURAÇÃO DA INTERFACE
 # =============================================================================
 st.set_page_config(page_title="IA Marketplace Global", layout="wide", page_icon="🌎")
+
+
+# Handler do redirect OAuth do Bling — corre antes de qualquer outra coisa
+# Quando o utilizador autoriza no Bling, este redireciona para a app com `?code=...&state=...`
+# Detectamos isso, trocamos pelo token, limpamos a query string e seguimos.
+def _handle_bling_oauth_callback():
+    qs = st.query_params
+    if "code" in qs and "state" in qs:
+        codigo = qs["code"]
+        state = qs["state"]
+        state_esperado = st.session_state.get("bling_oauth_state")
+        # Validar state (proteção CSRF)
+        if state_esperado and state != state_esperado:
+            st.error("⚠️ Estado OAuth inválido. Tente conectar novamente.")
+            st.query_params.clear()
+            return
+        ok, msg = bling_trocar_codigo_por_tokens(codigo)
+        if ok:
+            st.success(f"✅ {msg}")
+            st.session_state.pop("bling_oauth_state", None)
+        else:
+            st.error(f"❌ {msg}")
+        st.query_params.clear()
+
+
+_handle_bling_oauth_callback()
 
 
 # =============================================================================
@@ -238,6 +265,220 @@ def get_supabase_client():
 
 def supabase_ativo():
     return get_supabase_client() is not None
+
+
+# =============================================================================
+# 4b. INTEGRAÇÃO BLING OAUTH2 (V3)
+# =============================================================================
+BLING_AUTH_URL = "https://www.bling.com.br/Api/v3/oauth/authorize"
+BLING_TOKEN_URL = "https://www.bling.com.br/Api/v3/oauth/token"
+BLING_API_BASE = "https://api.bling.com.br/Api/v3"
+
+
+def bling_credenciais_disponiveis():
+    """Verifica se há client_id e client_secret nos Secrets."""
+    try:
+        return bool(st.secrets["BLING_CLIENT_ID"] and st.secrets["BLING_CLIENT_SECRET"])
+    except (KeyError, FileNotFoundError):
+        return False
+
+
+def _bling_redirect_uri():
+    """URL para onde o Bling vai redirecionar após autorização.
+    Configurável via Secrets, com fallback para a URL pública conhecida."""
+    try:
+        return st.secrets["BLING_REDIRECT_URI"]
+    except (KeyError, FileNotFoundError):
+        return "https://viabilidadedevendas.streamlit.app/"
+
+
+def bling_iniciar_autorizacao():
+    """Devolve URL para o utilizador autorizar a aplicação no Bling."""
+    import secrets as py_secrets  # nome local para não colidir com st.secrets
+    state = py_secrets.token_urlsafe(16)
+    st.session_state["bling_oauth_state"] = state
+
+    params = {
+        "response_type": "code",
+        "client_id": st.secrets["BLING_CLIENT_ID"],
+        "state": state,
+        "redirect_uri": _bling_redirect_uri(),
+    }
+    qs = "&".join(f"{k}={requests.utils.quote(str(v), safe='')}" for k, v in params.items())
+    return f"{BLING_AUTH_URL}?{qs}"
+
+
+def _bling_basic_header():
+    """Header de Basic Auth: base64(client_id:client_secret)."""
+    cid = st.secrets["BLING_CLIENT_ID"]
+    csec = st.secrets["BLING_CLIENT_SECRET"]
+    raw = f"{cid}:{csec}".encode("utf-8")
+    return base64.b64encode(raw).decode("ascii")
+
+
+def bling_trocar_codigo_por_tokens(codigo):
+    """Troca o `code` recebido do redirect pelo par (access_token, refresh_token).
+    Guarda os tokens no Supabase para reutilização entre sessões."""
+    try:
+        r = requests.post(
+            BLING_TOKEN_URL,
+            headers={
+                "Authorization": f"Basic {_bling_basic_header()}",
+                "Content-Type": "application/x-www-form-urlencoded",
+                "Accept": "application/json",
+            },
+            data={
+                "grant_type": "authorization_code",
+                "code": codigo,
+            },
+            timeout=30,
+        )
+        if r.status_code != 200:
+            return False, f"Erro {r.status_code}: {r.text[:300]}"
+        dados = r.json()
+        _bling_guardar_tokens(dados)
+        return True, "Conectado ao Bling"
+    except Exception as e:
+        return False, f"Falha ao trocar código: {e}"
+
+
+def bling_renovar_token():
+    """Usa refresh_token para obter novo access_token. Devolve True/False."""
+    tokens = _bling_carregar_tokens()
+    if not tokens or not tokens.get("refresh_token"):
+        return False
+    try:
+        r = requests.post(
+            BLING_TOKEN_URL,
+            headers={
+                "Authorization": f"Basic {_bling_basic_header()}",
+                "Content-Type": "application/x-www-form-urlencoded",
+                "Accept": "application/json",
+            },
+            data={
+                "grant_type": "refresh_token",
+                "refresh_token": tokens["refresh_token"],
+            },
+            timeout=30,
+        )
+        if r.status_code != 200:
+            return False
+        _bling_guardar_tokens(r.json())
+        return True
+    except Exception:
+        return False
+
+
+def _bling_guardar_tokens(payload):
+    """Persiste tokens no Supabase. payload vem do endpoint /oauth/token."""
+    sb = get_supabase_client()
+    if sb is None:
+        return
+    expires_in = int(payload.get("expires_in", 21600))  # default 6h
+    expires_at = (datetime.now(timezone.utc) + timedelta(seconds=expires_in)).isoformat()
+    sb.table("bling_tokens").upsert({
+        "id": 1,
+        "access_token": payload["access_token"],
+        "refresh_token": payload.get("refresh_token", ""),
+        "expires_at": expires_at,
+        "updated_at": datetime.now(timezone.utc).isoformat(),
+    }).execute()
+
+
+def _bling_carregar_tokens():
+    """Lê tokens do Supabase. Devolve dict ou None."""
+    sb = get_supabase_client()
+    if sb is None:
+        return None
+    try:
+        r = sb.table("bling_tokens").select("*").eq("id", 1).limit(1).execute()
+        return r.data[0] if r.data else None
+    except Exception:
+        return None
+
+
+def bling_access_token_valido():
+    """Devolve access_token válido ou None. Renova automaticamente se expirado."""
+    tokens = _bling_carregar_tokens()
+    if not tokens:
+        return None
+    try:
+        expires_at = datetime.fromisoformat(tokens["expires_at"].replace("Z", "+00:00"))
+        # Renovar 5 min antes de expirar para evitar corridas
+        if datetime.now(timezone.utc) + timedelta(minutes=5) >= expires_at:
+            if bling_renovar_token():
+                tokens = _bling_carregar_tokens()
+            else:
+                return None
+        return tokens["access_token"]
+    except Exception:
+        return None
+
+
+def bling_conectado():
+    return bling_access_token_valido() is not None
+
+
+def bling_desconectar():
+    """Apaga os tokens da BD. Próxima utilização exigirá nova autorização."""
+    sb = get_supabase_client()
+    if sb is not None:
+        try:
+            sb.table("bling_tokens").delete().eq("id", 1).execute()
+        except Exception:
+            pass
+
+
+def bling_listar_produtos(pagina=1, limite=100):
+    """Lista produtos do Bling V3. Devolve (lista, total_paginas) ou ([], 0) em erro."""
+    token = bling_access_token_valido()
+    if not token:
+        return [], 0
+    try:
+        r = requests.get(
+            f"{BLING_API_BASE}/produtos",
+            headers={"Authorization": f"Bearer {token}", "Accept": "application/json"},
+            params={"pagina": pagina, "limite": limite},
+            timeout=30,
+        )
+        if r.status_code == 401:
+            # Token expirado / revogado — tentar renovar uma vez
+            if bling_renovar_token():
+                token = bling_access_token_valido()
+                r = requests.get(
+                    f"{BLING_API_BASE}/produtos",
+                    headers={"Authorization": f"Bearer {token}", "Accept": "application/json"},
+                    params={"pagina": pagina, "limite": limite},
+                    timeout=30,
+                )
+        if r.status_code != 200:
+            st.warning(f"Bling devolveu {r.status_code}: {r.text[:200]}")
+            return [], 0
+        dados = r.json()
+        return dados.get("data", []), 1  # total de páginas: Bling V3 não devolve, paginar até vazio
+    except Exception as e:
+        st.warning(f"Erro ao chamar Bling: {e}")
+        return [], 0
+
+
+def bling_importar_catalogo(progresso_cb=None):
+    """Importa todos os produtos do Bling, paginando até esgotar.
+    progresso_cb(pagina_atual, n_total_acumulado) é chamado entre páginas (opcional)."""
+    todos = []
+    pagina = 1
+    while True:
+        produtos, _ = bling_listar_produtos(pagina=pagina, limite=100)
+        if not produtos:
+            break
+        todos.extend(produtos)
+        if progresso_cb:
+            progresso_cb(pagina, len(todos))
+        if len(produtos) < 100:
+            break  # última página
+        pagina += 1
+        if pagina > 50:  # circuit breaker para evitar loop infinito
+            break
+    return todos
 
 
 def gravar_historico_supabase(df_resultado, regiao, scope, imposto, markup, margem_minima):
@@ -614,14 +855,33 @@ def calcular_estrategias_preco(custo, imposto, markup, margem_minima, precos_con
     }
 
 
-def calcular_status(custo, imposto, markup, menor_concorrente):
+def calcular_status(custo, imposto, markup, margem_minima, menor_concorrente):
+    """Determina o status do produto face ao mercado.
+    Hierarquia de avaliação:
+    1. Sem dados → ❔
+    2. Concorrente abaixo do custo+imposto → 🟥 Burn (impossível competir sem prejuízo)
+    3. Concorrente abaixo do PREÇO MÍNIMO (custo+imposto+margem mínima) → 🟧 Chão acima do mercado
+       (consegue vender mas só com margem mínima, sem nunca alcançar o markup alvo)
+    4. Markup alvo ≥ 5% acima do menor concorrente → ⚠️ Caro
+    5. Markup alvo entre ±5% do menor → 🟡 Risco
+    6. Markup alvo ≥ 5% abaixo do menor → ✅ Vencendo (folga real para escolher entre preços)"""
     if menor_concorrente is None:
         return "❔ Sem dados", "sem_dados"
+
     fator_imposto = 1 / (1 - imposto) if imposto < 1 else 1
+    custo_com_imposto = custo * fator_imposto
+    preco_minimo = custo * (1 + margem_minima) * fator_imposto
     preco_alvo = custo * (1 + markup) * fator_imposto
-    custo_minimo = custo * fator_imposto
-    if menor_concorrente < custo_minimo:
+
+    # Concorrente abaixo do custo (após imposto): impossível sem prejuízo
+    if menor_concorrente < custo_com_imposto:
         return "🟥 Burn", "burn"
+
+    # Concorrente abaixo do nosso chão: vendemos com margem mínima mas nunca atingimos o markup
+    # (este era o caso oculto que confundia o "Diff vs Mercado %")
+    if menor_concorrente < preco_minimo:
+        return "🟧 Chão acima do mercado", "chao_alto"
+
     diff_pct = (preco_alvo - menor_concorrente) / menor_concorrente
     if diff_pct <= -0.05:
         return "✅ Vencendo", "vencendo"
@@ -631,14 +891,25 @@ def calcular_status(custo, imposto, markup, menor_concorrente):
 
 
 def recomendacao_investimento(status_codigo, score_procura, qtde_atual):
+    """Recomendação accionável para o decisor de compra.
+    Importante: o decisor não pode renegociar com o fornecedor (preço fixo);
+    só pode (a) ajustar margens, (b) comprar/não comprar, ou (c) liquidar stock."""
     if status_codigo == "burn":
-        return "❌ Não investir"
+        # Concorrente abaixo do nosso custo+imposto: não há nada a fazer
+        return "❌ Não comprar"
+    if status_codigo == "chao_alto":
+        # Custo+margem mínima já está acima do mercado
+        # Se a procura é alta, vale considerar reduzir margem mínima para conseguir vender
+        if score_procura >= 60:
+            return "📉 Reduzir margem mínima"
+        return "❌ Não comprar"
     if status_codigo == "sem_dados":
         return "❔ Sem dados de mercado"
     if score_procura >= 60 and status_codigo in ("vencendo", "risco"):
         return "🚀 Investir / Repor estoque"
     if score_procura >= 60 and status_codigo == "caro":
-        return "⚖️ Renegociar fornecedor"
+        # Markup alvo acima do mercado mas conseguimos undercut com margem aceitável
+        return "✅ Investir com margem reduzida"
     if score_procura >= 30 and status_codigo == "vencendo":
         return "✅ Manter / Investir leve"
     if score_procura < 30:
@@ -705,8 +976,8 @@ for k, v in {
 # 7. SIDEBAR
 # =============================================================================
 with st.sidebar:
-    st.header("🌎 Região")
-    pais_sel = st.selectbox("Selecione:", list(idiomas.keys()), key="pais_main")
+    st.markdown("### 🌎 Região")
+    pais_sel = st.selectbox("Selecione:", list(idiomas.keys()), key="pais_main", label_visibility="collapsed")
 
     if st.session_state.pais_anterior != pais_sel:
         st.session_state.df_final = None
@@ -714,58 +985,125 @@ with st.sidebar:
 
     t = idiomas[pais_sel]
 
-    st.divider()
-    st.header("🔑 Chave API")
-    api_key_input = st.text_input(t["label_chave"], type="password", value=st.session_state.api_key or "")
-    if st.button(t["btn_confirmar"]):
-        st.session_state.api_key = api_key_input.strip() or None
-        if st.session_state.api_key:
-            st.success("Chave ativada!")
-        else:
-            st.error("Chave vazia.")
-
     scope_pt = "Apenas Portugal"
     if "Portugal" in pais_sel:
-        scope_pt = st.radio("Âmbito:", ["Apenas Portugal", "União Europeia"])
+        scope_pt = st.radio("Âmbito:", ["Apenas Portugal", "União Europeia"], horizontal=True, label_visibility="collapsed")
 
-    st.divider()
-    # Status do Supabase
+    st.markdown("### 🔑 Chave SerpAPI")
+    api_key_input = st.text_input(
+        t["label_chave"], type="password",
+        value=st.session_state.api_key or "",
+        label_visibility="collapsed",
+    )
+    if st.button(t["btn_confirmar"], use_container_width=True):
+        st.session_state.api_key = api_key_input.strip() or None
+        if st.session_state.api_key:
+            st.success("Chave ativada!", icon="✅")
+        else:
+            st.error("Chave vazia.", icon="❌")
+
+    # Status do Supabase + Bling em uma linha (mais compacto)
     if supabase_ativo():
-        st.success("📚 Histórico ativo (Supabase)")
+        st.caption("📚 Histórico ativo")
     else:
-        st.info("📚 Histórico desativado\n(configure SUPABASE_URL/KEY)")
+        st.caption("📚 Histórico desativado")
+    if bling_credenciais_disponiveis():
+        if bling_conectado():
+            st.caption("🛒 Bling conectado")
+        else:
+            st.caption("🛒 Bling pronto para conectar")
+    else:
+        st.caption("🛒 Bling não configurado")
 
-    st.divider()
-    st.markdown("""
-    <div style='font-size: 0.85rem;'>
-    <b>Status</b><br>
-    ✅ Vencendo &nbsp; 🟡 Risco<br>
-    ⚠️ Caro &nbsp; 🟥 Burn<br><br>
-    <b>Procura</b><br>
-    🔥 Muito Alta &nbsp; 📈 Alta<br>
-    ➡️ Média &nbsp; 📉 Baixa
-    </div>
-    """, unsafe_allow_html=True)
-
-    st.divider()
-    st.header("✉️ Suporte")
-    user_q = st.text_input("Dúvida rápida:")
-    if user_q:
+    # Suporte primeiro (acima da dobra) — utilizador chega imediatamente
+    with st.expander("✉️ Suporte"):
         with st.form("suporte_form", clear_on_submit=True):
             sn = st.text_input("Nome")
             se = st.text_input("Email")
-            sm = st.text_area("Mensagem", value=user_q)
-            if st.form_submit_button("Enviar"):
-                if enviar_email_log(sn, se, sm):
+            sm = st.text_area("Mensagem", height=80)
+            if st.form_submit_button("Enviar", use_container_width=True):
+                if sm.strip() and enviar_email_log(sn, se, sm):
                     st.success("✅ Enviado")
                 else:
-                    st.error("❌ Falha no envio")
+                    st.error("❌ Falha no envio ou mensagem vazia")
+
+    # Legenda no fim (referência menos crítica, abaixo da dobra é aceitável)
+    with st.expander("ℹ️ Legenda dos sinais"):
+        st.markdown("""
+**Status**
+✅ Vencendo · 🟡 Risco
+⚠️ Caro · 🟧 Chão acima
+🟥 Burn
+
+**Procura**
+🔥 Muito Alta · 📈 Alta
+➡️ Média · 📉 Baixa
+
+**Atratividade** = Procura × Margem ÷ 100
+""")
 
 
 # =============================================================================
 # 8. CORPO PRINCIPAL — ABAS
 # =============================================================================
 st.title(t["titulo"])
+
+# Card discreto de ajuda — sempre acessível, opcional
+with st.expander("📚 Primeira vez aqui? Ver tutorial rápido", expanded=False):
+    st.markdown("""
+**Como usar esta aplicação em 5 passos**
+
+1. **Aceitar os Termos** — basta marcar a caixa abaixo do título.
+2. **Inserir a sua chave SerpAPI** na barra lateral. Ainda não tem chave? Veja o passo seguinte.
+3. **Carregar a planilha** com os seus produtos (ou importar do Bling se for plano pago) — pode descarregar uma planilha-modelo se ainda não tiver uma.
+4. **Configurar margens e impostos** nos parâmetros da análise.
+5. **Iniciar Análise** — vai pesquisar cada produto no Google Shopping e cruzar com concorrentes confiáveis da região seleccionada.
+
+---
+
+**🔑 Como obter chave SerpAPI**
+
+1. Crie conta em [serpapi.com](https://serpapi.com) (plano gratuito: 100 buscas/mês)
+2. Ao fazer login, no painel verá a sua **API Key** — copie-a
+3. Cole na barra lateral e clique **Confirmar Chave**
+
+⚠️ **Cada produto consome 1-3 buscas** (o algoritmo tenta primeiro EAN, depois SKU, depois nome). Para 90 produtos pode consumir até ~270 buscas. No plano gratuito só caberão ~30 produtos por mês.
+
+---
+
+**🛒 Como obter chave Bling V3 (OAuth2)**
+
+⚠️ **Requer plano Bling Cobrança ou superior** — o plano gratuito não dá acesso ao painel de developers.
+
+1. No Bling, ir a **Painel de developers** ([developer.bling.com.br](https://developer.bling.com.br))
+2. Clicar em **Criar aplicativo**
+3. Preencher:
+   - **Nome:** "Análise de Preços"
+   - **Categoria:** Privado / Uso próprio
+   - **Redirect URI:** `https://viabilidadedevendas.streamlit.app/` (a URL desta app)
+   - **Escopos:** apenas leitura de produtos e estoque
+4. Após criar, copiar o **client_id** e **client_secret** que aparecem
+5. Adicionar nos Secrets do Streamlit Cloud:
+
+```toml
+BLING_CLIENT_ID = "xxxxxx"
+BLING_CLIENT_SECRET = "xxxxxx"
+```
+
+6. Voltar à app, escolher origem **Bling**, clicar em **Autorizar no Bling**
+
+Os tokens ficam guardados no Supabase, portanto **só precisa autorizar uma vez** (até desconectar manualmente).
+
+---
+
+**❓ Significado dos sinais**
+
+- **Status:** ✅ Vencendo (markup alvo abaixo do menor concorrente — folga real) · 🟡 Risco (preço quase igual a concorrente) · ⚠️ Caro (markup acima do mercado, perde venda) · 🟧 Chão acima do mercado (custo+margem mínima já está acima do mercado, não há como competir sem renegociar fornecedor) · 🟥 Burn (concorrente abaixo do seu custo+imposto)
+- **Procura:** 🔥 Muito Alta · 📈 Alta · ➡️ Média · 📉 Baixa
+- **Atratividade:** índice 0-100 que combina Procura × Margem. Use para priorizar quais produtos comprar do fornecedor.
+- **Recomendação:** 🚀 Investir/Repor · ✅ Manter / Investir leve · ✅ Investir com margem reduzida · 📉 Reduzir margem mínima · 🔻 Liquidar · ⏸️ Aguardar · ❌ Não comprar
+""")
+
 
 st.subheader("📋 Termos de Uso")
 aceite_regiao = st.checkbox(t["termos_check"], key=f"aceite_{pais_sel}")
@@ -807,30 +1145,69 @@ with tab_analise:
         df_base = pd.DataFrame()
 
         if "Bling" in fonte:
-            token_bl = st.text_input("Token Bling V3:", type="password")
-            if st.button("📥 Importar do Bling"):
-                try:
-                    r = requests.get(
-                        "https://api.bling.com.br/Api/v3/produtos",
-                        headers={"Authorization": f"Bearer {token_bl}", "Accept": "application/json"},
-                        timeout=30,
-                    )
-                    if r.status_code == 200:
-                        dados = r.json().get("data", [])
+            if not bling_credenciais_disponiveis():
+                st.error(
+                    "🔌 **Bling não configurado.**\n\n"
+                    "Adicione `BLING_CLIENT_ID` e `BLING_CLIENT_SECRET` aos Secrets do Streamlit Cloud "
+                    "(estes valores são gerados ao criar uma 'Aplicação' no painel de developers do Bling)."
+                )
+            elif not supabase_ativo():
+                st.error(
+                    "📚 **Supabase necessário.** A integração Bling guarda os tokens de autenticação no "
+                    "Supabase para não exigir nova autorização a cada sessão. Configure SUPABASE_URL/KEY primeiro."
+                )
+            elif not bling_conectado():
+                # Ainda não há token válido — mostrar botão de autorização
+                st.info(
+                    "Para importar produtos do Bling, autorize a aplicação acima a aceder ao seu catálogo. "
+                    "Vai ser redirecionado para o Bling, onde tem de fazer login e clicar em **Autorizar**. "
+                    "Depois volta aqui automaticamente."
+                )
+                url_auth = bling_iniciar_autorizacao()
+                st.link_button("🔐 Autorizar no Bling", url_auth, type="primary")
+            else:
+                # Conectado — mostrar status e botão para importar
+                col_a, col_b = st.columns([3, 1])
+                with col_a:
+                    st.success("✅ Bling conectado.")
+                with col_b:
+                    if st.button("🚪 Desconectar", help="Apagar tokens e exigir nova autorização"):
+                        bling_desconectar()
+                        st.rerun()
+
+                if st.button("📥 Importar catálogo do Bling", type="primary"):
+                    progresso = st.progress(0.0, text="A importar produtos...")
+                    contador = st.empty()
+
+                    def _cb(pagina, total):
+                        # Estimativa visual: cada página são 100 produtos; cap de 50 páginas
+                        pct = min(pagina / 50.0, 1.0)
+                        progresso.progress(pct, text=f"Página {pagina} ({total} produtos)")
+                        contador.caption(f"Recebidos {total} produtos até agora...")
+
+                    produtos = bling_importar_catalogo(progresso_cb=_cb)
+                    progresso.empty()
+                    contador.empty()
+
+                    if not produtos:
+                        st.error("Nenhum produto retornado. Verifique se há produtos cadastrados no Bling.")
+                    else:
                         df_base = pd.DataFrame([{
                             "Nome": i.get("nome", ""),
                             "Custo": round(float(i.get("precoCusto", 0) or 0), 2),
-                            "Qtde": float(i.get("estoque", {}).get("quantidade", 1) or 1),
+                            "Qtde": float((i.get("estoque") or {}).get("quantidade", 1) or 1),
                             "EAN": i.get("codigoBarra", ""),
                             "SKU": i.get("codigo", ""),
                             "Linha": (i.get("categoria") or {}).get("nome", "Geral"),
                             "ID": i.get("id", 0),
-                        } for i in dados])
-                        st.success(f"✅ {len(df_base)} produtos importados.")
-                    else:
-                        st.error(f"Erro Bling {r.status_code}: {r.text[:200]}")
-                except Exception as e:
-                    st.error(f"Erro ao chamar API Bling: {e}")
+                        } for i in produtos])
+                        # Limpeza básica
+                        df_base["Custo"] = pd.to_numeric(df_base["Custo"], errors="coerce")
+                        n_invalid = df_base["Custo"].isna().sum() + (df_base["Custo"] <= 0).sum()
+                        df_base = df_base[df_base["Custo"].notna() & (df_base["Custo"] > 0)]
+                        st.success(f"✅ {len(df_base)} produtos importados (de {len(produtos)} recebidos do Bling).")
+                        if n_invalid > 0:
+                            st.caption(f"ℹ️ {n_invalid} produtos ignorados por terem custo zero ou inválido.")
         else:
             uploaded_file = st.file_uploader(t["btn_excel"], type=["xlsx", "csv"])
             if uploaded_file:
@@ -979,6 +1356,7 @@ with tab_analise:
                     score, rotulo_procura = calcular_score_procura(concorrentes)
                     status_label, status_codigo = calcular_status(
                         custo=row["Custo"], imposto=imposto, markup=markup,
+                        margem_minima=margem_minima,
                         menor_concorrente=estrategias["menor_concorrente"],
                     )
                     recomendacao = recomendacao_investimento(status_codigo, score, row["Qtde"])
@@ -987,6 +1365,11 @@ with tab_analise:
                         preco_sugerido = estrategias["preco_otimo"]
                     elif status_codigo in ("risco", "caro"):
                         preco_sugerido = estrategias["preco_competitivo"]
+                    elif status_codigo == "chao_alto":
+                        # Mercado está abaixo do nosso chão. O melhor que podemos fazer é
+                        # vender ao Preço Mínimo — perdemos competitividade mas garantimos
+                        # margem mínima de subsistência.
+                        preco_sugerido = estrategias["preco_minimo"]
                     elif status_codigo == "burn":
                         preco_sugerido = estrategias["preco_minimo"]
                     else:
@@ -999,10 +1382,15 @@ with tab_analise:
                     concorrentes_ordenados = sorted(concorrentes, key=lambda x: x["preco"]) if concorrentes else []
                     loja_lider = concorrentes_ordenados[0]["loja"] if concorrentes_ordenados else "Sem dados"
 
-                    diff_vs_mercado = None
-                    if estrategias["mercado_competitivo"] and preco_sugerido:
-                        diff_vs_mercado = round(
-                            (preco_sugerido - estrategias["mercado_competitivo"]) / estrategias["mercado_competitivo"] * 100, 1
+                    # Pressão de mercado: quanto o Preço Sugerido ficou abaixo (ou acima) do Preço Markup.
+                    # Negativo = mercado obrigou-me a baixar o preço alvo
+                    # Zero    = consigo vender exactamente pelo markup que queria
+                    # Positivo = consigo vender ACIMA do meu markup (raro, mercado folgado)
+                    pressao_mercado = None
+                    preco_markup_alvo = estrategias["preco_alvo_markup"]
+                    if preco_markup_alvo and preco_sugerido:
+                        pressao_mercado = round(
+                            (preco_sugerido - preco_markup_alvo) / preco_markup_alvo * 100, 1
                         )
 
                     registos.append({
@@ -1014,15 +1402,14 @@ with tab_analise:
                         "Custo": row["Custo"],
                         "Preço Markup": estrategias["preco_alvo_markup"],
                         "Menor Concorrente": estrategias["menor_concorrente"],
-                        "Mercado Competitivo": estrategias["mercado_competitivo"],
-                        "Diff vs Mercado %": diff_vs_mercado,
+                        "Preço Sugerido": preco_sugerido,
+                        "Pressão Mercado %": pressao_mercado,
                         "_concorrentes": concorrentes_ordenados,
+                        "_mercado_competitivo": estrategias["mercado_competitivo"],
                         "N Concorrentes": len(concorrentes),
                         "Preço Mínimo": estrategias["preco_minimo"],
                         "Preço Competitivo": estrategias["preco_competitivo"],
                         "Preço Óptimo": estrategias["preco_otimo"],
-                        "Preço Mercado": estrategias["preco_mercado"],
-                        "Preço Sugerido": preco_sugerido,
                         "Margem Real %": round(margem_real, 1),
                         "Lucro Unitário": round(lucro_unitario, 2),
                         "Lucro Total": lucro_total,
@@ -1031,6 +1418,9 @@ with tab_analise:
                         "Score Procura": score,
                         "Procura": rotulo_procura,
                         "Recomendação": recomendacao,
+                        # Atratividade = Score Procura × Margem Real ÷ 100 (resultado 0-100)
+                        # Ex: Procura 80 e margem 30% → 80*30/100 = 24
+                        "Atratividade": round(score * max(margem_real, 0) / 100, 1),
                         "_loja_lider": loja_lider,
                         "_mediana_mercado": estrategias["mediana_mercado"],
                     })
@@ -1043,6 +1433,7 @@ with tab_analise:
                 st.session_state.df_final.attrs["margem_minima"] = margem_minima
                 st.session_state.df_final.attrs["regiao"] = regiao_id
                 st.session_state.df_final.attrs["rejeitados"] = rejeitados_total
+                st.session_state.df_final.attrs["timestamp"] = datetime.now()
 
                 # Resumo dos filtros aplicados
                 if any(rejeitados_total.values()):
@@ -1081,6 +1472,24 @@ with tab_analise:
         st.divider()
         st.header("📊 Resultados da Análise")
 
+        # Aviso de snapshot — preços capturados num momento específico podem mudar depois
+        ts_analise = df.attrs.get("timestamp")
+        if ts_analise:
+            minutos_atras = int((datetime.now() - ts_analise).total_seconds() / 60)
+            if minutos_atras < 1:
+                idade = "agora mesmo"
+            elif minutos_atras < 60:
+                idade = f"há {minutos_atras} min"
+            elif minutos_atras < 1440:
+                idade = f"há {minutos_atras // 60}h{minutos_atras % 60:02d}"
+            else:
+                idade = f"há {minutos_atras // 1440} dias"
+            st.caption(
+                f"📸 **Snapshot tirado {idade}** ({ts_analise.strftime('%d/%m/%Y %H:%M')}) — "
+                "preços, ratings e disponibilidade dos concorrentes podem ter mudado entretanto. "
+                "Se um link mostrar preço diferente, o concorrente atualizou após a captura."
+            )
+
         cf1, cf2, cf3 = st.columns(3)
         with cf1:
             sel_lojas = st.multiselect("🏪 Marketplace líder (🥇):",
@@ -1105,16 +1514,42 @@ with tab_analise:
             st.warning("Nenhum produto corresponde aos filtros.")
             st.stop()
 
-        investimento = (df_v["Custo"] * df_v["Qtde"]).sum()
-        lucro_proj = df_v["Lucro Total"].sum()
-        roi = (lucro_proj / investimento * 100) if investimento > 0 else 0
-        margem_media = df_v["Margem Real %"].mean()
+        # Métricas globais — calculadas com cuidado para serem matematicamente coerentes
+        investimento = float((df_v["Custo"] * df_v["Qtde"]).sum())
+        lucro_proj = float(df_v["Lucro Total"].sum())
+        # ROI sobre o investimento real (apenas itens que existem em stock)
+        roi = (lucro_proj / investimento * 100) if investimento > 0 else 0.0
+
+        # Margem média PONDERADA pelo peso do investimento de cada produto.
+        # Antes estava a fazer média simples — produtos baratos pesavam tanto como caros,
+        # o que inflava o número quando havia muitos produtos pequenos com margem alta.
+        # Fórmula: lucro total / receita total (onde receita = preço sugerido × qtde)
+        receita_total = float((df_v["Preço Sugerido"] * df_v["Qtde"]).sum())
+        margem_media = (lucro_proj / receita_total * 100) if receita_total > 0 else 0.0
+
+        # Aviso sobre produtos sem stock: contam para Atratividade/Recomendação,
+        # mas não contam para Investimento/Lucro/ROI (porque ainda não os comprou)
+        n_sem_stock = int((df_v["Qtde"] == 0).sum())
+        n_total = len(df_v)
 
         m1, m2, m3, m4 = st.columns(4)
-        m1.metric("💰 Investimento", f"{moeda} {investimento:,.2f}")
-        m2.metric("📈 Lucro Projetado", f"{moeda} {lucro_proj:,.2f}")
-        m3.metric("🎯 ROI", f"{roi:.1f}%")
-        m4.metric("📐 Margem Média", f"{margem_media:.1f}%")
+        m1.metric("💰 Investimento", f"{moeda} {investimento:,.2f}",
+                  help="Soma de Custo × Quantidade. Apenas produtos em stock.")
+        m2.metric("📈 Lucro Projetado", f"{moeda} {lucro_proj:,.2f}",
+                  help="Soma do Lucro Total da coluna. Apenas produtos em stock (Qtde > 0).")
+        m3.metric("🎯 ROI", f"{roi:.1f}%",
+                  help=f"Lucro Projetado ÷ Investimento × 100. "
+                       f"Receita total estimada: {moeda} {receita_total:,.2f}")
+        m4.metric("📐 Margem Média (ponderada)", f"{margem_media:.1f}%",
+                  help="Margem ponderada pelo peso de cada produto (lucro total ÷ receita total). "
+                       "Não é a média simples das margens individuais.")
+
+        if n_sem_stock > 0:
+            st.caption(
+                f"ℹ️ Das {n_total} linhas analisadas, {n_sem_stock} têm stock zero — "
+                "estas não contam para Investimento/Lucro/ROI mas mantêm Atratividade e Recomendação "
+                "para você decidir se vale a pena trazer do fornecedor."
+            )
 
         st.divider()
         st.subheader("📉 Análise Visual")
@@ -1123,16 +1558,17 @@ with tab_analise:
             "1. Distribuição por Status",
             "2. Lucro por Marketplace",
             "3. Lucro por Categoria",
-            "4. Procura vs Estoque",
-            "5. Matriz Investimento (Margem × Procura)",
-            "6. Top 10 Oportunidades de Lucro",
+            "4. Top 20 — Atratividade (Procura × Margem)",
+            "5. Top 20 — Lucro Total Projetado",
+            "6. Distribuição de Atratividade por Categoria",
             "7. Posicionamento de Preço (Eu vs Mercado)",
-            "8. Cobertura de Estoque vs Procura",
+            "8. Tabela: Recomendação por Categoria",
         ])
 
         color_map = {
             "✅ Vencendo": "#2ecc71", "🟡 Risco": "#f39c12",
-            "⚠️ Caro": "#e67e22", "🟥 Burn": "#e74c3c", "❔ Sem dados": "#95a5a6",
+            "⚠️ Caro": "#e67e22", "🟧 Chão acima do mercado": "#d35400",
+            "🟥 Burn": "#e74c3c", "❔ Sem dados": "#95a5a6",
         }
 
         if grafico.startswith("1"):
@@ -1148,35 +1584,52 @@ with tab_analise:
             fig = px.pie(df_v, names="Linha", values="Lucro Total", hole=0.45,
                          title="Lucro projetado por categoria")
         elif grafico.startswith("4"):
-            fig = px.scatter(df_v, x="Score Procura", y="Qtde", size="Lucro Total",
-                             color="Status", color_discrete_map=color_map,
-                             hover_name="Nome", title="Procura de mercado vs Stock atual")
-            fig.update_layout(xaxis_title="Score de Procura (0-100)", yaxis_title="Quantidade em Stock")
+            # Top 20 produtos por Atratividade — barras horizontais ordenadas
+            top = df_v.nlargest(20, "Atratividade")
+            fig = px.bar(
+                top, x="Atratividade", y="Nome", orientation="h",
+                color="Status", color_discrete_map=color_map,
+                hover_data={"Score Procura": True, "Margem Real %": ":.1f", "Lucro Total": ":.2f"},
+                title="Top 20 produtos por Atratividade — onde priorizar a compra",
+            )
+            fig.update_layout(yaxis={"categoryorder": "total ascending"}, height=600)
         elif grafico.startswith("5"):
-            fig = px.scatter(df_v, x="Score Procura", y="Margem Real %",
-                             size="Qtde", color="Status", color_discrete_map=color_map,
-                             hover_name="Nome",
-                             title="Onde investir: alta procura + alta margem = quadrante superior direito")
-            fig.add_hline(y=20, line_dash="dot", line_color="grey", annotation_text="Margem 20%")
-            fig.add_vline(x=45, line_dash="dot", line_color="grey", annotation_text="Procura média")
+            top = df_v.nlargest(20, "Lucro Total")
+            fig = px.bar(
+                top, x="Lucro Total", y="Nome", orientation="h",
+                color="Status", color_discrete_map=color_map,
+                title="Top 20 produtos por lucro projetado total",
+            )
+            fig.update_layout(yaxis={"categoryorder": "total ascending"}, height=600)
         elif grafico.startswith("6"):
-            top = df_v.nlargest(10, "Lucro Total")
-            fig = px.bar(top, x="Lucro Total", y="Nome", orientation="h",
-                         color="Status", color_discrete_map=color_map,
-                         title="Top 10 produtos por lucro projetado")
-            fig.update_layout(yaxis={"categoryorder": "total ascending"})
+            # Distribuição da atratividade por categoria — boxplot
+            fig = px.box(
+                df_v, x="Linha", y="Atratividade", color="Linha", points="all",
+                hover_name="Nome",
+                title="Distribuição de Atratividade por categoria — onde concentrar o catálogo",
+            )
+            fig.update_layout(showlegend=False, xaxis_tickangle=-45, height=550)
         elif grafico.startswith("7"):
             amostra = df_v.head(15) if len(df_v) > 15 else df_v
             fig = go.Figure()
+            fig.add_trace(go.Bar(name="Preço Markup (alvo ideal)", x=amostra["Nome"], y=amostra["Preço Markup"], marker_color="#9b59b6"))
             fig.add_trace(go.Bar(name="Preço Sugerido", x=amostra["Nome"], y=amostra["Preço Sugerido"], marker_color="#3498db"))
             fig.add_trace(go.Bar(name="Menor Concorrente", x=amostra["Nome"], y=amostra["Menor Concorrente"], marker_color="#e74c3c"))
-            fig.add_trace(go.Bar(name="Mercado Competitivo (top 3)", x=amostra["Nome"], y=amostra["Mercado Competitivo"], marker_color="#95a5a6"))
-            fig.update_layout(barmode="group", title="Posicionamento de preço (até 15 produtos)",
+            fig.update_layout(barmode="group", title="Pressão do mercado: Markup ideal vs Sugerido vs Concorrente (até 15 produtos)",
                               xaxis_tickangle=-45, height=550)
         else:
-            fig = px.scatter(df_v, x="Score Procura", y="Qtde",
-                             color="Recomendação", hover_name="Nome",
-                             size="Custo", title="Cobertura de stock vs procura")
+            # Heatmap categoria × recomendação (texto, não scatter)
+            tabela = (
+                df_v.groupby(["Linha", "Recomendação"])
+                .size().reset_index(name="N")
+                .pivot(index="Linha", columns="Recomendação", values="N")
+                .fillna(0).astype(int)
+            )
+            fig = px.imshow(
+                tabela, text_auto=True, aspect="auto", color_continuous_scale="Blues",
+                title="Quantos produtos por Categoria × Recomendação",
+            )
+            fig.update_layout(height=max(400, len(tabela) * 35))
 
         st.plotly_chart(fig, use_container_width=True)
 
@@ -1186,9 +1639,10 @@ with tab_analise:
         colunas_show = [
             "Nome", "Linha", "Qtde",
             "Custo", "Preço Markup",
-            "Menor Concorrente", "Mercado Competitivo", "Diff vs Mercado %",
-            "Preço Sugerido", "Margem Real %", "Lucro Total",
-            "Status", "Procura", "Recomendação",
+            "Menor Concorrente",
+            "Preço Sugerido", "Margem Real %", "Pressão Mercado %",
+            "Lucro Total",
+            "Status", "Procura", "Atratividade", "Recomendação",
             "N Concorrentes",
         ]
 
@@ -1200,25 +1654,45 @@ with tab_analise:
                 "Custo": st.column_config.NumberColumn(format=f"{moeda} %.2f"),
                 "Preço Markup": st.column_config.NumberColumn(
                     format=f"{moeda} %.2f",
-                    help="Preço calculado pela sua margem (markup) configurada, "
-                         "ignorando o mercado. Fórmula: custo × (1 + markup) / (1 - imposto). "
-                         "Compare com o Preço Sugerido para ver se o mercado o obriga a baixar.",
+                    help="O preço alvo IDEAL — calculado pela sua margem desejada, ignorando o mercado. "
+                         "Fórmula: custo × (1 + markup) ÷ (1 - imposto).",
                 ),
-                "Menor Concorrente": st.column_config.NumberColumn(format=f"{moeda} %.2f"),
-                "Mercado Competitivo": st.column_config.NumberColumn(
+                "Menor Concorrente": st.column_config.NumberColumn(
                     format=f"{moeda} %.2f",
-                    help="Média dos 3 concorrentes mais baratos confiáveis",
-                ),
-                "Diff vs Mercado %": st.column_config.NumberColumn(
-                    "Δ vs Mercado", format="%+.1f %%",
-                    help="Diferença do Preço Sugerido face ao Mercado Competitivo",
+                    help="Menor preço entre os concorrentes confiáveis encontrados.",
                 ),
                 "Preço Sugerido": st.column_config.NumberColumn(
                     format=f"{moeda} %.2f",
-                    help="O que o algoritmo recomenda face ao mercado e ao status",
+                    help="Preço efectivo a praticar, escolhido pelo algoritmo conforme o status.",
                 ),
-                "Margem Real %": st.column_config.NumberColumn(format="%.1f %%"),
-                "Lucro Total": st.column_config.NumberColumn(format=f"{moeda} %.2f"),
+                "Pressão Mercado %": st.column_config.NumberColumn(
+                    "Δ Pressão",
+                    format="%+.1f %%",
+                    help="Quanto o Preço Sugerido se afasta do Preço Markup desejado, "
+                         "por causa da concorrência.\n"
+                         "• 0% = consigo praticar exactamente o preço que queria\n"
+                         "• Negativo = mercado obrigou-me a baixar (perdi % do meu markup)\n"
+                         "• Positivo = consigo vender ACIMA do meu markup (raro)",
+                ),
+                "Margem Real %": st.column_config.NumberColumn(
+                    format="%.1f %%",
+                    help="Margem efectiva sobre o Preço Sugerido, descontando imposto.\n"
+                         "Fórmula: (Preço Sugerido × (1 - imposto) - Custo) ÷ Preço Sugerido × 100",
+                ),
+                "Lucro Total": st.column_config.NumberColumn(
+                    format=f"{moeda} %.2f",
+                    help="Lucro projetado para o stock actual.\n"
+                         "Fórmula: (Preço Sugerido × (1 - imposto) - Custo) × Quantidade.\n"
+                         "Se Qtde = 0, Lucro Total = 0 mesmo que a margem seja boa.",
+                ),
+                "Atratividade": st.column_config.ProgressColumn(
+                    "🎯 Atratividade",
+                    format="%.0f",
+                    min_value=0, max_value=100,
+                    help="Combina Procura e Margem em um índice 0-100. "
+                         "Fórmula: Score Procura × Margem Real ÷ 100. "
+                         "Use para priorizar produtos a comprar (não depende de stock).",
+                ),
             },
         )
 
