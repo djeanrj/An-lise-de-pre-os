@@ -427,18 +427,30 @@ def renderizar_pagina_login():
 
         url_google = iniciar_login_google()
         if url_google:
-            # Botão que redireciona NA MESMA ABA (não abre nova).
-            # link_button do Streamlit abriria nova aba (target="_blank"),
-            # o que quebra o fluxo OAuth — o callback voltaria à aba nova,
-            # não a esta onde a app está.
-            if st.button("🔐 Entrar com Google", type="primary", use_container_width=True):
-                st.markdown(
-                    f"<meta http-equiv='refresh' content='0; url={url_google}'>"
-                    f"<script>window.location.href = {url_google!r};</script>"
-                    f"<p>A redirecionar para o Google...</p>",
-                    unsafe_allow_html=True,
-                )
-                st.stop()
+            # Link HTML estilizado como botão Streamlit primary.
+            # target="_top" navega na janela inteira (escapa do iframe do Streamlit Cloud).
+            st.markdown(
+                f"""
+                <a href="{url_google}" target="_top" style="
+                    display: inline-block;
+                    padding: 0.4rem 1rem;
+                    background-color: #FF4B4B;
+                    color: white;
+                    text-align: center;
+                    text-decoration: none;
+                    border-radius: 0.5rem;
+                    font-weight: 400;
+                    font-size: 0.95rem;
+                    border: 1px solid #FF4B4B;
+                    cursor: pointer;
+                    transition: background-color 0.15s;
+                " onmouseover="this.style.backgroundColor='#E03E3E'"
+                   onmouseout="this.style.backgroundColor='#FF4B4B'">
+                    🔐 Entrar com Google
+                </a>
+                """,
+                unsafe_allow_html=True,
+            )
         st.caption(
             "Ao entrar, aceita os Termos de Utilização e a Política de Privacidade. "
             "Os seus dados (catálogo, análises) ficam isolados — só você os vê."
