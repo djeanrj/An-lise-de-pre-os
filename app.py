@@ -247,22 +247,25 @@ def titulo_relevante(item, nome_produto, sku):
 
 
 # =============================================================================
-# 4. AUTENTICAÇÃO + CLIENTE SUPABASE (multi-tenant via Supabase Auth + RLS)
+# 4. AUTENTICAÇÃO (st.login nativo do Streamlit) + CLIENTE SUPABASE
 # =============================================================================
-# Estratégia: usamos a chave ANON do Supabase (segura para frontend) + access_token
-# do utilizador autenticado via Google OAuth. As Row-Level Security policies
-# aplicam-se automaticamente: cada user só vê os seus dados.
+# Usamos st.login() nativo do Streamlit (>= 1.42), que faz OIDC com Google
+# e gere a sessão via cookies seguros. O Supabase é apenas a base de dados —
+# o user_id que usamos é o email do utilizador autenticado pelo Google,
+# e isolamos manualmente cada query por user_id (sem RLS porque não temos
+# o JWT do Supabase Auth).
 
 @st.cache_resource
-def _get_anon_client():
-    """Cliente Supabase com chave anónima (não autenticado)."""
+def get_supabase_client():
+    """Cliente Supabase com service_role (acesso total à BD).
+    O isolamento entre utilizadores é feito manualmente em Python via user_id."""
     if not SUPABASE_AVAILABLE:
         return None
     try:
         url = st.secrets["SUPABASE_URL"]
-        # SUPABASE_ANON_KEY é a chave 'publishable'/'anon' (segura para frontend),
-        # diferente da service_role que dava acesso total
-        key = st.secrets["SUPABASE_ANON_KEY"]
+        # service_role: chave secreta com acesso total. Como esta key vive
+        # apenas no servidor Streamlit (nunca no browser do user), é segura.
+        key = st.secrets["SUPABASE_KEY"]
         return create_client(url, key)
     except (KeyError, FileNotFoundError):
         return None
@@ -271,144 +274,47 @@ def _get_anon_client():
         return None
 
 
-def get_supabase_client():
-    """Cliente Supabase com a sessão do utilizador actual.
-    Devolve None se Supabase não estiver configurado ou se utilizador não estiver autenticado."""
-    base = _get_anon_client()
-    if base is None:
-        return None
-    sess = st.session_state.get("user_session")
-    if sess and sess.get("access_token"):
-        try:
-            base.postgrest.auth(sess["access_token"])
-        except Exception:
-            pass
-    return base
-
-
 def supabase_ativo():
-    """True se Supabase está configurado (não diz nada sobre auth do user)."""
-    return _get_anon_client() is not None
+    """True se Supabase está configurado."""
+    return get_supabase_client() is not None
 
 
 def utilizador_autenticado():
-    """True se há um utilizador logado nesta sessão."""
-    return bool(st.session_state.get("user_session"))
+    """True se há utilizador logado via st.login()."""
+    try:
+        return bool(st.user.is_logged_in)
+    except Exception:
+        return False
 
 
 def user_id_actual():
-    """Devolve o UUID do utilizador autenticado, ou None."""
-    sess = st.session_state.get("user_session") or {}
-    return (sess.get("user") or {}).get("id")
+    """Devolve o identificador único do utilizador (email Google)."""
+    try:
+        return st.user.email if st.user.is_logged_in else None
+    except Exception:
+        return None
 
 
 def user_email_actual():
-    """Devolve o email do utilizador autenticado, ou None."""
-    sess = st.session_state.get("user_session") or {}
-    return (sess.get("user") or {}).get("email")
+    return user_id_actual()
 
 
-def iniciar_login_google():
-    """Devolve URL para o utilizador iniciar o login com Google via fluxo PKCE.
-    PKCE devolve `?code=...` na URL (query param, não fragmento), o que o Streamlit
-    consegue ler nativamente via st.query_params, sem precisar de hacks JavaScript."""
-    sb = _get_anon_client()
-    if sb is None:
-        return None
+def user_nome_actual():
     try:
-        site_url = st.secrets.get("SITE_URL", "https://viabilidadedevendas.streamlit.app/")
-        resp = sb.auth.sign_in_with_oauth({
-            "provider": "google",
-            "options": {
-                "redirect_to": site_url,
-                # PKCE: o Supabase devolve "?code=..." em vez de "#access_token=..."
-                "flow_type": "pkce",
-            },
-        })
-        return resp.url
-    except Exception as e:
-        st.error(f"Falha ao iniciar login Google: {e}")
+        return getattr(st.user, "name", None) or st.user.email
+    except Exception:
         return None
 
 
-def _processar_token_url():
-    """Detecta o `code` retornado pelo Supabase após login OAuth (fluxo PKCE).
-    Troca o code por uma sessão completa (access_token + refresh_token + user info)."""
-    if utilizador_autenticado():
-        return
-
-    qs = st.query_params
-
-    # FLUXO PKCE (preferido): Supabase devolve ?code=...
-    if "code" in qs and "state" not in qs:  # Bling também usa state, este é só o do Supabase
-        code = qs["code"]
-        try:
-            sb = _get_anon_client()
-            if sb is None:
-                return
-            sess_resp = sb.auth.exchange_code_for_session({"auth_code": code})
-            if sess_resp and sess_resp.session and sess_resp.user:
-                st.session_state["user_session"] = {
-                    "access_token": sess_resp.session.access_token,
-                    "refresh_token": sess_resp.session.refresh_token,
-                    "user": {
-                        "id": sess_resp.user.id,
-                        "email": sess_resp.user.email,
-                        "name": (sess_resp.user.user_metadata or {}).get("full_name", ""),
-                        "avatar": (sess_resp.user.user_metadata or {}).get("avatar_url", ""),
-                    },
-                }
-                st.query_params.clear()
-                st.rerun()
-        except Exception as e:
-            # Se o code já foi usado ou expirou, simplesmente limpar
-            err_msg = str(e).lower()
-            if "code verifier" in err_msg or "invalid" in err_msg or "expired" in err_msg:
-                st.query_params.clear()
-            else:
-                st.error(f"Falha ao validar login: {e}")
-                st.query_params.clear()
-
-    # FLUXO IMPLÍCITO (fallback): Supabase devolve ?access_token=... directamente
-    # (caso a config ainda não esteja em PKCE no painel Supabase)
-    elif "access_token" in qs and "refresh_token" in qs:
-        try:
-            sb = _get_anon_client()
-            if sb is None:
-                return
-            user_resp = sb.auth.get_user(qs["access_token"])
-            if user_resp and user_resp.user:
-                st.session_state["user_session"] = {
-                    "access_token": qs["access_token"],
-                    "refresh_token": qs["refresh_token"],
-                    "user": {
-                        "id": user_resp.user.id,
-                        "email": user_resp.user.email,
-                        "name": (user_resp.user.user_metadata or {}).get("full_name", ""),
-                        "avatar": (user_resp.user.user_metadata or {}).get("avatar_url", ""),
-                    },
-                }
-                st.query_params.clear()
-                st.rerun()
-        except Exception as e:
-            st.error(f"Falha ao validar sessão: {e}")
-            st.query_params.clear()
-
-
-def fazer_logout():
-    """Termina a sessão do utilizador localmente."""
-    sb = _get_anon_client()
-    if sb is not None:
-        try:
-            sb.auth.sign_out()
-        except Exception:
-            pass
-    for k in list(st.session_state.keys()):
-        del st.session_state[k]
+def user_avatar_actual():
+    try:
+        return getattr(st.user, "picture", None)
+    except Exception:
+        return None
 
 
 def renderizar_pagina_login():
-    """Mostra a tela de login. Bloqueia o resto da app até o user autenticar."""
+    """Tela de login. Bloqueia o resto da app até o user autenticar com Google."""
     st.title("🌎 Viabilidade de Vendas")
     st.markdown("### Análise de preços e concorrência para o seu catálogo")
     st.divider()
@@ -417,34 +323,9 @@ def renderizar_pagina_login():
     with col2:
         st.markdown("#### Faça login para começar")
         st.write("")
-
-        if not supabase_ativo():
-            st.error(
-                "🔌 Sistema de autenticação indisponível.\n\n"
-                "Configure `SUPABASE_URL` e `SUPABASE_ANON_KEY` nos Secrets."
-            )
-            return
-
-        url_google = iniciar_login_google()
-        if not url_google:
-            st.error(
-                "❌ Não foi possível gerar o link de login.\n\n"
-                "Verifique que o Supabase tem o provider Google configurado e activado, "
-                "e que `SUPABASE_URL` e `SUPABASE_ANON_KEY` estão nos Secrets."
-            )
-        else:
-            st.markdown("#### 🔐 Como entrar")
-            st.markdown(
-                "**Por limitação técnica** do Streamlit Cloud, o botão de login não funciona "
-                "directamente. Faça o seguinte:"
-            )
-            st.markdown("**1.** Copie o link abaixo:")
-            st.code(url_google, language=None)
-            st.markdown(
-                "**2.** Cole no separador de endereços do navegador e prima Enter\n\n"
-                "**3.** Faça login com a sua conta Google\n\n"
-                "**4.** Será automaticamente redirecionado de volta para esta página, já autenticado."
-            )
+        # Botão nativo st.login — funciona dentro do Streamlit Cloud porque
+        # o redirect é gerido pelo próprio Streamlit (rota /oauth2callback).
+        st.button("🔐 Entrar com Google", on_click=st.login, type="primary", use_container_width=True)
         st.caption(
             "Ao entrar, aceita os Termos de Utilização e a Política de Privacidade. "
             "Os seus dados (catálogo, análises) ficam isolados — só você os vê."
@@ -453,10 +334,10 @@ def renderizar_pagina_login():
         st.divider()
         with st.expander("ℹ️ Como funciona"):
             st.markdown("""
-- Login com a sua conta Google (sem precisar criar nova senha)
-- Carrega o seu catálogo (planilha Excel/CSV ou via Bling)
-- Configura margens e impostos
-- Analisa preços face a concorrentes confiáveis da região
+- Login com a sua conta Google (sem criar palavra-passe nova)
+- Carregue o seu catálogo (planilha Excel/CSV ou via Bling)
+- Configure margens e impostos
+- Analise preços face a concorrentes confiáveis da região
 - Histórico de análises guardado para ver tendências
 
 Os seus dados são privados — outros utilizadores não os conseguem ver.
@@ -1171,15 +1052,14 @@ for k, v in {
 # =============================================================================
 # 6b. BARREIRA DE AUTENTICAÇÃO + HANDLERS DE OAUTH
 # =============================================================================
-# 1) Tentar processar token Google na URL (utilizador acabou de fazer login)
-_processar_token_url()
+# st.login() trata do callback Google automaticamente — não precisamos handler manual.
 
-# 2) Se não está autenticado, mostrar página de login e parar
+# 1) Se não está autenticado, mostrar página de login e parar
 if not utilizador_autenticado():
     renderizar_pagina_login()
     st.stop()
 
-# 3) Já autenticado — processar callback Bling se aplicável
+# 2) Já autenticado — processar callback Bling se aplicável (usa ?code= + ?state=)
 _handle_bling_oauth_callback()
 
 
@@ -1275,23 +1155,21 @@ with st.sidebar:
     # Info do utilizador logado + botão logout — no fundo da sidebar
     st.divider()
     email = user_email_actual() or "(sem email)"
-    nome = (st.session_state.get("user_session", {}).get("user", {}) or {}).get("name", "")
-    avatar = (st.session_state.get("user_session", {}).get("user", {}) or {}).get("avatar", "")
+    nome = user_nome_actual() or email
+    avatar = user_avatar_actual()
 
     col_av, col_logout = st.columns([3, 1])
     with col_av:
         if avatar:
             st.markdown(
                 f"<img src='{avatar}' width='28' style='border-radius:50%;vertical-align:middle;'/> "
-                f"<span style='font-size:0.85rem;'>{nome or email}</span>",
+                f"<span style='font-size:0.85rem;'>{nome}</span>",
                 unsafe_allow_html=True,
             )
         else:
-            st.caption(f"👤 {nome or email}")
+            st.caption(f"👤 {nome}")
     with col_logout:
-        if st.button("Sair", key="btn_logout", help="Terminar sessão"):
-            fazer_logout()
-            st.rerun()
+        st.button("Sair", key="btn_logout", on_click=st.logout, help="Terminar sessão")
 
 
 # =============================================================================
