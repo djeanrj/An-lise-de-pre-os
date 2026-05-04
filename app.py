@@ -976,6 +976,28 @@ for k, v in {
 # 7. SIDEBAR
 # =============================================================================
 with st.sidebar:
+    # CSS para reduzir espaçamento entre secções na sidebar
+    st.markdown("""
+    <style>
+        /* Reduzir margem dos divisores */
+        section[data-testid="stSidebar"] hr {
+            margin-top: 0.6rem !important;
+            margin-bottom: 0.6rem !important;
+        }
+        /* Reduzir margem dos cabeçalhos */
+        section[data-testid="stSidebar"] h2 {
+            margin-top: 0.3rem !important;
+            margin-bottom: 0.3rem !important;
+            padding-top: 0 !important;
+            padding-bottom: 0 !important;
+        }
+        /* Reduzir padding em volta dos elementos */
+        section[data-testid="stSidebar"] .stMarkdown {
+            margin-bottom: 0.3rem !important;
+        }
+    </style>
+    """, unsafe_allow_html=True)
+
     st.header("🌎 Região")
     pais_sel = st.selectbox("Selecione:", list(idiomas.keys()), key="pais_main")
 
