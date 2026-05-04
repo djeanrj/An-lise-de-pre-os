@@ -39,16 +39,17 @@ except ImportError:
 st.set_page_config(page_title="IA Marketplace Global", layout="wide", page_icon="🌎")
 
 
-# Handler do redirect OAuth do Bling — corre antes de qualquer outra coisa
+# Handler do redirect OAuth do Bling — só executa se houver utilizador autenticado.
 # Quando o utilizador autoriza no Bling, este redireciona para a app com `?code=...&state=...`
-# Detectamos isso, trocamos pelo token, limpamos a query string e seguimos.
 def _handle_bling_oauth_callback():
     qs = st.query_params
     if "code" in qs and "state" in qs:
+        # Só faz sentido se o user já está autenticado (o Bling é por user)
+        if not utilizador_autenticado():
+            return
         codigo = qs["code"]
         state = qs["state"]
         state_esperado = st.session_state.get("bling_oauth_state")
-        # Validar state (proteção CSRF)
         if state_esperado and state != state_esperado:
             st.error("⚠️ Estado OAuth inválido. Tente conectar novamente.")
             st.query_params.clear()
@@ -62,7 +63,8 @@ def _handle_bling_oauth_callback():
         st.query_params.clear()
 
 
-_handle_bling_oauth_callback()
+# A chamada destes handlers acontece mais abaixo no ficheiro,
+# depois de todas as funções estarem definidas.
 
 
 # =============================================================================
@@ -245,16 +247,22 @@ def titulo_relevante(item, nome_produto, sku):
 
 
 # =============================================================================
-# 4. CLIENTE SUPABASE (lazy-loaded e cacheado)
+# 4. AUTENTICAÇÃO + CLIENTE SUPABASE (multi-tenant via Supabase Auth + RLS)
 # =============================================================================
+# Estratégia: usamos a chave ANON do Supabase (segura para frontend) + access_token
+# do utilizador autenticado via Google OAuth. As Row-Level Security policies
+# aplicam-se automaticamente: cada user só vê os seus dados.
+
 @st.cache_resource
-def get_supabase_client():
-    """Devolve o cliente Supabase ou None se não estiver configurado."""
+def _get_anon_client():
+    """Cliente Supabase com chave anónima (não autenticado)."""
     if not SUPABASE_AVAILABLE:
         return None
     try:
         url = st.secrets["SUPABASE_URL"]
-        key = st.secrets["SUPABASE_KEY"]
+        # SUPABASE_ANON_KEY é a chave 'publishable'/'anon' (segura para frontend),
+        # diferente da service_role que dava acesso total
+        key = st.secrets["SUPABASE_ANON_KEY"]
         return create_client(url, key)
     except (KeyError, FileNotFoundError):
         return None
@@ -263,8 +271,170 @@ def get_supabase_client():
         return None
 
 
+def get_supabase_client():
+    """Cliente Supabase com a sessão do utilizador actual.
+    Devolve None se Supabase não estiver configurado ou se utilizador não estiver autenticado."""
+    base = _get_anon_client()
+    if base is None:
+        return None
+    sess = st.session_state.get("user_session")
+    if sess and sess.get("access_token"):
+        try:
+            base.postgrest.auth(sess["access_token"])
+        except Exception:
+            pass
+    return base
+
+
 def supabase_ativo():
-    return get_supabase_client() is not None
+    """True se Supabase está configurado (não diz nada sobre auth do user)."""
+    return _get_anon_client() is not None
+
+
+def utilizador_autenticado():
+    """True se há um utilizador logado nesta sessão."""
+    return bool(st.session_state.get("user_session"))
+
+
+def user_id_actual():
+    """Devolve o UUID do utilizador autenticado, ou None."""
+    sess = st.session_state.get("user_session") or {}
+    return (sess.get("user") or {}).get("id")
+
+
+def user_email_actual():
+    """Devolve o email do utilizador autenticado, ou None."""
+    sess = st.session_state.get("user_session") or {}
+    return (sess.get("user") or {}).get("email")
+
+
+def iniciar_login_google():
+    """Devolve URL para o utilizador iniciar o login com Google.
+    O Supabase trata do fluxo OAuth e redireciona de volta com #access_token=... no fragmento."""
+    sb = _get_anon_client()
+    if sb is None:
+        return None
+    try:
+        site_url = st.secrets.get("SITE_URL", "https://viabilidadedevendas.streamlit.app/")
+        resp = sb.auth.sign_in_with_oauth({
+            "provider": "google",
+            "options": {"redirect_to": site_url},
+        })
+        return resp.url
+    except Exception as e:
+        st.error(f"Falha ao iniciar login Google: {e}")
+        return None
+
+
+def _processar_token_url():
+    """Detecta access_token retornado pelo Supabase no fragmento # da URL.
+    Como Streamlit não vê fragmentos da URL directamente, fazemos um pequeno hack JS
+    que lê o # e converte em query params para o Streamlit poder ler."""
+    # Se já temos sessão, nada a fazer
+    if utilizador_autenticado():
+        return
+
+    qs = st.query_params
+    # Caso o JS já tenha convertido o fragmento em query params
+    if "access_token" in qs and "refresh_token" in qs:
+        access_token = qs["access_token"]
+        refresh_token = qs["refresh_token"]
+        try:
+            sb = _get_anon_client()
+            if sb is None:
+                return
+            # Validar e obter dados do utilizador
+            user_resp = sb.auth.get_user(access_token)
+            if user_resp and user_resp.user:
+                st.session_state["user_session"] = {
+                    "access_token": access_token,
+                    "refresh_token": refresh_token,
+                    "user": {
+                        "id": user_resp.user.id,
+                        "email": user_resp.user.email,
+                        "name": (user_resp.user.user_metadata or {}).get("full_name", ""),
+                        "avatar": (user_resp.user.user_metadata or {}).get("avatar_url", ""),
+                    },
+                }
+                st.query_params.clear()
+                st.rerun()
+        except Exception as e:
+            st.error(f"Falha ao validar sessão: {e}")
+            st.query_params.clear()
+
+
+def fazer_logout():
+    """Termina a sessão do utilizador localmente."""
+    sb = _get_anon_client()
+    if sb is not None:
+        try:
+            sb.auth.sign_out()
+        except Exception:
+            pass
+    for k in list(st.session_state.keys()):
+        del st.session_state[k]
+
+
+def renderizar_pagina_login():
+    """Mostra a tela de login. Bloqueia o resto da app até o user autenticar."""
+    st.title("🌎 Viabilidade de Vendas")
+    st.markdown("### Análise de preços e concorrência para o seu catálogo")
+    st.divider()
+
+    col1, col2, col3 = st.columns([1, 2, 1])
+    with col2:
+        st.markdown("#### Faça login para começar")
+        st.write("")
+
+        if not supabase_ativo():
+            st.error(
+                "🔌 Sistema de autenticação indisponível.\n\n"
+                "Configure `SUPABASE_URL` e `SUPABASE_ANON_KEY` nos Secrets."
+            )
+            return
+
+        url_google = iniciar_login_google()
+        if url_google:
+            st.link_button(
+                "🔐 Entrar com Google",
+                url_google,
+                type="primary",
+                use_container_width=True,
+            )
+        st.caption(
+            "Ao entrar, aceita os Termos de Utilização e a Política de Privacidade. "
+            "Os seus dados (catálogo, análises) ficam isolados — só você os vê."
+        )
+
+        st.divider()
+        with st.expander("ℹ️ Como funciona"):
+            st.markdown("""
+- Login com a sua conta Google (sem precisar criar nova senha)
+- Carrega o seu catálogo (planilha Excel/CSV ou via Bling)
+- Configura margens e impostos
+- Analisa preços face a concorrentes confiáveis da região
+- Histórico de análises guardado para ver tendências
+
+Os seus dados são privados — outros utilizadores não os conseguem ver.
+            """)
+
+    # Hack JavaScript para converter fragmento da URL (#access_token=...)
+    # em query params (?access_token=...) para o Streamlit conseguir ler
+    st.markdown("""
+    <script>
+    (function() {
+        const hash = window.location.hash;
+        if (hash && hash.includes('access_token')) {
+            const params = new URLSearchParams(hash.substring(1));
+            const search = new URLSearchParams(window.location.search);
+            for (const [k, v] of params.entries()) {
+                search.set(k, v);
+            }
+            window.location.replace(window.location.pathname + '?' + search.toString());
+        }
+    })();
+    </script>
+    """, unsafe_allow_html=True)
 
 
 # =============================================================================
@@ -973,6 +1143,21 @@ for k, v in {
 
 
 # =============================================================================
+# 6b. BARREIRA DE AUTENTICAÇÃO + HANDLERS DE OAUTH
+# =============================================================================
+# 1) Tentar processar token Google na URL (utilizador acabou de fazer login)
+_processar_token_url()
+
+# 2) Se não está autenticado, mostrar página de login e parar
+if not utilizador_autenticado():
+    renderizar_pagina_login()
+    st.stop()
+
+# 3) Já autenticado — processar callback Bling se aplicável
+_handle_bling_oauth_callback()
+
+
+# =============================================================================
 # 7. SIDEBAR
 # =============================================================================
 with st.sidebar:
@@ -998,6 +1183,27 @@ with st.sidebar:
     </style>
     """, unsafe_allow_html=True)
 
+    # Info do utilizador logado + botão logout
+    email = user_email_actual() or "(sem email)"
+    nome = (st.session_state.get("user_session", {}).get("user", {}) or {}).get("name", "")
+    avatar = (st.session_state.get("user_session", {}).get("user", {}) or {}).get("avatar", "")
+
+    col_av, col_logout = st.columns([3, 1])
+    with col_av:
+        if avatar:
+            st.markdown(
+                f"<img src='{avatar}' width='28' style='border-radius:50%;vertical-align:middle;'/> "
+                f"<span style='font-size:0.85rem;'>{nome or email}</span>",
+                unsafe_allow_html=True,
+            )
+        else:
+            st.caption(f"👤 {nome or email}")
+    with col_logout:
+        if st.button("Sair", key="btn_logout", help="Terminar sessão"):
+            fazer_logout()
+            st.rerun()
+
+    st.divider()
     st.header("🌎 Região")
     pais_sel = st.selectbox("Selecione:", list(idiomas.keys()), key="pais_main")
 
