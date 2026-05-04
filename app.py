@@ -433,53 +433,18 @@ def renderizar_pagina_login():
                 "e que `SUPABASE_URL` e `SUPABASE_ANON_KEY` estão nos Secrets."
             )
         else:
-            # O Streamlit Cloud bloqueia navegação cross-origin via st.button/st.link_button.
-            # A solução que funciona é injectar um link <a> com target="_top" + JavaScript
-            # que força window.top.location, mais um botão de fallback "abrir manualmente".
-            import streamlit.components.v1 as components
-            components.html(
-                f"""
-                <html><body style="margin:0;padding:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
-                <a id="google-login-btn"
-                   href="{url_google}"
-                   target="_top"
-                   style="
-                       display: inline-block;
-                       padding: 0.5rem 1.2rem;
-                       background-color: #FF4B4B;
-                       color: white;
-                       text-decoration: none;
-                       border-radius: 0.5rem;
-                       font-size: 0.95rem;
-                       border: 1px solid #FF4B4B;
-                       cursor: pointer;
-                   ">
-                   🔐 Entrar com Google
-                </a>
-                <script>
-                  // Forçar a navegação a sair do iframe do Streamlit Cloud
-                  document.getElementById('google-login-btn').addEventListener('click', function(e) {{
-                      e.preventDefault();
-                      try {{
-                          window.top.location.href = "{url_google}";
-                      }} catch (err) {{
-                          // Fallback: abrir em nova janela top-level
-                          window.open("{url_google}", "_top");
-                      }}
-                  }});
-                </script>
-                </body></html>
-                """,
-                height=60,
+            st.markdown("#### 🔐 Como entrar")
+            st.markdown(
+                "**Por limitação técnica** do Streamlit Cloud, o botão de login não funciona "
+                "directamente. Faça o seguinte:"
             )
-
-            st.caption(
-                "Se o botão acima não funcionar, copie a URL do debug e cole numa nova aba do navegador."
+            st.markdown("**1.** Copie o link abaixo:")
+            st.code(url_google, language=None)
+            st.markdown(
+                "**2.** Cole no separador de endereços do navegador e prima Enter\n\n"
+                "**3.** Faça login com a sua conta Google\n\n"
+                "**4.** Será automaticamente redirecionado de volta para esta página, já autenticado."
             )
-
-            # Manter o expander de debug para fallback manual
-            with st.expander("🔧 Não funciona? Copie esta URL e cole no navegador"):
-                st.code(url_google, language="text")
         st.caption(
             "Ao entrar, aceita os Termos de Utilização e a Política de Privacidade. "
             "Os seus dados (catálogo, análises) ficam isolados — só você os vê."
@@ -1244,27 +1209,6 @@ with st.sidebar:
     </style>
     """, unsafe_allow_html=True)
 
-    # Info do utilizador logado + botão logout
-    email = user_email_actual() or "(sem email)"
-    nome = (st.session_state.get("user_session", {}).get("user", {}) or {}).get("name", "")
-    avatar = (st.session_state.get("user_session", {}).get("user", {}) or {}).get("avatar", "")
-
-    col_av, col_logout = st.columns([3, 1])
-    with col_av:
-        if avatar:
-            st.markdown(
-                f"<img src='{avatar}' width='28' style='border-radius:50%;vertical-align:middle;'/> "
-                f"<span style='font-size:0.85rem;'>{nome or email}</span>",
-                unsafe_allow_html=True,
-            )
-        else:
-            st.caption(f"👤 {nome or email}")
-    with col_logout:
-        if st.button("Sair", key="btn_logout", help="Terminar sessão"):
-            fazer_logout()
-            st.rerun()
-
-    st.divider()
     st.header("🌎 Região")
     pais_sel = st.selectbox("Selecione:", list(idiomas.keys()), key="pais_main")
 
@@ -1327,6 +1271,27 @@ with st.sidebar:
                     st.success("✅ Enviado")
                 else:
                     st.error("❌ Falha no envio ou mensagem vazia")
+
+    # Info do utilizador logado + botão logout — no fundo da sidebar
+    st.divider()
+    email = user_email_actual() or "(sem email)"
+    nome = (st.session_state.get("user_session", {}).get("user", {}) or {}).get("name", "")
+    avatar = (st.session_state.get("user_session", {}).get("user", {}) or {}).get("avatar", "")
+
+    col_av, col_logout = st.columns([3, 1])
+    with col_av:
+        if avatar:
+            st.markdown(
+                f"<img src='{avatar}' width='28' style='border-radius:50%;vertical-align:middle;'/> "
+                f"<span style='font-size:0.85rem;'>{nome or email}</span>",
+                unsafe_allow_html=True,
+            )
+        else:
+            st.caption(f"👤 {nome or email}")
+    with col_logout:
+        if st.button("Sair", key="btn_logout", help="Terminar sessão"):
+            fazer_logout()
+            st.rerun()
 
 
 # =============================================================================
