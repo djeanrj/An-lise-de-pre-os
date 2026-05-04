@@ -309,8 +309,9 @@ def user_email_actual():
 
 
 def iniciar_login_google():
-    """Devolve URL para o utilizador iniciar o login com Google.
-    O Supabase trata do fluxo OAuth e redireciona de volta com #access_token=... no fragmento."""
+    """Devolve URL para o utilizador iniciar o login com Google via fluxo PKCE.
+    PKCE devolve `?code=...` na URL (query param, não fragmento), o que o Streamlit
+    consegue ler nativamente via st.query_params, sem precisar de hacks JavaScript."""
     sb = _get_anon_client()
     if sb is None:
         return None
@@ -318,7 +319,11 @@ def iniciar_login_google():
         site_url = st.secrets.get("SITE_URL", "https://viabilidadedevendas.streamlit.app/")
         resp = sb.auth.sign_in_with_oauth({
             "provider": "google",
-            "options": {"redirect_to": site_url},
+            "options": {
+                "redirect_to": site_url,
+                # PKCE: o Supabase devolve "?code=..." em vez de "#access_token=..."
+                "flow_type": "pkce",
+            },
         })
         return resp.url
     except Exception as e:
@@ -327,28 +332,55 @@ def iniciar_login_google():
 
 
 def _processar_token_url():
-    """Detecta access_token retornado pelo Supabase no fragmento # da URL.
-    Como Streamlit não vê fragmentos da URL directamente, fazemos um pequeno hack JS
-    que lê o # e converte em query params para o Streamlit poder ler."""
-    # Se já temos sessão, nada a fazer
+    """Detecta o `code` retornado pelo Supabase após login OAuth (fluxo PKCE).
+    Troca o code por uma sessão completa (access_token + refresh_token + user info)."""
     if utilizador_autenticado():
         return
 
     qs = st.query_params
-    # Caso o JS já tenha convertido o fragmento em query params
-    if "access_token" in qs and "refresh_token" in qs:
-        access_token = qs["access_token"]
-        refresh_token = qs["refresh_token"]
+
+    # FLUXO PKCE (preferido): Supabase devolve ?code=...
+    if "code" in qs and "state" not in qs:  # Bling também usa state, este é só o do Supabase
+        code = qs["code"]
         try:
             sb = _get_anon_client()
             if sb is None:
                 return
-            # Validar e obter dados do utilizador
-            user_resp = sb.auth.get_user(access_token)
+            sess_resp = sb.auth.exchange_code_for_session({"auth_code": code})
+            if sess_resp and sess_resp.session and sess_resp.user:
+                st.session_state["user_session"] = {
+                    "access_token": sess_resp.session.access_token,
+                    "refresh_token": sess_resp.session.refresh_token,
+                    "user": {
+                        "id": sess_resp.user.id,
+                        "email": sess_resp.user.email,
+                        "name": (sess_resp.user.user_metadata or {}).get("full_name", ""),
+                        "avatar": (sess_resp.user.user_metadata or {}).get("avatar_url", ""),
+                    },
+                }
+                st.query_params.clear()
+                st.rerun()
+        except Exception as e:
+            # Se o code já foi usado ou expirou, simplesmente limpar
+            err_msg = str(e).lower()
+            if "code verifier" in err_msg or "invalid" in err_msg or "expired" in err_msg:
+                st.query_params.clear()
+            else:
+                st.error(f"Falha ao validar login: {e}")
+                st.query_params.clear()
+
+    # FLUXO IMPLÍCITO (fallback): Supabase devolve ?access_token=... directamente
+    # (caso a config ainda não esteja em PKCE no painel Supabase)
+    elif "access_token" in qs and "refresh_token" in qs:
+        try:
+            sb = _get_anon_client()
+            if sb is None:
+                return
+            user_resp = sb.auth.get_user(qs["access_token"])
             if user_resp and user_resp.user:
                 st.session_state["user_session"] = {
-                    "access_token": access_token,
-                    "refresh_token": refresh_token,
+                    "access_token": qs["access_token"],
+                    "refresh_token": qs["refresh_token"],
                     "user": {
                         "id": user_resp.user.id,
                         "email": user_resp.user.email,
@@ -395,12 +427,18 @@ def renderizar_pagina_login():
 
         url_google = iniciar_login_google()
         if url_google:
-            st.link_button(
-                "🔐 Entrar com Google",
-                url_google,
-                type="primary",
-                use_container_width=True,
-            )
+            # Botão que redireciona NA MESMA ABA (não abre nova).
+            # link_button do Streamlit abriria nova aba (target="_blank"),
+            # o que quebra o fluxo OAuth — o callback voltaria à aba nova,
+            # não a esta onde a app está.
+            if st.button("🔐 Entrar com Google", type="primary", use_container_width=True):
+                st.markdown(
+                    f"<meta http-equiv='refresh' content='0; url={url_google}'>"
+                    f"<script>window.location.href = {url_google!r};</script>"
+                    f"<p>A redirecionar para o Google...</p>",
+                    unsafe_allow_html=True,
+                )
+                st.stop()
         st.caption(
             "Ao entrar, aceita os Termos de Utilização e a Política de Privacidade. "
             "Os seus dados (catálogo, análises) ficam isolados — só você os vê."
@@ -417,24 +455,6 @@ def renderizar_pagina_login():
 
 Os seus dados são privados — outros utilizadores não os conseguem ver.
             """)
-
-    # Hack JavaScript para converter fragmento da URL (#access_token=...)
-    # em query params (?access_token=...) para o Streamlit conseguir ler
-    st.markdown("""
-    <script>
-    (function() {
-        const hash = window.location.hash;
-        if (hash && hash.includes('access_token')) {
-            const params = new URLSearchParams(hash.substring(1));
-            const search = new URLSearchParams(window.location.search);
-            for (const [k, v] of params.entries()) {
-                search.set(k, v);
-            }
-            window.location.replace(window.location.pathname + '?' + search.toString());
-        }
-    })();
-    </script>
-    """, unsafe_allow_html=True)
 
 
 # =============================================================================
