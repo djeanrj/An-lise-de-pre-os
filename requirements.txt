@@ -6,3 +6,5 @@ requests
 google-search-results
 openpyxl
 supabase
+streamlit>=1.42
+Authlib
