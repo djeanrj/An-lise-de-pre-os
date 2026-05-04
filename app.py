@@ -426,28 +426,36 @@ def renderizar_pagina_login():
             return
 
         url_google = iniciar_login_google()
-        if url_google:
-            # Link HTML estilizado como botão Streamlit primary.
-            # target="_top" navega na janela inteira (escapa do iframe do Streamlit Cloud).
+        if not url_google:
+            st.error(
+                "❌ Não foi possível gerar o link de login.\n\n"
+                "Verifique que o Supabase tem o provider Google configurado e activado, "
+                "e que `SUPABASE_URL` e `SUPABASE_ANON_KEY` estão nos Secrets."
+            )
+        else:
+            # Mostrar a URL gerada (debug temporário, ajuda a perceber problemas)
+            with st.expander("🔧 Debug — URL de login gerada"):
+                st.code(url_google, language="text")
+                st.caption("Pode copiar esta URL e abrir manualmente no navegador para testar.")
+
+            # Forma 1: link nativo do Streamlit (abre nova aba)
+            st.link_button(
+                "🔐 Entrar com Google (nova aba)",
+                url_google,
+                type="primary",
+                use_container_width=False,
+            )
+
+            # Forma 2: link HTML com target=_top (mesma aba, força sair do iframe)
             st.markdown(
                 f"""
-                <a href="{url_google}" target="_top" style="
-                    display: inline-block;
-                    padding: 0.4rem 1rem;
-                    background-color: #FF4B4B;
-                    color: white;
-                    text-align: center;
-                    text-decoration: none;
-                    border-radius: 0.5rem;
-                    font-weight: 400;
-                    font-size: 0.95rem;
-                    border: 1px solid #FF4B4B;
-                    cursor: pointer;
-                    transition: background-color 0.15s;
-                " onmouseover="this.style.backgroundColor='#E03E3E'"
-                   onmouseout="this.style.backgroundColor='#FF4B4B'">
-                    🔐 Entrar com Google
-                </a>
+                <p style="margin-top: 0.5rem;">
+                Ou: <a href="{url_google}" target="_top" style="
+                    color: #FF4B4B;
+                    font-weight: 500;
+                    text-decoration: underline;
+                ">entrar na mesma aba</a>
+                </p>
                 """,
                 unsafe_allow_html=True,
             )
