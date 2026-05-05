@@ -1,3 +1,5 @@
+streamlit==1.56.0
+Authlib==1.6.11
 pandas
 numpy
 plotly
@@ -5,5 +7,3 @@ requests
 google-search-results
 openpyxl
 supabase
-streamlit>=1.42
-Authlib
