@@ -39,6 +39,78 @@ except ImportError:
 st.set_page_config(page_title="IA Marketplace Global", layout="wide", page_icon="🌎")
 
 
+# ─── DEBUG OAUTH CALLBACK (temporário) ─────────────────────────────────────────
+# Como não conseguimos aceder aos logs do Streamlit Cloud, este handler captura
+# eventuais erros do callback OAuth e mostra-os na página. Remover quando
+# o login estiver a funcionar.
+def _debug_oauth_callback():
+    """Mostra info de debug se a URL tiver parâmetros típicos do callback OAuth."""
+    qs = st.query_params
+    # Detectar se viemos de um redirect Google/OIDC
+    tem_code = "code" in qs
+    tem_state = "state" in qs
+    tem_iss = "iss" in qs  # Google envia &iss=https://accounts.google.com
+
+    if not (tem_code and tem_state):
+        return
+
+    # Identificar se é callback Bling (tem state mas não tem iss) ou Google
+    if not tem_iss:
+        return  # Provavelmente Bling, não Google
+
+    # Já viemos do Google. Tentar fazer st.login() processar isto manualmente
+    # capturando qualquer exceção que ocorra
+    import traceback
+    st.warning(
+        "🔍 **Modo debug OAuth**: A app detectou um callback do Google "
+        "mas algo está a falhar. Os detalhes abaixo ajudam a perceber porquê."
+    )
+
+    # Mostrar info da request
+    with st.expander("📋 Parâmetros recebidos do Google", expanded=False):
+        for k, v in qs.items():
+            st.code(f"{k}: {v[:80]}{'...' if len(str(v)) > 80 else ''}")
+
+    # Mostrar config esperada
+    with st.expander("⚙️ Configuração [auth] esperada", expanded=False):
+        try:
+            auth_cfg = dict(st.secrets["auth"])
+            # Não expor valores sensíveis
+            for k in auth_cfg:
+                v = str(auth_cfg[k])
+                if "secret" in k.lower() or "client_id" in k.lower():
+                    v = v[:8] + "..." if len(v) > 8 else "(vazio)"
+                st.code(f"{k}: {v}")
+        except Exception as e:
+            st.error(f"Sem bloco [auth] nos Secrets: {e}")
+
+    # Verificar se st.user funciona
+    with st.expander("👤 Estado de st.user", expanded=False):
+        try:
+            st.code(f"is_logged_in: {st.user.is_logged_in}")
+            if st.user.is_logged_in:
+                st.code(f"email: {getattr(st.user, 'email', 'N/A')}")
+                st.code(f"name: {getattr(st.user, 'name', 'N/A')}")
+                st.success("✅ Utilizador autenticado! O login funcionou afinal.")
+                if st.button("Continuar para a app"):
+                    st.query_params.clear()
+                    st.rerun()
+                st.stop()
+        except Exception as e:
+            st.error(f"st.user não disponível: {type(e).__name__}: {e}")
+            st.code(traceback.format_exc())
+
+    st.divider()
+    if st.button("🗑️ Limpar URL e voltar ao login"):
+        st.query_params.clear()
+        st.rerun()
+    st.stop()
+
+
+_debug_oauth_callback()
+# ────────────────────────────────────────────────────────────────────────────────
+
+
 # Handler do redirect OAuth do Bling — só executa se houver utilizador autenticado.
 # Quando o utilizador autoriza no Bling, este redireciona para a app com `?code=...&state=...`
 def _handle_bling_oauth_callback():
