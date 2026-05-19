@@ -1,5 +1,4 @@
-streamlit==1.56.0
-Authlib==1.6.11
+streamlit
 pandas
 numpy
 plotly
@@ -7,3 +6,4 @@ requests
 google-search-results
 openpyxl
 supabase
+PyJWT
