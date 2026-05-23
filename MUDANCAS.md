@@ -1,6 +1,79 @@
 # Mudanças no `app.py` — Resumo das Correções e Melhorias
 
-## 🆕 Sessão actual (Maio 2026) — SaaS-ready
+## 🆕 Sessão Maio 2026 (parte 3) — Correções Brasil + drift warning
+
+### Bug crítico: preços incorretos no Brasil
+A SerpAPI no Brasil devolve **valor de parcela** em `extracted_price` (ex: "12x de R$ 33,34" = R$ 33,34) e o **preço total real** em `extracted_total`. A app estava a usar `extracted_price`, mostrando R$ 33,34 quando o real era R$ 133,34.
+
+**Solução:** usar `max(extracted_price, extracted_total)`. Quando há `shipping` explícito (formato "+ R$ X,XX"), descontar do total para obter preço base do produto. Mantém compatibilidade com mercados sem parcelas (EU/USA) onde os 2 são iguais.
+
+### Aviso de drift na tabela
+Nova coluna "⚠️" marca preços 25%+ abaixo da mediana — provável snapshot SerpAPI desactualizado.
+
+## 🆕 Sessão Maio 2026 (parte 2) — Plano B: links directos universais
+
+### Problema resolvido
+A SerpAPI no engine `google_shopping` **não devolve link directo da loja** em PT/UE (devolve apenas link para Google Shopping). Resultado: links inúteis para o utilizador.
+
+### Solução: Plano B com cache 30 dias
+
+**1. Engine `google_immersive_product`:**
+- Para cada item da SerpAPI com `product_id`, 2ª chamada usando `immersive_product_page_token`
+- Devolve `product_results.stores[]` com `name`, `link`, `price`, `total`, `extracted_price`
+- Até 13 lojas por `product_id` com `more_stores=1`
+
+**2. Cache global Supabase (`cache_product_sellers`):**
+- Chave: `product_id` da SerpAPI
+- TTL: 30 dias
+- Partilhada entre utilizadores (apenas URLs públicas, sem dados sensíveis)
+- RLS: leitura aberta, escrita por autenticados
+
+**3. Expansão automática:**
+- Cada item forte da SerpAPI expande-se em N concorrentes (todas as stores do `product_id`)
+- Resultado: 1-3 itens originais → 10-14 concorrentes com link directo ao produto
+
+**4. Funcionamento:**
+- ✅ Funciona para qualquer marca/categoria (não hard-coded para LEGO)
+- ✅ Zero mapping manual de URLs
+- ✅ Cache reduz chamadas SerpAPI nas análises seguintes
+- ✅ Match seller vs source com normalização (acentos, espaços, TLDs)
+
+### Aviso de drift de preço
+- Coluna "⚠️" na tabela de concorrentes
+- Marca preços 25%+ abaixo da mediana (provavelmente snapshot SerpAPI desactualizado)
+- Tooltip explica ao utilizador para confirmar no link
+
+### Notas importantes (Dezembro 2025)
+- Google descontinuou o endpoint legado `google_product` ("The Google Product service is no longer offered by Google")
+- Alternativa oficial: `google_immersive_product` (implementada)
+- Google processou SerpAPI em Dezembro 2025 — serviço continua a funcionar mas tem futuro incerto
+
+### Limpeza de filtros
+- Removidos mappings de URLs inventados/não validados (capytoys, papelariaencantada com `/loja/`, marcelofonte.pt com DNS inexistente)
+- Mantidos como fallback apenas URLs validados manualmente: Worten, Continente, Marcelo Fonte (Universo Encantado), Amazon ES/DE/IT/FR/NL/BR/COM
+- Loja própria e revendedores particulares (eBay, Etsy, Wallapop, Vinted, OLX) blacklisted globalmente
+- Loja "loja dos brindes" blacklisted (vende brindes corporativos, não LEGO/retalho)
+- Loja "you get" blacklisted (não tem link directo fiável)
+
+### Classificação de relevância (forte/fraco/rejeitar)
+- Nova função `classificar_relevancia` substitui `titulo_relevante` (que vira wrapper)
+- **forte**: marca + SKU exacto no título → tabela principal (decisões da app)
+- **fraco**: marca confirmada mas SKU diferente → expander "Possíveis similares" (informativo)
+- **rejeitar**: sem marca ou totalmente irrelevante → não mostra
+- Decisões (Status, Preço Sugerido, métricas) usam APENAS fortes
+
+### Expander "Possíveis similares"
+- Mostra: #, Loja, Preço (?), Link
+- Título oculto (sempre diferente, gera confusão)
+- "(?)" no header do preço indica "a confirmar"
+- Tooltips explicam que o preço pode não ser do produto procurado
+
+### Filtros adicionais
+- Equivalências PT-BR ↔ PT-PT ↔ EN: `buquê`↔`bouquet`, `icons`↔`creator`, etc.
+- "Damaged Box", "Open Box", "Damaged packaging" rejeitados como "usado"
+- Filtro anti-fallback Google: links `google.com/shopping/...` e `udm=28` rejeitados
+
+## 🆕 Sessão Maio 2026 — SaaS-ready
 
 ### Autenticação e sessão
 - **Login Google PKCE manual** (Supabase Auth com `?code=`) — fluxo customizado

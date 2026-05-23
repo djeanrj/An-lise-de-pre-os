@@ -270,7 +270,7 @@ WHITELIST = {
         "pixmania.pt", "kuantokusta.pt", "toysrus.pt", "globaldata.pt",
         "phonehouse.pt", "rdgshop.pt", "chip7.pt", "bebebrinquedo.pt",
         # Lojas LEGO + brinquedos PT confirmadas
-        "lego.com", "lojadosbrindes.com", "universoencantado.com", "colorbricks.pt",
+        "lego.com", "universoencantado.com", "colorbricks.pt",
         "cubosluminosos.pt", "capytoys.pt", "papelariaencantada.pt",
         "babykids.pt", "imaginarium.pt", "minilatas.pt",
         # Generalistas com presença confiável em PT
@@ -282,7 +282,7 @@ WHITELIST = {
         "kuantokusta.pt", "phonehouse.pt", "radiopopular.pt", "auchan.pt",
         "continente.pt", "bebebrinquedo.pt", "toysrus.pt", "chip7.pt",
         # Lojas LEGO + brinquedos PT confirmadas
-        "lego.com", "lojadosbrindes.com", "universoencantado.com", "colorbricks.pt",
+        "lego.com", "universoencantado.com", "colorbricks.pt",
         "cubosluminosos.pt", "capytoys.pt", "papelariaencantada.pt",
         "babykids.pt", "imaginarium.pt", "minilatas.pt",
         # === ESPANHA ===
@@ -306,16 +306,22 @@ WHITELIST = {
 }
 
 BLACKLIST_GLOBAL = [
+    # Plataformas dropshipping/internacionais
     "aliexpress.com", "temu.com", "wish.com", "tiendamia", "fishpond",
-    "grandado", "fruugo", "desertcart", "ubuy", "joom",
+    "grandado", "fruugo", "desertcart", "ubuy", "joom", "banggood",
+    "etsy.com",  # quase sempre vasos/acessórios LEGO, não LEGO original
+    # Marketplaces de revendedores particulares (preços não fiáveis)
+    "ebay", "wallapop", "vinted", "olx",
+    # Lojas de brindes corporativos / roupa profissional (não fiável para retalho)
+    "lojadosbrindes",
     # Loja própria: não deve contar como concorrente
     "vembrincarcomagente.com", "vembrincarcomagente.com.br",
 ]
 
 BLACKLIST_REGIONAL = {
-    "BR": BLACKLIST_GLOBAL + ["ebay.com", "kidinn.com", "tradeinn.com", "vendiloshop"],
-    "PT_ONLY": BLACKLIST_GLOBAL + ["ebay", "kidinn.com", "tradeinn.com", "vendiloshop"],
-    "EU": BLACKLIST_GLOBAL + ["ebay"],
+    "BR": BLACKLIST_GLOBAL + ["kidinn.com", "tradeinn.com", "vendiloshop", "you get"],
+    "PT_ONLY": BLACKLIST_GLOBAL + ["kidinn.com", "tradeinn.com", "vendiloshop", "you get"],
+    "EU": BLACKLIST_GLOBAL + ["kidinn.com", "tradeinn.com", "vendiloshop", "you get"],
     "US": BLACKLIST_GLOBAL,
 }
 
@@ -330,6 +336,7 @@ KEYWORDS_NAO_NOVO = [
     "em segunda mão", "segunda mao", "como novo", "reembalado",
     # EN
     "used", "pre-owned", "preowned", "open box", "open-box", "openbox",
+    "damaged box", "damaged-box", "damaged packaging",
     "refurbished", "loose", "no box", "incomplete", "missing pieces",
     "missing parts", "bricklink", "spare", "replacement parts",
     # IT
@@ -620,68 +627,98 @@ def detectar_marca(nome_produto):
     return None
 
 
-def titulo_relevante(item, nome_produto, sku, marca_esperada=None):
-    """Verifica se o título do produto retornado tem relação com o produto pesquisado.
-    Devolve True se houver match suficiente, False senão.
+def classificar_relevancia(item, nome_produto, sku, marca_esperada=None):
+    """Classifica a relevância do título de um resultado SerpAPI face ao produto procurado.
 
-    Estratégia (em ordem de prioridade):
-    1) Se há marca esperada (override ou detectada do nome), exigir que apareça no título
-    2) Se SKU é alfanumérico (ex: LGO75301) e aparece no título → match forte, aceitar
-    3) Se SKU é puramente numérico (ex: 10280), precisa estar no título E ter marca a bater
-    4) Validar palavras significativas do nome esperado no título
+    Devolve uma das 3 strings:
+    - "forte"   → marca + SKU exacto no título (alta confiança, é o produto procurado)
+    - "fraco"   → marca confirmada, mas SKU não bate ou ausente (similar — mostrar no expander)
+    - "rejeitar"→ sem marca correcta ou totalmente irrelevante (lixo, não mostrar)
     """
     titulo = str(item.get("title", "")).lower().strip()
     if not titulo:
-        return False
+        return "rejeitar"
 
     # 1) Marca: usa o que foi passado, senão tenta detectar do nome
     if marca_esperada is None:
         marca_esperada = detectar_marca(nome_produto)
 
+    marca_no_titulo = False
     if marca_esperada:
         marca_lower = marca_esperada.lower()
-        # Procurar aliases conhecidos desta marca canónica
         aliases_marca = next(
             (aliases for canon, aliases in MARCAS_CONHECIDAS if canon == marca_esperada),
-            [marca_lower]  # Fallback: usa o próprio nome da marca como alias
+            [marca_lower]
         )
         marca_no_titulo = any(
             re.search(rf"\b{re.escape(a)}\b", titulo) for a in aliases_marca
         )
         if not marca_no_titulo:
-            return False
+            return "rejeitar"  # marca esperada mas não está no título → outro produto
 
     sku_str = str(sku).strip().lower() if sku else ""
     sku_no_titulo = False
     if sku_str:
         if re.search(rf"\b{re.escape(sku_str)}\b", titulo):
             sku_no_titulo = True
-            # SKU alfanumérico + marca a bater já é o suficiente
-            if any(c.isalpha() for c in sku_str):
-                return True
+
+    # 2) ✅ FORTE: marca + SKU exacto no título (alta confiança)
+    if marca_no_titulo and sku_no_titulo:
+        return "forte"
+
+    # SKU alfanumérico (ex: LGO75301) sozinho é considerado forte
+    if sku_no_titulo and any(c.isalpha() for c in sku_str):
+        return "forte"
 
     if not nome_produto:
-        return sku_no_titulo
+        # Sem nome para comparar — se o SKU bate é forte, senão rejeitar
+        return "forte" if sku_no_titulo else "rejeitar"
 
+    # Equivalências PT-BR ↔ PT-PT ↔ EN
+    EQUIV = {
+        "buquê": "bouquet", "buque": "bouquet", "bouquet": "bouquet",
+        "icons": "creator", "creator": "creator",
+        "estrela": "star", "star": "star",
+        "guerras": "wars", "wars": "wars",
+        "natal": "christmas", "christmas": "christmas",
+    }
     def _tokens(s):
         s = re.sub(r"[^\w\s]", " ", s.lower())
-        return {w for w in s.split() if len(w) >= 3 and w not in STOPWORDS_RELEVANCIA}
+        tokens = set()
+        for w in s.split():
+            if len(w) < 3 or w in STOPWORDS_RELEVANCIA:
+                continue
+            tokens.add(EQUIV.get(w, w))
+        return tokens
 
     tokens_esperados = _tokens(nome_produto)
     if not tokens_esperados:
-        return sku_no_titulo if sku_str else True
+        return "forte" if sku_no_titulo else ("fraco" if marca_no_titulo else "rejeitar")
 
     tokens_titulo = _tokens(titulo)
     intersecao = tokens_esperados & tokens_titulo
 
-    # Se já temos marca + SKU no título, basta uma palavra extra do nome — muito provável ser o produto certo
-    if marca_esperada and sku_no_titulo:
-        return len(intersecao) >= 1
+    # 3) Marca confirmada + palavras a bater = FRACO (similar, vale para verificação)
+    if marca_no_titulo:
+        if len(intersecao) >= 1:
+            return "fraco"
+        # Marca presente mas zero palavras coincidem — provavelmente outro produto da marca
+        # mas vale a pena o utilizador ver no expander (talvez é o mesmo produto renomeado)
+        return "fraco"
 
-    # Sem SKU no título, exigir mais palavras
-    if len(tokens_esperados) <= 3:
-        return len(intersecao) >= 1
-    return len(intersecao) / len(tokens_esperados) >= 0.5
+    # Sem marca esperada — só palavras
+    if len(tokens_esperados) <= 3 and len(intersecao) >= 1:
+        return "forte"
+    if len(intersecao) / len(tokens_esperados) >= 0.5:
+        return "forte"
+
+    return "rejeitar"
+
+
+def titulo_relevante(item, nome_produto, sku, marca_esperada=None):
+    """Wrapper de compatibilidade — devolve True se o resultado é minimamente relevante
+    (forte OU fraco). Quem precisa de saber qual é dos dois deve usar classificar_relevancia."""
+    return classificar_relevancia(item, nome_produto, sku, marca_esperada) != "rejeitar"
 
 
 # =============================================================================
@@ -1672,43 +1709,216 @@ def parse_preco(valor_raw, formato="BR"):
 
 
 def vendedor_confiavel(item, whitelist, blacklist):
-    """True se o item é de um vendedor confiável da região (whitelist) e não está na blacklist.
-    Compara contra `source` (nome amigável da SerpAPI), `link` e `dominio` (do URL).
-    Para suportar `source="PCDiga"` bater com whitelist `pcdiga.com`, fazemos match
-    contra o nome sem TLD."""
-    fonte = str(item.get("source", "")).lower()
-    link = str(item.get("link", "")).lower()
+    """Filtragem de vendedor — estratégia 'tudo aceite excepto lixo conhecido'.
+
+    Filosofia: o utilizador quer ver os mesmos resultados que veria num Google Shopping
+    directo. Em vez de exigir a loja estar numa whitelist (que requer manutenção contínua),
+    aceitamos por defeito e rejeitamos APENAS:
+
+    1. Lojas/marketplaces na blacklist (eBay com revendedores particulares, Aliexpress,
+       lojas fraude conhecidas, sites de "compatível com X", etc.)
+    2. Itens sem source nem link válido (lixo da SerpAPI)
+    3. Se a whitelist for explicitamente "minúscula e restrita" (modo PT_ONLY estrito),
+       respeita-a — mas EU/USA são abertos.
+
+    Devolve: True (aceitar) ou False (rejeitar).
+    """
+    fonte = str(item.get("source", "")).lower().strip()
+    link = str(item.get("link", "")).lower().strip()
+
+    # Sem source nem link → lixo
+    if not fonte and not link:
+        return False
+
     try:
-        dominio = urlparse(link).netloc.lower()
+        dominio = urlparse(link).netloc.lower() if link else ""
     except Exception:
         dominio = ""
 
-    # Normalizar fonte: remover espaços e acentos comuns
+    # Normalizar fonte para comparar (remove acentos/espaços/pontuação)
     import unicodedata
-    fonte_normalizada = unicodedata.normalize("NFKD", fonte).encode("ascii", "ignore").decode("ascii").replace(" ", "").replace("-", "").replace(".", "")
+    fonte_normalizada = unicodedata.normalize("NFKD", fonte).encode("ascii", "ignore").decode("ascii")
+    fonte_normalizada = re.sub(r"[^a-z0-9]", "", fonte_normalizada)
     blob = f"{fonte} {link} {dominio} {fonte_normalizada}"
 
-    # Blacklist sobrepõe whitelist
+    # Blacklist: rejeita imediatamente
     for b in blacklist:
         b_low = b.lower()
         if b_low in blob:
             return False
-        # Também testar versão sem TLD
-        b_no_tld = re.sub(r"\.(com|pt|es|de|fr|it|nl|com\.br|co\.uk)$", "", b_low).replace(".", "").replace(" ", "")
+        b_no_tld = re.sub(r"\.(com|pt|es|de|fr|it|nl|com\.br|co\.uk)$", "", b_low)
+        b_no_tld = re.sub(r"[^a-z0-9]", "", b_no_tld)
         if b_no_tld and b_no_tld in fonte_normalizada:
             return False
 
-    if whitelist:
+    # Sem whitelist → aceita tudo (excepto blacklist acima)
+    if not whitelist:
+        return True
+
+    # Se a whitelist é "pequena" (< 25 entradas), tratamos como modo estrito (PT_ONLY)
+    # Senão, é apenas uma lista indicativa — aceita também o que não está nela
+    if len(whitelist) < 25:
+        # Modo estrito: SÓ aceita se bater
         for w in whitelist:
             w_low = w.lower()
             if w_low in blob:
                 return True
-            # Versão sem TLD para bater com fonte amigável
-            w_no_tld = re.sub(r"\.(com|pt|es|de|fr|it|nl|com\.br|co\.uk)$", "", w_low).replace(".", "").replace(" ", "")
+            w_no_tld = re.sub(r"\.(com|pt|es|de|fr|it|nl|com\.br|co\.uk)$", "", w_low)
+            w_no_tld = re.sub(r"[^a-z0-9]", "", w_no_tld)
             if w_no_tld and w_no_tld in fonte_normalizada:
                 return True
         return False
+
+    # Modo aberto: aceita por defeito (whitelist é só "lista preferida")
     return True
+
+
+# ============================================================================
+# CACHE DE LINKS DIRECTOS DA LOJA (Plano B)
+# ============================================================================
+# A SerpAPI no engine google_shopping NÃO devolve links directos da loja em PT/UE
+# (devolve apenas product_link → Google Shopping, e o campo `link` vem vazio).
+#
+# Para obter o URL real (worten.pt/produtos/X, continente.pt/produto/Y, etc.)
+# é preciso uma 2ª chamada à API google_product, que devolve `sellers_results`
+# com os links reais de cada loja para esse product_id.
+#
+# Para reduzir o custo SerpAPI, fazemos cache no Supabase com TTL 30 dias.
+# Cache é GLOBAL (partilhada entre utilizadores) — é só URL público de loja,
+# não há informação sensível.
+
+@st.cache_data(ttl=300, show_spinner=False)
+def _cache_get_sellers(product_id: str):
+    """Procura sellers na cache Supabase. Devolve lista de {name, link, price} ou None.
+    Cache válida durante 30 dias."""
+    if not product_id:
+        return None
+    try:
+        sb = get_supabase_client()
+        if not sb:
+            return None
+        res = sb.table("cache_product_sellers").select("sellers, updated_at").eq("product_id", str(product_id)).limit(1).execute()
+        if not res.data:
+            return None
+        row = res.data[0]
+        # Verificar TTL: 30 dias
+        try:
+            updated_at = datetime.fromisoformat(row["updated_at"].replace("Z", "+00:00"))
+            if (datetime.now(timezone.utc) - updated_at).days > 30:
+                return None  # expirou
+        except Exception:
+            pass
+        return row.get("sellers") or []
+    except Exception:
+        return None
+
+
+def _cache_set_sellers(product_id: str, gl: str, sellers: list):
+    """Guarda sellers na cache Supabase. Faz upsert."""
+    if not product_id or not sellers:
+        return
+    try:
+        sb = get_supabase_client()
+        if not sb:
+            return
+        sb.table("cache_product_sellers").upsert({
+            "product_id": str(product_id),
+            "gl": gl,
+            "sellers": sellers,
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+        }, on_conflict="product_id").execute()
+        # Invalidar cache local Streamlit para que próxima leitura vá ao Supabase
+        _cache_get_sellers.clear()
+    except Exception as e:
+        print(f"[CACHE] Falha ao guardar sellers para {product_id}: {e}", flush=True)
+
+
+def _fetch_real_sellers(cache_key: str, page_token: str, regiao_cfg: dict, api_key: str):
+    """Faz 2ª chamada SerpAPI (engine=google_immersive_product) para obter URLs reais das lojas.
+
+    cache_key: usado como chave única na cache (geralmente product_id da SerpAPI).
+    page_token: o `immersive_product_page_token` que veio nos resultados de google_shopping.
+
+    Devolve lista de {name, link, price_str}. Faz cache no Supabase (TTL 30 dias).
+
+    A SerpAPI Google Product API foi descontinuada em Setembro 2025 (Google fechou o endpoint).
+    Esta versão usa a alternativa oficial recomendada: google_immersive_product.
+    """
+    if not cache_key:
+        return []
+
+    # 1) Verificar cache primeiro
+    cached = _cache_get_sellers(cache_key)
+    if cached is not None:
+        return cached
+
+    if not page_token:
+        return []  # sem token não há como chamar a API
+
+    # 2) Cache miss — chamada SerpAPI google_immersive_product
+    try:
+        params = {
+            "engine": "google_immersive_product",
+            "page_token": page_token,
+            "more_stores": "1",  # até 13 lojas em vez de 3-5 default
+            "api_key": api_key,
+        }
+        search = GoogleSearch(params)
+        results = search.get_dict()
+
+        # As lojas estão em product_results.stores (estrutura nova da SerpAPI Maio 2026)
+        _stores = (
+            results.get("product_results", {}).get("stores", [])
+            or results.get("stores", [])
+            or []
+        )
+
+        sellers = []
+        for s in _stores:
+            link = s.get("link") or ""
+            if not link or "google.com" in link.lower():
+                continue  # ignorar links que vão ao Google
+            sellers.append({
+                "name": s.get("name", ""),
+                "link": link,
+                "price_str": s.get("price") or s.get("base_price") or "",
+                "total_str": s.get("total") or "",
+                "extracted_price": s.get("extracted_price"),
+                "extracted_total": s.get("extracted_total"),
+                "shipping": s.get("shipping", ""),
+            })
+        # 3) Popular cache (mesmo se vazia, para evitar repetir chamada falhada nos próximos 30 dias)
+        _cache_set_sellers(cache_key, regiao_cfg["gl"], sellers)
+        return sellers
+    except Exception as e:
+        print(f"[PLANO-B] EXCEPTION key={cache_key}: {e}", flush=True)
+        return []
+
+
+def _link_real_da_loja(item: dict, regiao_cfg: dict, api_key: str):
+    """Para um item da SerpAPI, devolve o URL real da loja (via cache ou 2ª chamada
+    google_immersive_product). Devolve '' se não conseguir."""
+    pid = item.get("product_id")
+    page_token = item.get("immersive_product_page_token", "")
+    source = str(item.get("source", "")).strip().lower()
+    if not pid or not source:
+        return ""
+
+    import unicodedata
+    src_norm = unicodedata.normalize("NFKD", source).encode("ascii", "ignore").decode()
+    src_norm = re.sub(r"[^a-z0-9]", "", src_norm)
+
+    sellers = _fetch_real_sellers(str(pid), page_token, regiao_cfg, api_key)
+    if not sellers:
+        return ""
+    for s in sellers:
+        seller_name = str(s.get("name", "")).strip().lower()
+        seller_norm = unicodedata.normalize("NFKD", seller_name).encode("ascii", "ignore").decode()
+        seller_norm = re.sub(r"[^a-z0-9]", "", seller_norm)
+        if src_norm and seller_norm:
+            if src_norm in seller_norm or seller_norm in src_norm:
+                return s.get("link", "")
+    return ""
 
 
 def buscar_serpapi(produto, ean, sku, custo, regiao_cfg, whitelist, blacklist, api_key,
@@ -1722,7 +1932,8 @@ def buscar_serpapi(produto, ean, sku, custo, regiao_cfg, whitelist, blacklist, a
       (default 40%: se compraste a R$ 100, ignora resultados abaixo de R$ 40)
     - marca_override: se passar valor, usa esta marca em vez de detectar do nome
       (útil quando planilha tem coluna "Marca")"""
-    concorrentes = []
+    concorrentes = []           # match forte (marca + SKU exacto, alta confiança)
+    concorrentes_similares = [] # match fraco (marca confirmada, sem SKU exacto — para verificação)
     rejeitados_log = {"usado": 0, "outlier_baixo": 0, "outlier_alto": 0, "irrelevante": 0, "internacional": 0, "acessorio": 0, "vendedor_naoconfiavel": 0, "serpapi_total": 0, "sem_preco": 0}
     consultas = []
 
@@ -1787,9 +1998,12 @@ def buscar_serpapi(produto, ean, sku, custo, regiao_cfg, whitelist, blacklist, a
                 rejeitados_log["vendedor_naoconfiavel"] += 1
                 continue
 
-            if not titulo_relevante(item, produto, sku, marca_esperada=marca):
+            relevancia = classificar_relevancia(item, produto, sku, marca_esperada=marca)
+            if relevancia == "rejeitar":
                 rejeitados_log["irrelevante"] += 1
                 continue
+            # `relevancia` agora é "forte" ou "fraco" — usado mais abaixo para
+            # decidir em qual lista colocar o item.
 
             if apenas_novos and not parece_produto_novo(item):
                 rejeitados_log["usado"] += 1
@@ -1837,81 +2051,55 @@ def buscar_serpapi(produto, ean, sku, custo, regiao_cfg, whitelist, blacklist, a
 
             if not link_real:
                 _source_str = str(item.get("source", "")).strip()
-                _title_str = str(item.get("title", "")).strip()
-                # Termo de busca para o link de fallback:
-                # - Se temos marca + SKU → usar (mais limpo e a maioria das lojas indexam SKU)
-                # - Senão, primeiras 5 palavras do título (cortando "Loja Especializada..." etc.)
-                if marca and _valido(sku):
-                    _termo_busca = f"{marca} {str(sku).strip()}"
-                elif _title_str:
-                    _palavras = _title_str.split()
-                    _termo_busca = " ".join(_palavras[:5])
+                _src_low = _source_str.lower()
+                _sku_str = str(sku).strip() if _valido(sku) else ""
+
+                # === ESTRATÉGIA DE LINKS (Plano B com cache) ===
+                # 1) Para LEGO+SKU: URL directa lego.com/pt-pt/product/<SKU> (testada)
+                # 2) Senão: 2ª chamada SerpAPI (google_product) → URL real da loja, com cache 30 dias
+                # 3) Fallback: mapping de URLs validadas manualmente para lojas comuns
+                # 4) Sem link → será filtrado no painel
+
+                if marca == "LEGO" and _sku_str and ("lego" in _src_low):
+                    link_real = f"https://www.lego.com/pt-pt/product/{_sku_str}"
                 else:
-                    _termo_busca = produto[:60]
-                if _source_str and _termo_busca:
-                    # Heurística simples: mapear source comum → domínio + busca
-                    _src_low = _source_str.lower()
+                    # PLANO B: tenta obter URL real via google_product API (com cache)
+                    link_real = _link_real_da_loja(item, regiao_cfg, api_key)
 
-                    # Para marcas que indexam o SKU directamente na URL, podemos ir
-                    # ao produto exacto sem passar pela busca (muito melhor UX).
-                    # Tem de ser uma marca conhecida + SKU válido + loja oficial dessa marca.
-                    _sku_str = str(sku).strip() if _valido(sku) else ""
-                    _direct_url_pairs = []
-                    if marca == "LEGO" and _sku_str and ("lego" in _src_low):
-                        # LEGO.com PT: /pt-pt/product/<SKU>
-                        _direct_url_pairs.append(f"https://www.lego.com/pt-pt/product/{_sku_str}")
-
-                    if _direct_url_pairs:
-                        link_real = _direct_url_pairs[0]
+                if not link_real:
+                    # Fallback final: mapping validado manualmente para lojas comuns
+                    if marca and _sku_str:
+                        _termo_busca = f"{marca} {_sku_str}"
+                    elif _sku_str:
+                        _termo_busca = _sku_str
                     else:
-                        _mapping = {
-                            "worten": "https://www.worten.pt/search?query={q}",
-                            "fnac": "https://www.fnac.pt/SearchResult/ResultList.aspx?Search={q}",
-                            "pcdiga": "https://www.pcdiga.com/catalogsearch/result/?q={q}",
-                            "continente": "https://www.continente.pt/search/?q={q}",
-                            "elcorteingles": "https://www.elcorteingles.pt/search/?s={q}",
-                            "el corte inglés": "https://www.elcorteingles.pt/search/?s={q}",
-                            "amazon.es": "https://www.amazon.es/s?k={q}",
-                            "amazon.de": "https://www.amazon.de/s?k={q}",
-                            "amazon.it": "https://www.amazon.it/s?k={q}",
-                            "amazon.fr": "https://www.amazon.fr/s?k={q}",
-                            "amazon.nl": "https://www.amazon.nl/s?k={q}",
-                            "amazon.com.br": "https://www.amazon.com.br/s?k={q}",
-                            "amazon": "https://www.amazon.com/s?k={q}",
-                            "lego.com": "https://www.lego.com/pt-pt/search?q={q}",
-                            "lego": "https://www.lego.com/pt-pt/search?q={q}",
-                            "loja dos brindes": "https://lojadosbrindes.com/?s={q}",
-                            "marcelo fonte": "https://universoencantado.com/?s={q}&post_type=product",
-                            "universo encantado": "https://universoencantado.com/?s={q}&post_type=product",
-                            "colorbricks": "https://colorbricks.pt/?s={q}&post_type=product",
-                            "cubos luminosos": "https://cubosluminosos.pt/?s={q}",
-                            "capytoys": "https://capytoys.pt/?s={q}",
-                            "papelaria encantada": "https://papelariaencantada.pt/?s={q}",
-                            "babykids": "https://www.babykids.pt/search?q={q}",
-                            "imaginarium": "https://www.imaginarium.pt/search?q={q}",
-                            "minilatas": "https://minilatas.pt/?s={q}",
-                            "auchan": "https://www.auchan.pt/pt/search/?q={q}",
-                            "mediamarkt": "https://www.mediamarkt.pt/pt/search.html?query={q}",
-                            "radio popular": "https://www.radiopopular.pt/search?Termo={q}",
-                            "kuantokusta": "https://www.kuantokusta.pt/search?q={q}",
-                            "pccomponentes": "https://www.pccomponentes.com/buscar/?query={q}",
-                            "toys r us": "https://www.toysrus.pt/search?q={q}",
-                            "chip7": "https://www.chip7.pt/search?q={q}",
-                        }
-                        # Procurar match: source contém uma das chaves
-                        for chave, tpl in _mapping.items():
-                            if chave in _src_low:
-                                _q_enc = quote_plus(_termo_busca)
-                                link_real = tpl.format(q=_q_enc)
-                                break
+                        _termo_busca = produto[:60]
+                    _mapping_validado = {
+                        "worten": "https://www.worten.pt/search?query={q}",
+                        "continente": "https://www.continente.pt/pesquisa/?q={q}&start=0&srule=Continente&pmin=0.01",
+                        "marcelo fonte": "https://universoencantado.com/?s={q}&post_type=product",
+                        "universo encantado": "https://universoencantado.com/?s={q}&post_type=product",
+                        "amazon.es": "https://www.amazon.es/s?k={q}",
+                        "amazon.de": "https://www.amazon.de/s?k={q}",
+                        "amazon.it": "https://www.amazon.it/s?k={q}",
+                        "amazon.fr": "https://www.amazon.fr/s?k={q}",
+                        "amazon.nl": "https://www.amazon.nl/s?k={q}",
+                        "amazon.com.br": "https://www.amazon.com.br/s?k={q}",
+                        "amazon": "https://www.amazon.com/s?k={q}",
+                    }
+                    for chave, tpl in _mapping_validado.items():
+                        if chave in _src_low:
+                            link_real = tpl.format(q=quote_plus(_termo_busca))
+                            break
 
-            concorrentes.append({
+            registo = {
                 "preco": float(preco),
                 "loja": item.get("source", "Desconhecido"),
                 "link": link_real,
                 "rating": item.get("rating"),
                 "reviews": item.get("reviews", 0) or 0,
                 "tag": str(item.get("extensions", "")).lower() + " " + str(item).lower(),
+                "titulo": item.get("title", ""),  # útil para mostrar no expander
                 "_raw": {  # campos crus para debug — útil para identificar internacional
                     "title": item.get("title", ""),
                     "source": item.get("source", ""),
@@ -1922,32 +2110,133 @@ def buscar_serpapi(produto, ean, sku, custo, regiao_cfg, whitelist, blacklist, a
                     "tag": item.get("tag", ""),
                     "snippet": item.get("snippet", ""),
                 },
-            })
+            }
+            if relevancia == "forte":
+                concorrentes.append(registo)
 
-        if concorrentes:
-            break
+                # === EXPANSÃO: usar TODAS as stores do product_id como concorrentes ===
+                # O `product_id` no Google Shopping agrupa todas as lojas que vendem o
+                # mesmo produto. Já fizemos o _fetch_real_sellers acima (com cache),
+                # agora vamos adicionar essas stores como concorrentes adicionais.
+                # Resultado: 1 item original → 5-13 concorrentes (todos com link directo).
+                _pid = item.get("product_id")
+                _token = item.get("immersive_product_page_token", "")
+                if _pid and _token:
+                    _all_stores = _fetch_real_sellers(str(_pid), _token, regiao_cfg, api_key)
+                    for store in _all_stores:
+                        store_link = store.get("link", "")
+                        store_name = store.get("name", "")
+                        if not store_link or not store_name:
+                            continue
+                        # Não duplicar a loja original (que já adicionámos como registo)
+                        if store_name.lower().strip() == str(item.get("source", "")).lower().strip():
+                            continue
+
+                        # Aplicar os MESMOS filtros que aplicamos ao item original.
+                        # As stores expandidas vêm de Plano B mas precisam passar pelos
+                        # mesmos critérios — senão entra ruído (eBay blacklisted, produto
+                        # usado, preços outlier, etc.)
+                        store_item_compat = {
+                            "source": store_name,
+                            "link": store_link,
+                            "title": item.get("title", ""),  # herdamos do canónico
+                            "extensions": store.get("shipping", ""),
+                            "delivery": store.get("shipping", ""),
+                        }
+
+                        # Filtro 1: vendedor confiável (blacklist + whitelist)
+                        if not vendedor_confiavel(store_item_compat, whitelist, blacklist):
+                            continue
+
+                        # Filtro 2: produto novo (rejeita "usado", "open box", "damaged", etc.)
+                        # Aplicamos com base no `shipping` que pode mencionar essas keywords
+                        if apenas_novos and not parece_produto_novo(store_item_compat):
+                            continue
+
+                        # Filtro 3: preço — heurística robusta para lidar com bug do BR.
+                        # Problema: no Brasil a SerpAPI devolve VALOR DE PARCELA em `extracted_price`
+                        # (ex: "12x de R$ 33,34") e o preço total real (com envio) em `extracted_total`.
+                        # Estratégia: usar o MAIOR entre price e total (geralmente o total é o real),
+                        # mas descontar envio quando explícito.
+                        _ep = store.get("extracted_price") or 0
+                        _et = store.get("extracted_total") or 0
+                        store_preco = max(_ep, _et) if (_ep or _et) else None
+
+                        # Se há envio explícito (formato "+ R$ 60,00"), descontar do total
+                        # para chegar ao preço base do produto (mais útil para comparação)
+                        _ship_str = str(store.get("shipping", ""))
+                        if store_preco and "+" in _ship_str:
+                            _ship_val = parse_preco(_ship_str.replace("+", "").strip(), regiao_cfg["currency_format"])
+                            if _ship_val and _ship_val > 0 and store_preco - _ship_val > 0:
+                                store_preco = store_preco - _ship_val
+
+                        if store_preco is None or store_preco <= 0:
+                            store_preco = parse_preco(store.get("total_str", "") or store.get("price_str", ""), regiao_cfg["currency_format"])
+                        if store_preco is None or store_preco <= 0:
+                            continue
+
+                        # Filtro 4: outlier (mesmo que aplicamos ao original)
+                        if custo:
+                            if store_preco < preco_min_aceitavel or store_preco > preco_max_aceitavel:
+                                continue
+
+                        concorrentes.append({
+                            "preco": float(store_preco),
+                            "loja": store_name,
+                            "link": store_link,
+                            "rating": None,
+                            "reviews": 0,
+                            "tag": "",
+                            "titulo": item.get("title", ""),  # herdamos o título do item canónico
+                            "_raw": {
+                                "title": "(expandido do product_id " + str(_pid) + ")",
+                                "source": store_name,
+                                "link": store_link,
+                                "extensions": "",
+                                "delivery": "",
+                                "badge": "",
+                                "tag": "",
+                                "snippet": "",
+                            },
+                        })
+            else:  # "fraco"
+                concorrentes_similares.append(registo)
+
+        # Cascata: só pára quando tem ≥3 lojas DIFERENTES (entre fortes E similares).
+        # Senão, tenta a próxima consulta — porque consultas curtas (SKU+marca)
+        # às vezes devolvem só 1-2 lojas, mas o nome completo + EAN podem trazer mais.
+        if concorrentes or concorrentes_similares:
+            _lojas_unicas = {str(c.get("loja", "")).strip().lower() for c in (concorrentes + concorrentes_similares)}
+            if len(_lojas_unicas) >= 3:
+                break
 
         time.sleep(0.3)
 
-    # Deduplicar concorrentes da mesma loja — manter apenas o de MENOR preço.
-    # Isto dá-te variedade de lojas em vez de 2-3 listings da mesma loja,
-    # e o menor preço é o mais competitivo (relevante para a tua decisão).
-    if concorrentes:
-        import unicodedata
-        def _norm_loja(s):
-            s = unicodedata.normalize("NFKD", str(s).lower()).encode("ascii", "ignore").decode()
-            return re.sub(r"[^a-z0-9]", "", s)  # só letras+números, sem espaços/pontuação
+    # Deduplicar — uma loja só pode aparecer numa lista (fortes têm prioridade).
+    # Dentro de cada lista, manter o de MENOR preço por loja.
+    import unicodedata
+    def _norm_loja(s):
+        s = unicodedata.normalize("NFKD", str(s).lower()).encode("ascii", "ignore").decode()
+        return re.sub(r"[^a-z0-9]", "", s)
 
-        melhor_por_loja = {}
-        for c in concorrentes:
+    def _dedup_por_loja(lista):
+        melhor = {}
+        for c in lista:
             chave = _norm_loja(c.get("loja", ""))
             if not chave:
                 continue
-            if chave not in melhor_por_loja or c["preco"] < melhor_por_loja[chave]["preco"]:
-                melhor_por_loja[chave] = c
-        concorrentes = sorted(melhor_por_loja.values(), key=lambda x: x["preco"])
+            if chave not in melhor or c["preco"] < melhor[chave]["preco"]:
+                melhor[chave] = c
+        return sorted(melhor.values(), key=lambda x: x["preco"])
 
-    return concorrentes, rejeitados_log
+    concorrentes = _dedup_por_loja(concorrentes)
+    concorrentes_similares = _dedup_por_loja(concorrentes_similares)
+
+    # Se uma loja apareceu nas duas listas, removê-la dos similares (a forte ganha)
+    lojas_fortes = {_norm_loja(c.get("loja", "")) for c in concorrentes}
+    concorrentes_similares = [c for c in concorrentes_similares if _norm_loja(c.get("loja", "")) not in lojas_fortes]
+
+    return concorrentes, rejeitados_log, concorrentes_similares
 
 
 def calcular_score_procura(itens):
@@ -2311,22 +2600,16 @@ with st.sidebar:
 
     t = idiomas[pais_sel]
 
-    scope_pt = "Apenas Portugal"
-    if "Portugal" in pais_sel:
-        # Persistir âmbito PT também (Portugal vs UE)
-        _scope_pref = st.session_state.get("scope_pt_pref", "Apenas Portugal")
-        _scope_opcoes = ["Apenas Portugal", "União Europeia"]
-        _scope_idx = _scope_opcoes.index(_scope_pref) if _scope_pref in _scope_opcoes else 0
-        scope_pt = st.radio("Âmbito:", _scope_opcoes, index=_scope_idx, key="scope_radio")
-        if scope_pt != _scope_pref:
-            _guardar_preferencia("scope_pt", scope_pt)
-            st.session_state["scope_pt_pref"] = scope_pt
+    # Portugal busca sempre em toda a União Europeia (sem cobrança de IVA adicional
+    # entre países da UE — faz sentido o utilizador ver opções de compra em PT/ES/DE/IT/FR/NL).
+    # `scope_pt` mantido por compatibilidade com a BD, mas fixo em "União Europeia".
+    scope_pt = "União Europeia"
 
     # Calcular regiao_id globalmente (usado em várias secções fora do botão Analisar)
     if "Brasil" in pais_sel:
         regiao_id = "BR"
     elif "Portugal" in pais_sel:
-        regiao_id = "EU" if scope_pt == "União Europeia" else "PT"
+        regiao_id = "EU"
     else:
         regiao_id = "US"
 
@@ -3123,14 +3406,12 @@ with tab_analise:
                     blacklist = BLACKLIST_REGIONAL["BR"]
                     regiao_id = "BR"
                 elif "Portugal" in pais_sel:
-                    if scope_pt == "União Europeia":
-                        whitelist = WHITELIST["EU"]
-                        blacklist = BLACKLIST_REGIONAL["EU"]
-                        regiao_id = "EU"
-                    else:
-                        whitelist = WHITELIST["PT_ONLY"]
-                        blacklist = BLACKLIST_REGIONAL["PT_ONLY"]
-                        regiao_id = "PT"
+                    # Portugal busca em toda a UE (sem IVA adicional entre países UE).
+                    # Modo aberto: aceita qualquer loja excepto blacklist (sem manter
+                    # whitelist exaustiva — o universo de lojas EU é demasiado dinâmico).
+                    whitelist = None
+                    blacklist = BLACKLIST_REGIONAL["EU"]
+                    regiao_id = "EU"
                 else:
                     whitelist = WHITELIST["US"]
                     blacklist = BLACKLIST_REGIONAL["US"]
@@ -3143,7 +3424,7 @@ with tab_analise:
 
                 for idx, (_, row) in enumerate(df_base.iterrows()):
                     progress.progress((idx + 1) / total, text=f"Analisando {idx + 1}/{total}: {row['Nome'][:50]}")
-                    concorrentes, rej = buscar_serpapi(
+                    concorrentes, rej, concorrentes_similares = buscar_serpapi(
                         produto=row["Nome"],
                         ean=row.get("EAN", ""),
                         sku=row.get("SKU", ""),
@@ -3231,6 +3512,7 @@ with tab_analise:
                             "Diferença vs Mercado %": diferenca_vs_mercado,
                             "Margem no Sugerido %": margem_sugerido_pct,
                             "_concorrentes": concorrentes_ordenados,
+                            "_concorrentes_similares": concorrentes_similares,
                             "N Concorrentes": len(concorrentes),
                             "Status": status_label,
                             "_status_code": status_codigo,
@@ -3292,6 +3574,7 @@ with tab_analise:
                             "Preço Sugerido": preco_sugerido,
                             "Pressão Mercado %": pressao_mercado,
                             "_concorrentes": concorrentes_ordenados,
+                            "_concorrentes_similares": concorrentes_similares,
                             "_mercado_competitivo": estrategias["mercado_competitivo"],
                             "N Concorrentes": len(concorrentes),
                             "Preço Mínimo": estrategias["preco_minimo"],
@@ -3870,6 +4153,7 @@ with tab_analise:
         if produto_inspect:
             linha_inspect = df_v[df_v["Nome"] == produto_inspect].iloc[0]
             concorrentes_lista = linha_inspect.get("_concorrentes", []) or []
+            similares_lista = linha_inspect.get("_concorrentes_similares", []) or []
 
             # Cabeçalho de contexto — adaptado ao modo de análise
             modo_linha = linha_inspect.get("_modo", "custo_margem")
@@ -3990,37 +4274,36 @@ with tab_analise:
                     )
 
                 def _link_ou_fallback(c, nome_produto):
+                    """Devolve (link, tipo) onde tipo é 'directo' (link válido a um produto)
+                    ou 'sem_link' (não temos como dar link directo confiável).
+                    Concorrentes 'sem_link' são filtrados no painel para evitar mostrar URLs
+                    de busca interna que muitas vezes não encontram o produto."""
                     link_real = c.get("link") or ""
-                    # Se o "link directo" é uma página agregadora do Google, é frágil — ignorar
                     if link_real and not _e_link_agregador_google(link_real):
                         return link_real, "directo"
-
-                    # Identificar marketplace pelo nome da loja
-                    fonte = (c.get("loja") or "").lower()
-                    for dominio, template in MARKETPLACE_SEARCH_URL.items():
-                        if dominio in fonte:
-                            return template.format(q=quote_plus(nome_produto)), "marketplace"
-
-                    # Último recurso: Google Shopping da região
-                    domain = t.get("domain", "google.com")
-                    gl = t.get("gl", "us")
-                    hl = (t.get("lang") or "en")[:2]
-                    return (
-                        f"https://www.{domain}/search?tbm=shop"
-                        f"&q={quote_plus(nome_produto)}&gl={gl}&hl={hl}&ncr=1"
-                    ), "google"
+                    return "", "sem_link"
 
                 rows = []
+                # Calcular mediana dos preços para detectar drift suspeito
+                precos_validos = [c["preco"] for c in concorrentes_lista if c.get("preco") and c["preco"] > 0]
+                mediana_preco = sorted(precos_validos)[len(precos_validos)//2] if precos_validos else None
+
                 for i, c in enumerate(concorrentes_lista):
                     link, tipo = _link_ou_fallback(c, produto_inspect)
+                    if tipo != "directo":
+                        continue  # sem link directo → não mostra
+                    # Aviso de drift: preço >= 25% abaixo da mediana é suspeito
+                    aviso = ""
+                    if mediana_preco and c["preco"] < mediana_preco * 0.75:
+                        aviso = "⚠️"
                     rows.append({
-                        "Posição": f"#{i+1}",
+                        "#": len(rows) + 1,
+                        "⚠️": aviso,
                         "Loja": c["loja"],
                         "Preço": c["preco"],
                         "Rating": c.get("rating"),
                         "Reviews": c.get("reviews", 0),
                         "Link": link,
-                        "Tipo": {"directo": "✅ directo", "marketplace": "🛒 marketplace", "google": "🔍 Google"}[tipo],
                     })
                 df_conc = pd.DataFrame(rows)
 
@@ -4029,25 +4312,33 @@ with tab_analise:
                     use_container_width=True,
                     hide_index=True,
                     column_config={
-                        "Preço": st.column_config.NumberColumn(format=f"{moeda} %.2f"),
-                        "Rating": st.column_config.NumberColumn(format="⭐ %.1f"),
-                        "Reviews": st.column_config.NumberColumn(format="%d"),
-                        "Link": st.column_config.LinkColumn(
-                            "🔗 Anúncio",
-                            display_text="abrir",
-                            help="Abre o anúncio. Quando a SerpAPI não devolve link directo "
-                                 "(comum em Amazon Buy Box), redireciona para a busca interna "
-                                 "do marketplace ou, em último recurso, para o Google Shopping da região.",
+                        "#": st.column_config.NumberColumn(
+                            "#", width="small", format="%d",
+                            help="Posição (ordenado por preço crescente).",
                         ),
-                        "Tipo": st.column_config.TextColumn(
-                            "Tipo",
-                            help=(
-                                "✅ directo = link directo do anúncio na SerpAPI; "
-                                "🛒 marketplace = sem link directo, abre busca interna do próprio marketplace "
-                                "(mais fiável); "
-                                "🔍 Google = sem link nem marketplace conhecido, abre busca no Google Shopping "
-                                "regional."
-                            ),
+                        "⚠️": st.column_config.TextColumn(
+                            "⚠️", width="small",
+                            help="Preço 25% ou mais abaixo da mediana. "
+                                 "Provável drift (snapshot desactualizado da SerpAPI). "
+                                 "Confirme no link antes de confiar.",
+                        ),
+                        "Loja": st.column_config.TextColumn(
+                            "Loja", width="medium",
+                        ),
+                        "Preço": st.column_config.NumberColumn(
+                            "Preço", width="small", format=f"{moeda} %.2f",
+                        ),
+                        "Rating": st.column_config.NumberColumn(
+                            "⭐", width="small", format="%.1f",
+                        ),
+                        "Reviews": st.column_config.NumberColumn(
+                            "Avaliações", width="small", format="%d",
+                        ),
+                        "Link": st.column_config.LinkColumn(
+                            "🔗 Anúncio", width="small",
+                            display_text="abrir",
+                            help="Abre o anúncio do concorrente. Concorrentes sem link directo "
+                                 "ao produto não são mostrados.",
                         ),
                     },
                 )
@@ -4058,6 +4349,61 @@ with tab_analise:
                         "Poucos resultados podem indicar produto pouco distribuído ou que os filtros "
                         "rejeitaram resultados (consulte o resumo no topo da análise)."
                     )
+
+                # ---- POSSÍVEIS SIMILARES ----
+                # Produtos com a mesma marca, mas SKU diferente ou nome divergente.
+                # Não entram no cálculo de Preço Sugerido/Status, mas o utilizador pode
+                # querer verificá-los — talvez seja o mesmo produto renomeado, ou um
+                # similar relevante para comparação.
+                if similares_lista:
+                    with st.expander(
+                        f"🔍 Possíveis similares ({len(similares_lista)}) — verificar se algum é o produto que procuras"
+                    ):
+                        st.caption(
+                            "⚠️ **Estes anúncios têm a marca certa mas título diferente do que pesquisas.** "
+                            "Olha o **título do anúncio** — é o produto que a loja realmente listou. "
+                            "Pode ser: (1) o mesmo produto com nome diferente, "
+                            "(2) variação da linha (cor, tamanho), ou "
+                            "(3) outro produto da marca.\n\n"
+                            "💡 **O link vai à busca por **`SKU pesquisado`** na loja, não ao anúncio listado** — "
+                            "se a loja tem o produto que tu queres, vais encontrá-lo lá; "
+                            "se não tem, vais encontrar este similar."
+                        )
+                        rows_sim = []
+                        for i, c in enumerate(similares_lista):
+                            link, tipo = _link_ou_fallback(c, produto_inspect)
+                            if tipo != "directo":
+                                continue  # sem link directo → não mostra
+                            rows_sim.append({
+                                "#": len(rows_sim) + 1,
+                                "Loja": c["loja"],
+                                "Preço (?)": c["preco"],  # (?) indica preço a confirmar
+                                "Link": link,
+                            })
+                        df_sim = pd.DataFrame(rows_sim)
+                        st.dataframe(
+                            df_sim,
+                            use_container_width=True,
+                            hide_index=True,
+                            column_config={
+                                "#": st.column_config.NumberColumn("#", width="small", format="%d"),
+                                "Loja": st.column_config.TextColumn("Loja", width="medium"),
+                                "Preço (?)": st.column_config.NumberColumn(
+                                    "Preço (?)",
+                                    format=f"{moeda} %.2f",
+                                    width="small",
+                                    help="O preço listado refere-se a um anúncio que NÃO é o produto que "
+                                         "procuras (título e/ou SKU diferentes). Confirma no link.",
+                                ),
+                                "Link": st.column_config.LinkColumn(
+                                    "🔗",
+                                    width="small",
+                                    display_text="abrir",
+                                    help="Link directo do anúncio listado pela SerpAPI. "
+                                         "Confirma se é o produto que procuras antes de comparar.",
+                                ),
+                            },
+                        )
 
                 # ---- DEBUG: ver campos crus da SerpAPI para cada concorrente ----
                 # Útil para identificar como cada loja marca "produto internacional"
