@@ -2330,13 +2330,12 @@ def buscar_serpapi(produto, ean, sku, custo, regiao_cfg, whitelist, blacklist, a
 
         for item in _items_dbg:
             # Tentar registar este pid como "potencialmente rico" para expansão futura
+            # Registamos TODOS os pids — mesmo com 1 seller — porque produtos novos podem
+            # ter cada vendedor num PID separado. Depois validamos pelo SKU match.
             _pid_atual = item.get("product_id")
             _token_atual = item.get("immersive_product_page_token", "")
             if _pid_atual and _token_atual:
-                # Verificar quantas sellers tem na cache
-                _cached_check = _cache_get_sellers(str(_pid_atual))
-                if _cached_check is not None and len(_cached_check) >= 5:
-                    _pids_ricos_orfaos[str(_pid_atual)] = _token_atual
+                _pids_ricos_orfaos[str(_pid_atual)] = _token_atual
 
             rejeitados_log["serpapi_total"] += 1
             _src = str(item.get("source", ""))[:20]
@@ -2582,13 +2581,18 @@ def buscar_serpapi(produto, ean, sku, custo, regiao_cfg, whitelist, blacklist, a
             if _pid_orfao in _pids_ja_expandidos:
                 continue  # já foi expandido pelo item normal
             _all_stores_orfao = _fetch_real_sellers(_pid_orfao, _token_orfao, regiao_cfg, api_key)
-            if len(_all_stores_orfao) < 5:
+            if len(_all_stores_orfao) < 2:
+                # PID vazio ou só com 1 seller que já está no item original → pular
                 continue
 
             # Validação: maioria dos URLs OU nomes-de-loja deve conter o SKU
             # (para garantir que este pid representa o produto certo, não outro canónico).
             # Aceitar match em URL OU em nome da loja porque URLs sluggificados muitas vezes
             # omitem o SKU (ex: "lego-pacote-de-expansao-de-ponte" sem incluir o número).
+            #
+            # Threshold adaptativo:
+            # - PIDs ricos (≥5 sellers): 30% (mais permissivo, peso estatístico)
+            # - PIDs pequenos (2-4 sellers): 50% (mais rigoroso, evita falsos positivos)
             if _sku_check and len(_sku_check) >= 4:
                 _com_sku = sum(
                     1 for s in _all_stores_orfao
@@ -2598,14 +2602,15 @@ def buscar_serpapi(produto, ean, sku, custo, regiao_cfg, whitelist, blacklist, a
                     )
                 )
                 _pct_sku = _com_sku / len(_all_stores_orfao)
-                # Threshold 30% (era 50%): URLs sluggificados podem omitir o SKU,
-                # mas se ainda 30%+ menciona o SKU é forte sinal que é o produto correto.
-                if _pct_sku < 0.30:
-                    # Menos de 30% das stores têm o SKU → este pid é de outro produto
-                    print(f"[US-ORFAO] skip pid={_pid_orfao} sku_match={_pct_sku:.0%}", flush=True)
+                _threshold = 0.30 if len(_all_stores_orfao) >= 5 else 0.50
+                if _pct_sku < _threshold:
+                    print(f"[US-ORFAO] skip pid={_pid_orfao} sku_match={_pct_sku:.0%} (req={_threshold:.0%}, stores={len(_all_stores_orfao)})", flush=True)
                     continue
                 print(f"[US-ORFAO] expandindo pid={_pid_orfao} stores={len(_all_stores_orfao)} sku_match={_pct_sku:.0%}", flush=True)
             else:
+                # Sem SKU para validar — só aceitar PIDs ricos (>=5 stores)
+                if len(_all_stores_orfao) < 5:
+                    continue
                 print(f"[US-ORFAO] expandindo pid={_pid_orfao} stores={len(_all_stores_orfao)} (sem SKU para validar)", flush=True)
 
             # Adicionar as stores válidas como concorrentes fortes
