@@ -2007,6 +2007,79 @@ def vendedor_confiavel(item, whitelist, blacklist):
 # é preciso uma 2ª chamada à API google_product, que devolve `sellers_results`
 # com os links reais de cada loja para esse product_id.
 #
+# ============================================================
+# Cache de buscas SerpAPI principal (google_shopping)
+# ============================================================
+# Tabela Supabase: `cache_serpapi_searches`
+# Colunas: query_hash (PK), query, gl, results (jsonb), updated_at
+# TTL: 24 horas. Cache GLOBAL (partilhada entre utilizadores) — não há info sensível.
+
+import hashlib as _hashlib_serpcache
+
+CACHE_SERPAPI_TTL_HORAS = 24
+
+def _cache_serpapi_chave(query: str, gl: str):
+    """Gera hash único da query+região para usar como chave de cache."""
+    raw = f"{query.lower().strip()}|{gl.lower().strip()}"
+    return _hashlib_serpcache.sha256(raw.encode("utf-8")).hexdigest()
+
+
+@st.cache_data(ttl=60, show_spinner=False)
+def _cache_serpapi_get(query: str, gl: str):
+    """Procura resultados em cache Supabase. Devolve (results: dict | None, idade_horas: float | None).
+    Cache válido durante CACHE_SERPAPI_TTL_HORAS."""
+    if not query:
+        return None, None
+    try:
+        sb = get_supabase_client()
+        if not sb:
+            return None, None
+        chave = _cache_serpapi_chave(query, gl)
+        res = sb.table("cache_serpapi_searches").select("results, updated_at").eq("query_hash", chave).limit(1).execute()
+        if not res.data:
+            return None, None
+        row = res.data[0]
+        try:
+            updated_at = datetime.fromisoformat(row["updated_at"].replace("Z", "+00:00"))
+            idade = (datetime.now(timezone.utc) - updated_at).total_seconds() / 3600
+            if idade > CACHE_SERPAPI_TTL_HORAS:
+                return None, None  # expirado
+            return row.get("results") or {}, idade
+        except Exception:
+            return None, None
+    except Exception:
+        return None, None
+
+
+def _cache_serpapi_set(query: str, gl: str, results: dict):
+    """Guarda resultados na cache Supabase. Faz upsert."""
+    if not query or not results:
+        return
+    try:
+        sb = get_supabase_client()
+        if not sb:
+            return
+        chave = _cache_serpapi_chave(query, gl)
+        sb.table("cache_serpapi_searches").upsert({
+            "query_hash": chave,
+            "query": query[:500],
+            "gl": gl,
+            "results": results,
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+        }, on_conflict="query_hash").execute()
+        _cache_serpapi_get.clear()
+    except Exception as e:
+        print(f"[CACHE-SERPAPI] Falha ao guardar '{query[:60]}': {e}", flush=True)
+
+
+def _cache_serpapi_invalidar_tudo():
+    """Limpa cache local Streamlit (não apaga Supabase) — força próxima leitura a re-consultar BD."""
+    try:
+        _cache_serpapi_get.clear()
+    except Exception:
+        pass
+
+
 # Para reduzir o custo SerpAPI, fazemos cache no Supabase com TTL 30 dias.
 # Cache é GLOBAL (partilhada entre utilizadores) — é só URL público de loja,
 # não há informação sensível.
@@ -2153,7 +2226,8 @@ def _link_real_da_loja(item: dict, regiao_cfg: dict, api_key: str):
 
 
 def buscar_serpapi(produto, ean, sku, custo, regiao_cfg, whitelist, blacklist, api_key,
-                    apenas_novos=True, preco_minimo_pct_custo=0.40, marca_override=None):
+                    apenas_novos=True, preco_minimo_pct_custo=0.40, marca_override=None,
+                    forcar_busca=False):
     """Devolve concorrentes confiáveis + log de rejeitados.
     Estratégia em cascata: EAN > SKU+marca > Nome.
     Filtros aplicados:
@@ -2162,7 +2236,8 @@ def buscar_serpapi(produto, ean, sku, custo, regiao_cfg, whitelist, blacklist, a
     - Outlier de preço: rejeita preço abaixo de `preco_minimo_pct_custo` × custo
       (default 40%: se compraste a R$ 100, ignora resultados abaixo de R$ 40)
     - marca_override: se passar valor, usa esta marca em vez de detectar do nome
-      (útil quando planilha tem coluna "Marca")"""
+      (útil quando planilha tem coluna "Marca")
+    - forcar_busca: se True, ignora cache e faz busca SerpAPI real (consome créditos)."""
     concorrentes = []           # match forte (marca + SKU exacto, alta confiança)
     concorrentes_similares = [] # match fraco (marca confirmada, sem SKU exacto — para verificação)
     rejeitados_log = {"usado": 0, "outlier_baixo": 0, "outlier_alto": 0, "irrelevante": 0, "internacional": 0, "acessorio": 0, "vendedor_naoconfiavel": 0, "serpapi_total": 0, "sem_preco": 0}
@@ -2216,8 +2291,24 @@ def buscar_serpapi(produto, ean, sku, custo, regiao_cfg, whitelist, blacklist, a
                 "num": 30,
                 "api_key": api_key,
             }
-            search = GoogleSearch(params)
-            results = search.get_dict()
+            # === CACHE CHECK ===
+            # Se não estamos a forçar, tentar cache primeiro (TTL 24h, partilhada)
+            results = None
+            cache_hit = False
+            if not forcar_busca:
+                cached, idade_h = _cache_serpapi_get(q, regiao_cfg["gl"])
+                if cached is not None:
+                    results = cached
+                    cache_hit = True
+                    print(f"[CACHE-SERPAPI] HIT q='{q[:40]}' idade={idade_h:.1f}h", flush=True)
+            if results is None:
+                # Cache miss ou forçado → chamada real SerpAPI (consome crédito)
+                search = GoogleSearch(params)
+                results = search.get_dict()
+                # Guardar em cache se devolveu algo válido
+                if results and "error" not in results:
+                    _cache_serpapi_set(q, regiao_cfg["gl"], results)
+                    print(f"[CACHE-SERPAPI] MISS q='{q[:40]}' guardado", flush=True)
         except Exception as e:
             st.warning(f"Falha SerpAPI para '{q}': {e}")
             continue
@@ -3858,6 +3949,17 @@ with tab_analise:
                              "peças avulsas, fraude, ou erro de scraping).",
                     ) / 100
 
+            # ========== CACHE SerpAPI 24h ==========
+            forcar_busca_serpapi = st.checkbox(
+                "🔄 Forçar nova busca (ignorar cache)",
+                value=False,
+                help=(
+                    "Por defeito, buscas idênticas feitas nas últimas 24h reutilizam o resultado em cache "
+                    "(não consomem créditos SerpAPI). Marque esta caixa para forçar uma busca nova e fresca "
+                    "(útil se houve promoção recente, lançamento, ou se queres validar dados actualizados)."
+                ),
+            )
+
             if st.button(t["btn_analisar"], type="primary"):
                 if "Brasil" in pais_sel:
                     whitelist = WHITELIST["BR"]
@@ -3899,6 +4001,7 @@ with tab_analise:
                         apenas_novos=apenas_novos,
                         preco_minimo_pct_custo=preco_min_pct,
                         marca_override=row.get("Marca", ""),
+                        forcar_busca=forcar_busca_serpapi,
                     )
                     for k, v in rej.items():
                         rejeitados_total[k] += v
