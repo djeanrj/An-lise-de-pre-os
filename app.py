@@ -2585,14 +2585,23 @@ def buscar_serpapi(produto, ean, sku, custo, regiao_cfg, whitelist, blacklist, a
             if len(_all_stores_orfao) < 5:
                 continue
 
-            # Validação: maioria dos URLs deve conter o SKU (para garantir que este
-            # pid representa o produto certo, não outro produto canónico).
+            # Validação: maioria dos URLs OU nomes-de-loja deve conter o SKU
+            # (para garantir que este pid representa o produto certo, não outro canónico).
+            # Aceitar match em URL OU em nome da loja porque URLs sluggificados muitas vezes
+            # omitem o SKU (ex: "lego-pacote-de-expansao-de-ponte" sem incluir o número).
             if _sku_check and len(_sku_check) >= 4:
-                _com_sku = sum(1 for s in _all_stores_orfao
-                              if _sku_check in str(s.get("link", "")).lower())
+                _com_sku = sum(
+                    1 for s in _all_stores_orfao
+                    if (
+                        _sku_check in str(s.get("link", "")).lower()
+                        or _sku_check in str(s.get("name", "")).lower()
+                    )
+                )
                 _pct_sku = _com_sku / len(_all_stores_orfao)
-                if _pct_sku < 0.5:
-                    # Menos de 50% das stores têm o SKU → este pid é de outro produto
+                # Threshold 30% (era 50%): URLs sluggificados podem omitir o SKU,
+                # mas se ainda 30%+ menciona o SKU é forte sinal que é o produto correto.
+                if _pct_sku < 0.30:
+                    # Menos de 30% das stores têm o SKU → este pid é de outro produto
                     print(f"[US-ORFAO] skip pid={_pid_orfao} sku_match={_pct_sku:.0%}", flush=True)
                     continue
                 print(f"[US-ORFAO] expandindo pid={_pid_orfao} stores={len(_all_stores_orfao)} sku_match={_pct_sku:.0%}", flush=True)
