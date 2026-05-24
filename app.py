@@ -1571,6 +1571,38 @@ def bling_procurar_id_por_sku(sku):
         return None
 
 
+def bling_obter_preco_atual(produto_id):
+    """Obtém o preço atual do produto no Bling V3.
+    Usa GET em /produtos/{id} e extrai o campo `preco`.
+    Devolve (preco: float | None, mensagem: str).
+    """
+    token = bling_access_token_valido()
+    if not token:
+        return None, "Sem token Bling válido"
+
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Accept": "application/json",
+    }
+    url = f"{BLING_API_BASE}/produtos/{produto_id}"
+
+    try:
+        r = requests.get(url, headers=headers, timeout=15)
+        if r.status_code != 200:
+            return None, f"GET falhou ({r.status_code})"
+        produto = r.json().get("data") or {}
+        preco_raw = produto.get("preco")
+        if preco_raw is None:
+            return None, "Sem preço definido"
+        try:
+            preco = float(preco_raw)
+        except (TypeError, ValueError):
+            return None, f"Preço inválido: {preco_raw!r}"
+        return preco, "ok"
+    except Exception as e:
+        return None, f"Erro: {e}"
+
+
 def bling_atualizar_preco(produto_id, novo_preco):
     """Actualiza o preço de venda de um produto no Bling V3.
     Usa PATCH em /produtos/{id} enviando apenas o campo `preco` — evita problemas
@@ -4487,18 +4519,129 @@ with tab_analise:
                     "Use importação Bling ou inclua SKU na planilha."
                 )
             else:
+                # ---------- Buscar preços atuais do Bling ----------
+                # Buscamos uma única vez por sessão de análise para evitar custo repetido.
+                # Usa `_id_bling` se disponível; produtos sem ID não conseguem ser buscados.
+                cache_key = "_bling_precos_atuais"
+                ja_buscados = st.session_state.get(cache_key, {})
+
+                # Calcular Preço Calculado por linha (já existe na coluna "Preço Calculado")
+                if "Preço Calculado" in df_v.columns:
+                    precos_calculados = df_v["Preço Calculado"].astype(float)
+                else:
+                    # fallback: usar Preço Sugerido se a coluna não existe
+                    precos_calculados = df_v["Preço Sugerido"].astype(float)
+
+                # Construir lista de IDs Bling para buscar
+                ids_bling_serie = df_v.get("ID", pd.Series([None] * len(df_v)))
+                ids_a_buscar = []
+                for idx, id_b in enumerate(ids_bling_serie):
+                    if id_b is None or (isinstance(id_b, float) and pd.isna(id_b)):
+                        continue
+                    chave = str(id_b)
+                    if chave in ja_buscados:
+                        continue
+                    ids_a_buscar.append((idx, chave))
+
+                if ids_a_buscar:
+                    barra_preco = st.progress(0.0, text="🔍 A consultar preços atuais no Bling…")
+                    total = len(ids_a_buscar)
+                    for n, (_, chave) in enumerate(ids_a_buscar):
+                        preco, _msg = bling_obter_preco_atual(chave)
+                        ja_buscados[chave] = preco  # None se erro/sem preço
+                        barra_preco.progress((n + 1) / total, text=f"🔍 A consultar… {n+1}/{total}")
+                    barra_preco.empty()
+                    st.session_state[cache_key] = ja_buscados
+
+                # Construir coluna "Preço Atual Bling" a partir do cache
+                precos_atuais = []
+                for id_b in ids_bling_serie:
+                    if id_b is None or (isinstance(id_b, float) and pd.isna(id_b)):
+                        precos_atuais.append(None)
+                        continue
+                    precos_atuais.append(ja_buscados.get(str(id_b)))
+
+                # Valor inicial do Preço Final:
+                # = Preço Atual Bling se existe, senão Preço Calculado
+                preco_final_inicial = []
+                for p_atual, p_calc in zip(precos_atuais, precos_calculados):
+                    if p_atual is not None and p_atual > 0:
+                        preco_final_inicial.append(float(p_atual))
+                    else:
+                        preco_final_inicial.append(float(p_calc))
+
+                # Calcular delta visual (Sugerido vs Atual Bling)
+                # Cores reflectem IMPACTO FINANCEIRO, não direcção do preço:
+                # 🟢 verde: Sugerido > Atual → posso subir preço, ganho margem extra
+                # 🔴 vermelho: Sugerido < Atual → tenho de descer, perco margem
+                # ⚪ branco: igual (variação < 0,5%)
+                # — sem dados (produto novo no Bling ou sem ID)
+                deltas = []
+                for p_atual, p_sug in zip(precos_atuais, df_v["Preço Sugerido"].astype(float).values):
+                    if p_atual is None or p_atual <= 0:
+                        deltas.append("—")
+                        continue
+                    diff = p_sug - float(p_atual)
+                    pct = (diff / float(p_atual)) * 100 if p_atual > 0 else 0
+                    if abs(pct) < 0.5:
+                        deltas.append("⚪ ≈")
+                    elif diff > 0:
+                        # Sugerido > Atual → ganho margem
+                        deltas.append(f"🟢 {pct:+.1f}%")
+                    else:
+                        # Sugerido < Atual → perco margem
+                        deltas.append(f"🔴 {pct:+.1f}%")
+
                 # Construir dataframe editável
                 df_envio = pd.DataFrame({
                     "Enviar": False,  # checkbox por linha
-                    "Nome": df_v["Nome"],
-                    "SKU": df_v.get("SKU", pd.Series([""] * len(df_v))),
-                    "Preço Sugerido": df_v["Preço Sugerido"].astype(float),
-                    "Preço a Enviar": df_v["Preço Sugerido"].astype(float),
-                    "Status": df_v["Status"],
+                    "Nome": df_v["Nome"].values,
+                    "SKU": df_v.get("SKU", pd.Series([""] * len(df_v))).values,
+                    "Preço Atual Bling": [
+                        (float(p) if p is not None else None) for p in precos_atuais
+                    ],
+                    "Δ": deltas,
+                    "Preço Sugerido": df_v["Preço Sugerido"].astype(float).values,
+                    "Preço Final": preco_final_inicial,
+                    "Status": df_v.get("Status Mercado", df_v.get("Status", "")).values,
                 })
                 # Guardar ID se existir (em coluna escondida para identificar)
                 if tem_id_bling:
-                    df_envio["_id_bling"] = df_v["ID"]
+                    df_envio["_id_bling"] = df_v["ID"].values
+
+                # ---------- Marca automática: detectar edições do Preço Final ----------
+                # Comparamos com o "snapshot" guardado na sessão. Se o utilizador editar
+                # uma linha (Preço Final diferente do inicial), marcamos Enviar=True
+                # automaticamente. O utilizador pode desmarcar se mudou de ideias.
+                snap_key = "_bling_envio_snapshot"
+                if snap_key in st.session_state:
+                    snap_prev = st.session_state[snap_key]
+                    # snap_prev é dict {chave: preco_inicial} onde chave = (Nome, SKU)
+                    # Detectamos edição comparando com o valor *anterior* da sessão.
+                    estado_editor_key = "bling_envio_editor"
+                    if estado_editor_key in st.session_state:
+                        estado_editor = st.session_state[estado_editor_key]
+                        # edited_rows é dict {idx: {coluna: valor}}
+                        edits = estado_editor.get("edited_rows", {})
+                        for idx_str, mudancas in edits.items():
+                            try:
+                                idx = int(idx_str)
+                            except (TypeError, ValueError):
+                                continue
+                            if idx < 0 or idx >= len(df_envio):
+                                continue
+                            if "Preço Final" in mudancas:
+                                novo_valor = mudancas["Preço Final"]
+                                valor_inicial = preco_final_inicial[idx]
+                                if novo_valor is not None and abs(float(novo_valor) - float(valor_inicial)) > 0.005:
+                                    # Marca automática ao editar (utilizador pode desmarcar)
+                                    if "Enviar" not in mudancas:
+                                        df_envio.at[idx, "Enviar"] = True
+
+                # Guardar snapshot para próxima execução
+                st.session_state[snap_key] = {
+                    i: float(p) for i, p in enumerate(preco_final_inicial)
+                }
 
                 editado = st.data_editor(
                     df_envio,
@@ -4507,20 +4650,29 @@ with tab_analise:
                     column_config={
                         "Enviar": st.column_config.CheckboxColumn(
                             "Enviar?",
-                            help="Marque para incluir este produto no envio ao Bling",
+                            help="Marca-se automaticamente quando alteras o Preço Final. Desmarca se não quiseres enviar.",
                             default=False,
                             width="small",
                         ),
                         "Nome": st.column_config.TextColumn("Produto", disabled=True),
                         "SKU": st.column_config.TextColumn("SKU", disabled=True, width="small"),
-                        "Preço Sugerido": st.column_config.NumberColumn(
-                            "Sugerido", format=f"{moeda} %.2f", disabled=True,
-                            help="Preço calculado pela análise (referência, não editável)",
+                        "Preço Atual Bling": st.column_config.NumberColumn(
+                            "💼 Atual Bling", format=f"{moeda} %.2f", disabled=True,
+                            help="Preço actual no Bling (consultado agora). Vazio se produto não existe no Bling.",
                         ),
-                        "Preço a Enviar": st.column_config.NumberColumn(
-                            "Preço final",
+                        "Δ": st.column_config.TextColumn(
+                            "Δ", disabled=True, width="small",
+                            help="🟢 Posso subir preço (ganho margem) | 🔴 Tenho de descer (perco margem) | ⚪ ≈ sem alteração | — sem dados",
+                        ),
+                        "Preço Sugerido": st.column_config.NumberColumn(
+                            "💡 Sugerido", format=f"{moeda} %.2f", disabled=True,
+                            help="Preço recomendado pela análise. Considera mercado e margem mínima.",
+                        ),
+                        "Preço Final": st.column_config.NumberColumn(
+                            "✏️ Final",
                             format=f"{moeda} %.2f",
-                            help="Preço que será enviado ao Bling — edite se quiser ajustar",
+                            help="Preço que será enviado ao Bling. Inicial = Atual Bling (se existe) ou Calculado. "
+                                 "Edite para o Sugerido — a linha marca-se automaticamente.",
                             min_value=0.01,
                         ),
                         "Status": st.column_config.TextColumn("Status", disabled=True),
@@ -4554,7 +4706,7 @@ with tab_analise:
                     for i, (_, linha) in enumerate(seleccionados.iterrows()):
                         nome = linha["Nome"]
                         sku = linha.get("SKU", "")
-                        novo_preco = linha["Preço a Enviar"]
+                        novo_preco = linha["Preço Final"]
                         id_bling = linha.get("_id_bling")
 
                         # Validar preço
