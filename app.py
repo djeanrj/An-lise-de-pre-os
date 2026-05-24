@@ -239,10 +239,10 @@ idiomas = {
         "termos_check": "Aceito os Termos de Utilização de Portugal.",
         "btn_excel": "Carregar folha de cálculo", "btn_analisar": "Analisar Mercado Ibérico/UE",
     },
-    "USA 🇺🇸": {
+    "USA 🇺🇸 (experimental)": {
         "id": "US", "moeda": "$", "lang": "en", "domain": "google.com",
         "gl": "us", "loc": "United States", "currency_format": "US",
-        "titulo": "USA Marketplace Intelligence",
+        "titulo": "USA Marketplace Intelligence (experimental)",
         "label_chave": "SerpApi Key", "btn_confirmar": "Confirm Key",
         "termos_check": "I accept the USA Terms.",
         "btn_excel": "Upload Spreadsheet", "btn_analisar": "Start Market Analysis",
@@ -306,39 +306,73 @@ WHITELIST = {
 }
 
 BLACKLIST_GLOBAL = [
-    # Plataformas dropshipping/internacionais
+    # Plataformas dropshipping/internacionais (sempre rejeitar em qualquer região)
     "aliexpress.com", "temu.com", "wish.com", "tiendamia", "fishpond",
     "grandado", "fruugo", "desertcart", "ubuy", "joom", "banggood",
     "etsy.com",  # quase sempre vasos/acessórios LEGO, não LEGO original
-    # Marketplaces de revendedores particulares (preços não fiáveis)
-    "ebay", "wallapop", "vinted", "olx",
+    # Marketplaces de produtos usados em massa
+    "wallapop", "vinted", "olx",
     # Lojas de brindes corporativos / roupa profissional (não fiável para retalho)
     "lojadosbrindes",
     # Loja própria: não deve contar como concorrente
     "vembrincarcomagente.com", "vembrincarcomagente.com.br",
+    # NOTA: eBay NÃO está na global porque em US é um marketplace legítimo para retalho novo.
+    # Está na blacklist de BR/EU (mercados onde eBay é majoritariamente cross-border + frete caro).
 ]
 
 BLACKLIST_REGIONAL = {
-    "BR": BLACKLIST_GLOBAL + ["kidinn.com", "tradeinn.com", "vendiloshop", "you get"],
-    "PT_ONLY": BLACKLIST_GLOBAL + ["kidinn.com", "tradeinn.com", "vendiloshop", "you get"],
-    "EU": BLACKLIST_GLOBAL + ["kidinn.com", "tradeinn.com", "vendiloshop", "you get"],
-    "US": BLACKLIST_GLOBAL,
+    "BR": BLACKLIST_GLOBAL + ["ebay", "kidinn.com", "tradeinn.com", "vendiloshop", "you get"],
+    "PT_ONLY": BLACKLIST_GLOBAL + ["ebay", "kidinn.com", "tradeinn.com", "vendiloshop", "you get"],
+    "EU": BLACKLIST_GLOBAL + ["ebay", "kidinn.com", "tradeinn.com", "vendiloshop", "you get"],
+    "US": BLACKLIST_GLOBAL + [
+        # Lojas estrangeiras com frete internacional caro / impostos extras
+        # (lojas "estilo X" / acessórios LEGO não estão aqui — coerente_com_tipo()
+        # filtra por tipo do produto procurado; se procuras acessório, são bem-vindas).
+        "turkish souq", "kidinn", "tradeinn", "vendiloshop", "snkrdunk",
+        "desertcart", "ubuy", "fruugo",
+    ],
 }
 
 # Palavras-chave que indicam produto usado, incompleto ou peça avulsa.
 # Qualquer match faz o resultado ser rejeitado.
 KEYWORDS_NAO_NOVO = [
     # PT-BR
-    "usado", "seminovo", "semi-novo", "semi novo", "peças", "pecas",
+    "usado", "seminovo", "semi-novo", "semi novo",
     "incompleto", "avulso", "avulsa", "sem caixa", "sem manual", "recondicionado",
     "outlet", "vitrine", "mostruário", "mostruario", "danificado",
+    # ATENÇÃO: "peças" / "pecas" foi REMOVIDO da lista porque títulos em PT-BR
+    # usam "X peças" para descrever o número de peças do set (ex: "474 Peças").
+    # Para captar venda de peças avulsas, usar padrões específicos abaixo:
+    "peças avulsas", "pecas avulsas", "peças soltas", "pecas soltas",
+    "vendido em peças", "vendido em pecas", "venda de peças", "venda de pecas",
+    "lote de peças", "lote de pecas", "kit de peças", "kit de pecas",
+    "só peças", "so pecas", "apenas peças", "apenas pecas",
     # PT-PT
     "em segunda mão", "segunda mao", "como novo", "reembalado",
     # EN
-    "used", "pre-owned", "preowned", "open box", "open-box", "openbox",
+    "used", "pre-owned", "preowned", "previously owned", "previously-owned",
+    "like new", "like-new", "nearly new",  # Mercari/eBay common phrasing for used
+    "good condition", "fair condition",  # eBay condition tags
+    "open box", "open-box", "openbox",
     "damaged box", "damaged-box", "damaged packaging",
     "refurbished", "loose", "no box", "incomplete", "missing pieces",
     "missing parts", "bricklink", "spare", "replacement parts",
+    # Clones / não-originais
+    "3rd party", "3rd-party", "third party", "third-party", "non-oem",
+    "non oem", "knockoff", "knock-off", "replica", "fake",
+    # Saquetas individuais (vendido só uma parte do set, não o set completo)
+    "bag #", "bag no.", "bag no ", "bag 1 of", "bag 2 of", "bag 3 of", "bag 4 of",
+    "bag 5 of", "bag #1", "bag #2", "bag #3", "bag #4", "bag #5",
+    "bags 1 &", "bags 2 &", "bags 3 &", "bags 4 &", "bags 5 &",  # "Bags 4 & 5 Only"
+    "bag 4 & 5", "bag 1 & 2", "bag 2 & 3", "bag 3 & 4",
+    "& 5 only", "& 4 only", "& 3 only",  # "Bags 4 & 5 Only Sealed"
+    "sealed bag", "sealed no.", "sealed no ", "sealed no#",
+    "soil element sealed", "element sealed",  # "Soil Element Sealed Bag"
+    "from set", "from lego set", "single bag", "individual bag",
+    "polybag from", "parts from set", "pieces from set",
+    "manual only", "instructions only", "box only", "no bricks",
+    "no bricks or parts", "instruction manual only", "box and instructions",
+    "outer box only", "box & instructions", "set lot",  # "Lego Used Botanical Collection Set Lot"
     # IT
     "usato", "ricondizionato",
     # DE
@@ -361,15 +395,50 @@ KEYWORDS_ACESSORIO_OU_COMPATIVEL = [
     "moldura para lego", "suporte para lego", "base para lego", "case para lego",
     "estojo para lego", "organizador para lego",
     "adesivo para lego", "decalque", "decals",
+    # Acessórios para consolas/electrónica (cases, carregadores, etc.)
+    "capa para", "case para", "carregador para", "estojo para",
+    "protetor de tela", "película", "pelicula", "screen protector",
     # PT-PT (variações)
     "compatível com o", "para o",
-    # EN
+    # EN — LEGO/brinquedos
     "light kit", "led light kit", "lighting kit", "led kit",
     "compatible with lego", "compatible with the lego",
     "for lego", "fits lego", "designed for lego",
     "display case for lego", "display for lego", "shelf for lego",
     "stand for lego", "frame for lego",
+    "display case", "wall display", "premium display",  # genéricos
+    "display-case", "display-frame", "wall-display",  # slugs URL
+    "acrylic display", "acrylic-display",  # display acrílico
+    "elevenmark",  # domínio Mark's Magic Store (só vende displays)
+    "lf-displays", "lfdisplaysolu",  # vendedores Etsy de displays para LEGO
+    "kingdombricksupply", "brickshellcases", "brickcessories",  # display brands
+    "shoppopdisplays", "wezhape", "icuanuty", "hox3d", "prodocase",  # mais display brands
+    "wickedbrick",  # Wicked Brick (displays)
+    # MOC = "My Own Creation" — builds não oficiais (clones / instruções alternativas)
+    "moc-", "moc compatible", "moc compativel", "moc kompatibel",
+    "compatible moc", "build alternativo", "alternative build",
+    "moc instructions", "instruction moc",
     "sticker for lego", "decal for lego", "decals for",
+    # EN — Acessórios genéricos para consolas/electrónica
+    # (carrying case, protective case, charging case, etc — quando é um anexo, não o produto)
+    "carrying case", "carry case", "protective case",
+    "charging case", "charging dock", "charging stand", "screen protector",
+    "crossbody bag", "travel case", "storage case", "hard case",
+    "soft case", "shell case", "case for nintendo", "case for playstation",
+    "case for xbox", "case for switch", "skin for", "wrap for",
+    "snapback hat", "snapback cap", "trucker hat", "cap for", "hat for",
+    "stand for nintendo", "stand for playstation", "dock for",
+    "wall mount for", "mount for",
+    # Variantes sem espaço (slugs URL)
+    "fancycase", "shellcase", "softcase", "hardcase", "traveler-deluxe",
+    "carrycase", "carryingcase", "protectivecase", "screenprotector",
+    "crossbodybag", "travelcase", "storagecase",
+    # Outros tipos de produto (não acessórios mas também não o produto procurado)
+    # Detectados via slugs de URL
+    "game-traveler", "system-case", "deluxe-system",
+    "switch-dock", "switch-console", "switch-lite", "switch-oled",
+    "joy-con-set", "joy-con-strap",
+    "previously-owned", "previously_owned", "refurbished",
     # FR / ES / DE / IT (genérico)
     "compatible avec lego", "compatible con lego", "compatibile con lego",
     "kompatibel mit lego",
@@ -378,9 +447,68 @@ KEYWORDS_ACESSORIO_OU_COMPATIVEL = [
 ]
 
 
+def detectar_tipo_produto(nome_produto):
+    """Detecta se o produto procurado é o produto PRINCIPAL ou um ACESSÓRIO/PEÇA.
+
+    Devolve uma das strings:
+    - "acessorio"  → kits luz, vasos, displays, cases, "para X", "compatível com X"
+    - "peca_avulsa"→ minifiguras, instruções, polybags, "manual only", "box only"
+    - "principal"  → produto principal (default — quando nenhum indicador detectado)
+
+    Esta classificação é depois usada para FILTRAR resultados:
+    se procuro acessório, rejeito produto principal e vice-versa.
+    Princípio: o produto procurado define o que esperamos encontrar.
+    """
+    if not nome_produto:
+        return "principal"
+
+    nome = str(nome_produto).lower()
+
+    # Acessório: indicadores claros no nome procurado
+    keywords_acessorio = [
+        # Iluminação / luzes
+        "kit luz", "kit de luz", "luz led", "iluminação", "iluminacao", "iluminação led",
+        "light kit", "led light", "led kit", "lighting kit",
+        # Displays / cases / suportes
+        "case para", "display case", "expositor", "vitrine", "stand para", "stand for",
+        "suporte para", "support for", "wall mount", "mount for", "presentation case",
+        "skin", "skins", "decal", "sticker para",
+        # Acessório explícito
+        "acessório para", "acessorio para", "accessory for", "compatible with",
+        "compativel com", "compatível com",
+        # Vasos / decoração para o produto principal
+        "vaso para", "vase for", "vaso decorativo",
+        # "Para LEGO X" / "for LEGO X" — claramente acessório
+        " para lego ", " for lego ",
+    ]
+    for kw in keywords_acessorio:
+        if kw in nome:
+            return "acessorio"
+
+    # Peça avulsa: minifigura sozinha, manual, polybag, peças soltas
+    # Usar regex \b para bater "minifigure" tanto em "LEGO Minifigure" como "Minifigure pack"
+    keywords_peca_regex = [
+        r"\bminifigura\b", r"\bminifigure\b", r"\bminifig\b",
+        r"\binstructions only\b", r"\bmanual only\b",
+        r"\bpolybag\b", r"\bspare parts\b", r"\breplacement parts\b",
+        r"\bindividual part\b",
+        r"\bbox only\b", r"\bcaixa apenas\b", r"\binstruções apenas\b", r"\binstrucoes apenas\b",
+    ]
+    for kw_re in keywords_peca_regex:
+        if re.search(kw_re, nome):
+            return "peca_avulsa"
+
+    return "principal"
+
+
 def parece_acessorio_compativel(item):
     """Devolve True se o título indicar um acessório/produto compatível (não o LEGO oficial).
-    Usado para evitar comparar preço do LEGO original com luzes LED, expositores, etc."""
+    Usado para evitar comparar preço do LEGO original com luzes LED, expositores, etc.
+
+    ⚠️ Uso condicional: só faz sentido aplicar este filtro quando o produto PROCURADO
+    é o principal. Se o utilizador procura um acessório, este filtro está errado.
+    A coerência é validada via `coerente_com_tipo()`.
+    """
     blob = " ".join([
         str(item.get("title", "")),
         str(item.get("snippet", "")),
@@ -389,6 +517,64 @@ def parece_acessorio_compativel(item):
         if kw in blob:
             return True
     return False
+
+
+def coerente_com_tipo(item, tipo_procurado):
+    """Verifica se o resultado é coerente com o tipo de produto procurado.
+
+    Regra: o resultado tem de ser do MESMO tipo que o produto procurado.
+    - Procuro principal → rejeito acessórios e peças avulsas
+    - Procuro acessório → rejeito produto principal (não interessa para o que procuro)
+    - Procuro peça avulsa → rejeito set completo e acessórios
+
+    Esta abordagem torna a app universal sem manter blacklist de "lojas de acessórios".
+    Light My Bricks, BrickBling, etc. podem ser concorrentes legítimos para quem
+    vende acessórios. Aqui rejeitamos só se houver mismatch de tipo.
+
+    Olha o `title`, `snippet` E `link` — porque algumas vezes a SerpAPI dá título
+    genérico mas o link revela o tipo (ex: walmart.com/.../protective-case-for-...).
+    """
+    if not tipo_procurado:
+        tipo_procurado = "principal"
+
+    blob = " ".join([
+        str(item.get("title", "")),
+        str(item.get("snippet", "")),
+        str(item.get("link", "")),  # link revela tipo via URL
+    ]).lower()
+
+    # Detectar se o RESULTADO é acessório
+    resultado_e_acessorio = False
+    for kw in KEYWORDS_ACESSORIO_OU_COMPATIVEL:
+        if kw in blob:
+            resultado_e_acessorio = True
+            break
+
+    # Detectar se o RESULTADO é peça avulsa
+    resultado_e_peca = False
+    keywords_peca_resultado = [
+        "minifigure ", "minifig ", "instructions only", "manual only",
+        "polybag", "spare parts", "replacement parts", "individual part",
+        "box only", "no bricks or parts", "instruction manual only",
+        "bag #", "sealed bag", "from set",
+    ]
+    for kw in keywords_peca_resultado:
+        if kw in blob:
+            resultado_e_peca = True
+            break
+
+    # Aplicar regra de coerência
+    if tipo_procurado == "principal":
+        # Procuro produto principal → rejeito acessórios e peças
+        return not (resultado_e_acessorio or resultado_e_peca)
+    elif tipo_procurado == "acessorio":
+        # Procuro acessório → quero acessório, rejeito principal e peças
+        return resultado_e_acessorio
+    elif tipo_procurado == "peca_avulsa":
+        # Procuro peça → quero peça
+        return resultado_e_peca
+
+    return True  # fallback
 
 
 def parece_produto_novo(item):
@@ -653,8 +839,6 @@ def classificar_relevancia(item, nome_produto, sku, marca_esperada=None):
         marca_no_titulo = any(
             re.search(rf"\b{re.escape(a)}\b", titulo) for a in aliases_marca
         )
-        if not marca_no_titulo:
-            return "rejeitar"  # marca esperada mas não está no título → outro produto
 
     sku_str = str(sku).strip().lower() if sku else ""
     sku_no_titulo = False
@@ -662,8 +846,16 @@ def classificar_relevancia(item, nome_produto, sku, marca_esperada=None):
         if re.search(rf"\b{re.escape(sku_str)}\b", titulo):
             sku_no_titulo = True
 
-    # 2) ✅ FORTE: marca + SKU exacto no título (alta confiança)
-    if marca_no_titulo and sku_no_titulo:
+    # 1) Se temos marca esperada mas NÃO está no título E nem o SKU está → rejeitar
+    # (excepção: SKU específico e único — referência clara mesmo sem marca explícita)
+    if marca_esperada and not marca_no_titulo:
+        # Sem marca, mas há SKU específico (4+ caracteres) no título?
+        # Aceita-se porque o SKU é referência única (10281 = LEGO sem precisar dizer "LEGO")
+        if not (sku_no_titulo and len(sku_str) >= 4):
+            return "rejeitar"
+
+    # 2) ✅ FORTE: marca confirmada + SKU exacto OU SKU específico sozinho
+    if (marca_no_titulo or (sku_no_titulo and len(sku_str) >= 4)) and sku_no_titulo:
         return "forte"
 
     # SKU alfanumérico (ex: LGO75301) sozinho é considerado forte
@@ -1850,6 +2042,13 @@ def _fetch_real_sellers(cache_key: str, page_token: str, regiao_cfg: dict, api_k
     # 1) Verificar cache primeiro
     cached = _cache_get_sellers(cache_key)
     if cached is not None:
+        print(f"[PLANO-B] cache HIT key={cache_key} sellers={len(cached)}", flush=True)
+        # DEBUG: para pids ricos (5+ stores), mostrar quais stores temos
+        if len(cached) >= 5:
+            for s in cached[:13]:
+                _nm = s.get("name", "")[:30]
+                _lk = str(s.get("link", ""))[:90]
+                print(f"[PLANO-B]   store: '{_nm}' | {_lk}", flush=True)
         return cached
 
     if not page_token:
@@ -1935,6 +2134,10 @@ def buscar_serpapi(produto, ean, sku, custo, regiao_cfg, whitelist, blacklist, a
     concorrentes = []           # match forte (marca + SKU exacto, alta confiança)
     concorrentes_similares = [] # match fraco (marca confirmada, sem SKU exacto — para verificação)
     rejeitados_log = {"usado": 0, "outlier_baixo": 0, "outlier_alto": 0, "irrelevante": 0, "internacional": 0, "acessorio": 0, "vendedor_naoconfiavel": 0, "serpapi_total": 0, "sem_preco": 0}
+
+    # Detectar o tipo do produto procurado (principal / acessório / peça avulsa)
+    # para filtrar resultados de forma coerente
+    tipo_procurado = detectar_tipo_produto(produto)
     consultas = []
 
     def _valido(v):
@@ -1991,29 +2194,56 @@ def buscar_serpapi(produto, ean, sku, custo, regiao_cfg, whitelist, blacklist, a
             st.warning(f"SerpAPI: {results['error']}")
             continue
 
-        for item in results.get("shopping_results", []):
+        _items_dbg = results.get("shopping_results", []) or []
+        _srcs_dbg = [str(it.get("source", ""))[:20] for it in _items_dbg]
+        print(f"[US-DBG] q='{q}' total={len(_items_dbg)} sources={_srcs_dbg[:10]}", flush=True)
+
+        # Acumular product_ids "ricos" (>=5 sellers) durante o loop para expansão
+        # mesmo quando o item original é rejeitado. A SerpAPI dispersa product_ids
+        # mas alguns são "canónicos" (com muitas lojas) — vale a pena tentar expandir
+        # esses mesmo se o item da SerpAPI principal foi outlier ou acessório.
+        _pids_ricos_orfaos = {}  # {pid: token}  — pids a expandir mesmo após rejeição
+        _pids_ja_expandidos = set()  # pids que já foram expandidos via item aceito
+
+        for item in _items_dbg:
+            # Tentar registar este pid como "potencialmente rico" para expansão futura
+            _pid_atual = item.get("product_id")
+            _token_atual = item.get("immersive_product_page_token", "")
+            if _pid_atual and _token_atual:
+                # Verificar quantas sellers tem na cache
+                _cached_check = _cache_get_sellers(str(_pid_atual))
+                if _cached_check is not None and len(_cached_check) >= 5:
+                    _pids_ricos_orfaos[str(_pid_atual)] = _token_atual
+
             rejeitados_log["serpapi_total"] += 1
+            _src = str(item.get("source", ""))[:20]
+            _tit = str(item.get("title", ""))[:60]
 
             if not vendedor_confiavel(item, whitelist, blacklist):
+                print(f"[US-DBG] VEND '{_src}' | '{_tit}'", flush=True)
                 rejeitados_log["vendedor_naoconfiavel"] += 1
                 continue
 
             relevancia = classificar_relevancia(item, produto, sku, marca_esperada=marca)
             if relevancia == "rejeitar":
+                print(f"[US-DBG] REL '{_src}' | '{_tit}' (marca={marca} sku={sku})", flush=True)
                 rejeitados_log["irrelevante"] += 1
                 continue
             # `relevancia` agora é "forte" ou "fraco" — usado mais abaixo para
             # decidir em qual lista colocar o item.
 
             if apenas_novos and not parece_produto_novo(item):
+                print(f"[US-DBG] USD '{_src}' | '{_tit}'", flush=True)
                 rejeitados_log["usado"] += 1
                 continue
 
-            if parece_acessorio_compativel(item):
+            if not coerente_com_tipo(item, tipo_procurado):
+                print(f"[US-DBG] TIPO '{_src}' | '{_tit}' (procurado={tipo_procurado})", flush=True)
                 rejeitados_log["acessorio"] = rejeitados_log.get("acessorio", 0) + 1
                 continue
 
             if parece_compra_internacional(item, regiao_cfg.get("id", "")):
+                print(f"[US-DBG] INT '{_src}' | '{_tit}'", flush=True)
                 rejeitados_log["internacional"] = rejeitados_log.get("internacional", 0) + 1
                 continue
 
@@ -2021,14 +2251,17 @@ def buscar_serpapi(produto, ean, sku, custo, regiao_cfg, whitelist, blacklist, a
             if preco is None:
                 preco = parse_preco(item.get("price"), regiao_cfg["currency_format"])
             if preco is None or preco <= 0:
+                print(f"[US-DBG] PRC '{_src}' | sem preço", flush=True)
                 rejeitados_log["sem_preco"] += 1
                 continue
 
             if custo:
                 if preco < preco_min_aceitavel:
+                    print(f"[US-DBG] OBX '{_src}' | {preco} < min {preco_min_aceitavel}", flush=True)
                     rejeitados_log["outlier_baixo"] += 1
                     continue
                 if preco > preco_max_aceitavel:
+                    print(f"[US-DBG] OAX '{_src}' | {preco} > max {preco_max_aceitavel}", flush=True)
                     rejeitados_log["outlier_alto"] += 1
                     continue
 
@@ -2123,6 +2356,8 @@ def buscar_serpapi(produto, ean, sku, custo, regiao_cfg, whitelist, blacklist, a
                 _token = item.get("immersive_product_page_token", "")
                 if _pid and _token:
                     _all_stores = _fetch_real_sellers(str(_pid), _token, regiao_cfg, api_key)
+                    print(f"[US-EXP] inicio expansao pid={_pid} stores_devolvidas={len(_all_stores)} item_source={item.get('source','')}", flush=True)
+                    _pids_ja_expandidos.add(str(_pid))  # registar para não duplicar no fim
                     for store in _all_stores:
                         store_link = store.get("link", "")
                         store_name = store.get("name", "")
@@ -2136,22 +2371,35 @@ def buscar_serpapi(produto, ean, sku, custo, regiao_cfg, whitelist, blacklist, a
                         # As stores expandidas vêm de Plano B mas precisam passar pelos
                         # mesmos critérios — senão entra ruído (eBay blacklisted, produto
                         # usado, preços outlier, etc.)
+                        # ATENÇÃO: a SerpAPI google_immersive_product não devolve um título
+                        # específico por store — usamos o link da store como "pseudo-título"
+                        # para filtros de coerência (palavras na URL revelam o tipo).
+                        store_pseudo_title = (store_link + " " + item.get("title", "")).lower()
                         store_item_compat = {
                             "source": store_name,
                             "link": store_link,
-                            "title": item.get("title", ""),  # herdamos do canónico
+                            "title": store_pseudo_title,
                             "extensions": store.get("shipping", ""),
                             "delivery": store.get("shipping", ""),
                         }
 
                         # Filtro 1: vendedor confiável (blacklist + whitelist)
                         if not vendedor_confiavel(store_item_compat, whitelist, blacklist):
+                            print(f"[US-EXP] VEND '{store_name}' | {store_link[:80]}", flush=True)
                             continue
 
                         # Filtro 2: produto novo (rejeita "usado", "open box", "damaged", etc.)
-                        # Aplicamos com base no `shipping` que pode mencionar essas keywords
                         if apenas_novos and not parece_produto_novo(store_item_compat):
+                            print(f"[US-EXP] USD '{store_name}' | {store_link[:80]}", flush=True)
                             continue
+
+                        # Filtro 3: coerência de tipo (acessório vs principal vs peça)
+                        # Usa palavras-chave do link da store + título canónico
+                        if not coerente_com_tipo(store_item_compat, tipo_procurado):
+                            print(f"[US-EXP] TIPO '{store_name}' | {store_link[:80]} (proc={tipo_procurado})", flush=True)
+                            continue
+
+                        print(f"[US-EXP] ACEITO '{store_name}' | {store_link[:80]}", flush=True)
 
                         # Filtro 3: preço — heurística robusta para lidar com bug do BR.
                         # Problema: no Brasil a SerpAPI devolve VALOR DE PARCELA em `extracted_price`
@@ -2202,6 +2450,85 @@ def buscar_serpapi(produto, ean, sku, custo, regiao_cfg, whitelist, blacklist, a
             else:  # "fraco"
                 concorrentes_similares.append(registo)
 
+        # === EXPANSÃO DE PIDs RICOS ÓRFÃOS ===
+        # Alguns product_ids têm muitas stores (>=5) mas o item original que aponta
+        # para eles foi rejeitado. Vamos tentar expandir esses pids também — se a
+        # maioria dos URLs contiver o SKU, é o produto certo.
+        _sku_check = str(sku).strip().lower() if _valido(sku) else ""
+        for _pid_orfao, _token_orfao in _pids_ricos_orfaos.items():
+            if _pid_orfao in _pids_ja_expandidos:
+                continue  # já foi expandido pelo item normal
+            _all_stores_orfao = _fetch_real_sellers(_pid_orfao, _token_orfao, regiao_cfg, api_key)
+            if len(_all_stores_orfao) < 5:
+                continue
+
+            # Validação: maioria dos URLs deve conter o SKU (para garantir que este
+            # pid representa o produto certo, não outro produto canónico).
+            if _sku_check and len(_sku_check) >= 4:
+                _com_sku = sum(1 for s in _all_stores_orfao
+                              if _sku_check in str(s.get("link", "")).lower())
+                _pct_sku = _com_sku / len(_all_stores_orfao)
+                if _pct_sku < 0.5:
+                    # Menos de 50% das stores têm o SKU → este pid é de outro produto
+                    print(f"[US-ORFAO] skip pid={_pid_orfao} sku_match={_pct_sku:.0%}", flush=True)
+                    continue
+                print(f"[US-ORFAO] expandindo pid={_pid_orfao} stores={len(_all_stores_orfao)} sku_match={_pct_sku:.0%}", flush=True)
+            else:
+                print(f"[US-ORFAO] expandindo pid={_pid_orfao} stores={len(_all_stores_orfao)} (sem SKU para validar)", flush=True)
+
+            # Adicionar as stores válidas como concorrentes fortes
+            for store in _all_stores_orfao:
+                store_link = store.get("link", "")
+                store_name = store.get("name", "")
+                if not store_link or not store_name:
+                    continue
+
+                store_pseudo_title = (store_link + " " + (produto or "")).lower()
+                store_item_compat = {
+                    "source": store_name,
+                    "link": store_link,
+                    "title": store_pseudo_title,
+                    "extensions": store.get("shipping", ""),
+                    "delivery": store.get("shipping", ""),
+                }
+
+                if not vendedor_confiavel(store_item_compat, whitelist, blacklist):
+                    continue
+                if apenas_novos and not parece_produto_novo(store_item_compat):
+                    continue
+                if not coerente_com_tipo(store_item_compat, tipo_procurado):
+                    continue
+
+                _ep = store.get("extracted_price") or 0
+                _et = store.get("extracted_total") or 0
+                store_preco = max(_ep, _et) if (_ep or _et) else None
+                _ship_str = str(store.get("shipping", ""))
+                if store_preco and "+" in _ship_str:
+                    _ship_val = parse_preco(_ship_str.replace("+", "").strip(), regiao_cfg["currency_format"])
+                    if _ship_val and _ship_val > 0 and store_preco - _ship_val > 0:
+                        store_preco = store_preco - _ship_val
+                if store_preco is None or store_preco <= 0:
+                    continue
+                if custo:
+                    if store_preco < preco_min_aceitavel or store_preco > preco_max_aceitavel:
+                        continue
+
+                concorrentes.append({
+                    "preco": float(store_preco),
+                    "loja": store_name,
+                    "link": store_link,
+                    "rating": None,
+                    "reviews": 0,
+                    "tag": "",
+                    "titulo": "(orfão do product_id " + _pid_orfao + ")",
+                    "_raw": {
+                        "title": "(órfão do product_id " + _pid_orfao + ")",
+                        "source": store_name,
+                        "link": store_link,
+                        "extensions": "", "delivery": "", "badge": "", "tag": "", "snippet": "",
+                    },
+                })
+
         # Cascata: só pára quando tem ≥3 lojas DIFERENTES (entre fortes E similares).
         # Senão, tenta a próxima consulta — porque consultas curtas (SKU+marca)
         # às vezes devolvem só 1-2 lojas, mas o nome completo + EAN podem trazer mais.
@@ -2214,15 +2541,42 @@ def buscar_serpapi(produto, ean, sku, custo, regiao_cfg, whitelist, blacklist, a
 
     # Deduplicar — uma loja só pode aparecer numa lista (fortes têm prioridade).
     # Dentro de cada lista, manter o de MENOR preço por loja.
+    # Normalização robusta: usa o DOMÍNIO do link (mais fiável que o nome,
+    # porque a SerpAPI varia: "Mercari" vs "mercari.com" vs "eBay - vendor123").
     import unicodedata
+    from urllib.parse import urlparse
+
     def _norm_loja(s):
         s = unicodedata.normalize("NFKD", str(s).lower()).encode("ascii", "ignore").decode()
         return re.sub(r"[^a-z0-9]", "", s)
 
+    def _dominio_do_link(link):
+        """Extrai o domínio base do link: 'https://mercari.com/us/item/...' → 'mercari.com'.
+        Remove subdomínios comuns (www, m, store) para colapsar variantes."""
+        if not link:
+            return ""
+        try:
+            host = urlparse(str(link)).netloc.lower()
+            # Remover prefixos comuns (www., m., store., shop.)
+            for pref in ("www.", "m.", "store.", "shop.", "us.", "global."):
+                if host.startswith(pref):
+                    host = host[len(pref):]
+            return host
+        except Exception:
+            return ""
+
+    def _chave_loja(c):
+        """Devolve uma chave canónica para deduplicação.
+        Prefere domínio do link (mais fiável), com fallback ao nome normalizado."""
+        dom = _dominio_do_link(c.get("link", ""))
+        if dom:
+            return dom
+        return _norm_loja(c.get("loja", ""))
+
     def _dedup_por_loja(lista):
         melhor = {}
         for c in lista:
-            chave = _norm_loja(c.get("loja", ""))
+            chave = _chave_loja(c)
             if not chave:
                 continue
             if chave not in melhor or c["preco"] < melhor[chave]["preco"]:
@@ -2232,9 +2586,36 @@ def buscar_serpapi(produto, ean, sku, custo, regiao_cfg, whitelist, blacklist, a
     concorrentes = _dedup_por_loja(concorrentes)
     concorrentes_similares = _dedup_por_loja(concorrentes_similares)
 
+    # === Detecção de drift e movimentação para similares ===
+    # Quando vários concorrentes existem, preços muito abaixo do P25 são
+    # provavelmente drift (snapshot SerpAPI desactualizado) ou listings que escaparam
+    # aos filtros. Mover para "similares" para que o utilizador confirme antes
+    # de afectarem decisões de preço.
+    #
+    # Estratégia mais robusta: usar Q1 (quartil baixo) em vez de mediana, e
+    # aplicar threshold sobre Q1. Isto evita penalizar preço justo de loja oficial
+    # quando há outliers altos (revendedores caros) a puxar a mediana para cima.
+    if len(concorrentes) >= 4:
+        precos = sorted([c["preco"] for c in concorrentes if c.get("preco") and c["preco"] > 0])
+        if precos:
+            q1_idx = len(precos) // 4
+            q1 = precos[q1_idx]  # 25º percentil
+            threshold = q1 * 0.60  # 40% abaixo de Q1 = muito suspeito
+            fortes_filtrados = []
+            for c in concorrentes:
+                if c["preco"] < threshold:
+                    # Drift suspeito → mover para similares
+                    concorrentes_similares.append(c)
+                else:
+                    fortes_filtrados.append(c)
+            concorrentes = fortes_filtrados
+
+    # Re-dedup similares depois de inserções
+    concorrentes_similares = _dedup_por_loja(concorrentes_similares)
+
     # Se uma loja apareceu nas duas listas, removê-la dos similares (a forte ganha)
-    lojas_fortes = {_norm_loja(c.get("loja", "")) for c in concorrentes}
-    concorrentes_similares = [c for c in concorrentes_similares if _norm_loja(c.get("loja", "")) not in lojas_fortes]
+    lojas_fortes = {_chave_loja(c) for c in concorrentes}
+    concorrentes_similares = [c for c in concorrentes_similares if _chave_loja(c) not in lojas_fortes]
 
     return concorrentes, rejeitados_log, concorrentes_similares
 
@@ -2294,8 +2675,11 @@ def calcular_estrategias_preco(custo, imposto, markup, margem_minima, precos_con
     top_n = min(3, len(precos_ord))
     mercado_competitivo = round(sum(precos_ord[:top_n]) / top_n, 2)
 
-    preco_competitivo = max(round(menor * 0.98, 2), preco_minimo)
-    preco_otimo = max(round(segundo * 0.98, 2), preco_minimo)
+    # Margem competitiva: 0,5% abaixo do concorrente é suficiente para ficar
+    # visualmente mais barato no comparador, sem desperdiçar margem.
+    # (Antes era 2% — descia margem desnecessariamente)
+    preco_competitivo = max(round(menor * 0.995, 2), preco_minimo)
+    preco_otimo = max(round(segundo * 0.995, 2), preco_minimo)
     preco_mercado = max(round(mercado_competitivo, 2), preco_minimo)
 
     return {
@@ -2612,6 +2996,17 @@ with st.sidebar:
         regiao_id = "EU"
     else:
         regiao_id = "US"
+
+    # Aviso para utilizadores da região US: ainda em fase experimental
+    if regiao_id == "US":
+        st.warning(
+            "⚠️ **US market is experimental.** Some products (especially electronics "
+            "and accessories) may return fewer competitors than expected due to how "
+            "Google Shopping fragments product listings in the US market. "
+            "Results for LEGO and physical products work well. "
+            "Brazil and EU markets are fully supported.",
+            icon="🧪",
+        )
 
     st.divider()
     st.header("🔑 Chave API")
@@ -3413,7 +3808,12 @@ with tab_analise:
                     blacklist = BLACKLIST_REGIONAL["EU"]
                     regiao_id = "EU"
                 else:
-                    whitelist = WHITELIST["US"]
+                    # USA: modo aberto (consistente com Portugal/UE)
+                    # Aceita qualquer loja excepto blacklist — em vez de whitelist exaustiva.
+                    # O universo de retalhistas US é enorme e dinâmico (LEGO.com, Barnes & Noble,
+                    # BrickFever, legoland.com, GameStop, Nintendo, etc. — manter lista actualizada
+                    # à mão é insustentável).
+                    whitelist = None
                     blacklist = BLACKLIST_REGIONAL["US"]
                     regiao_id = "US"
 
@@ -3569,7 +3969,7 @@ with tab_analise:
                             "ID": row.get("ID", 0),
                             "Qtde": row["Qtde"],
                             "Custo": row["Custo"],
-                            "Preço Markup": estrategias["preco_alvo_markup"],
+                            "Preço Calculado": estrategias["preco_alvo_markup"],
                             "Menor Concorrente": estrategias["menor_concorrente"],
                             "Preço Sugerido": preco_sugerido,
                             "Pressão Mercado %": pressao_mercado,
@@ -3852,7 +4252,7 @@ with tab_analise:
                                   xaxis_tickangle=-45, height=550)
             else:
                 # Modo clássico
-                fig.add_trace(go.Bar(name="Preço Markup (alvo ideal)", x=amostra["Nome"], y=amostra["Preço Markup"], marker_color="#9b59b6"))
+                fig.add_trace(go.Bar(name="Preço Calculado (alvo ideal)", x=amostra["Nome"], y=amostra["Preço Calculado"], marker_color="#9b59b6"))
                 fig.add_trace(go.Bar(name="Preço Sugerido", x=amostra["Nome"], y=amostra["Preço Sugerido"], marker_color="#3498db"))
                 fig.add_trace(go.Bar(name="Menor Concorrente", x=amostra["Nome"], y=amostra["Menor Concorrente"], marker_color="#e74c3c"))
                 fig.update_layout(barmode="group", title="Pressão do mercado: Markup ideal vs Sugerido vs Concorrente (até 15 produtos)",
@@ -3940,7 +4340,7 @@ with tab_analise:
             # Modo clássico (custo + margem)
             colunas_show = [
                 "Nome", "Linha", "Qtde",
-                "Custo", "Preço Markup",
+                "Custo", "Preço Calculado",
                 "Menor Concorrente",
                 "Preço Sugerido", "Margem Real %", "Pressão Mercado %",
                 "Lucro Total",
@@ -3949,9 +4349,9 @@ with tab_analise:
             ]
             col_config_tabela = {
                 "Custo": st.column_config.NumberColumn(format=f"{moeda} %.2f"),
-                "Preço Markup": st.column_config.NumberColumn(
+                "Preço Calculado": st.column_config.NumberColumn(
                     format=f"{moeda} %.2f",
-                    help="O preço alvo IDEAL — calculado pela sua margem desejada, ignorando o mercado. "
+                    help="Preço alvo IDEAL — calculado pela sua margem desejada, ignorando o mercado. "
                          "Fórmula: custo × (1 + markup) ÷ (1 - imposto).",
                 ),
                 "Menor Concorrente": st.column_config.NumberColumn(
@@ -3960,16 +4360,16 @@ with tab_analise:
                 ),
                 "Preço Sugerido": st.column_config.NumberColumn(
                     format=f"{moeda} %.2f",
-                    help="Preço efectivo a praticar, escolhido pelo algoritmo conforme o status.",
+                    help="Preço efectivo recomendado, considerando o mercado e a sua margem mínima.",
                 ),
                 "Pressão Mercado %": st.column_config.NumberColumn(
                     "Δ Pressão",
                     format="%+.1f %%",
-                    help="Quanto o Preço Sugerido se afasta do Preço Markup desejado, "
+                    help="Quanto o Preço Sugerido se afasta do Preço Calculado, "
                          "por causa da concorrência.\n"
                          "• 0% = consigo praticar exactamente o preço que queria\n"
                          "• Negativo = mercado obrigou-me a baixar (perdi % do meu markup)\n"
-                         "• Positivo = consigo vender ACIMA do meu markup (raro)",
+                         "• Positivo = consigo vender ACIMA do meu cálculo (raro)",
                 ),
                 "Margem Real %": st.column_config.NumberColumn(
                     format="%.1f %%",
@@ -4204,7 +4604,7 @@ with tab_analise:
                 # Modo clássico
                 ci1, ci2, ci3, ci4 = st.columns(4)
                 ci1.metric("Custo", f"{moeda} {linha_inspect.get('Custo', 0):,.2f}")
-                ci2.metric("Preço Markup", f"{moeda} {linha_inspect.get('Preço Markup', 0):,.2f}")
+                ci2.metric("Preço Calculado", f"{moeda} {linha_inspect.get('Preço Calculado', 0):,.2f}")
                 ci3.metric("Preço Sugerido", f"{moeda} {linha_inspect['Preço Sugerido']:,.2f}")
                 ci4.metric("Concorrentes encontrados", len(concorrentes_lista))
 
@@ -4284,21 +4684,12 @@ with tab_analise:
                     return "", "sem_link"
 
                 rows = []
-                # Calcular mediana dos preços para detectar drift suspeito
-                precos_validos = [c["preco"] for c in concorrentes_lista if c.get("preco") and c["preco"] > 0]
-                mediana_preco = sorted(precos_validos)[len(precos_validos)//2] if precos_validos else None
-
                 for i, c in enumerate(concorrentes_lista):
                     link, tipo = _link_ou_fallback(c, produto_inspect)
                     if tipo != "directo":
                         continue  # sem link directo → não mostra
-                    # Aviso de drift: preço >= 25% abaixo da mediana é suspeito
-                    aviso = ""
-                    if mediana_preco and c["preco"] < mediana_preco * 0.75:
-                        aviso = "⚠️"
                     rows.append({
                         "#": len(rows) + 1,
-                        "⚠️": aviso,
                         "Loja": c["loja"],
                         "Preço": c["preco"],
                         "Rating": c.get("rating"),
@@ -4315,12 +4706,6 @@ with tab_analise:
                         "#": st.column_config.NumberColumn(
                             "#", width="small", format="%d",
                             help="Posição (ordenado por preço crescente).",
-                        ),
-                        "⚠️": st.column_config.TextColumn(
-                            "⚠️", width="small",
-                            help="Preço 25% ou mais abaixo da mediana. "
-                                 "Provável drift (snapshot desactualizado da SerpAPI). "
-                                 "Confirme no link antes de confiar.",
                         ),
                         "Loja": st.column_config.TextColumn(
                             "Loja", width="medium",
