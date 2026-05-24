@@ -2695,7 +2695,9 @@ def calcular_estrategias_preco(custo, imposto, markup, margem_minima, precos_con
 
 
 def calcular_status(custo, imposto, markup, margem_minima, menor_concorrente):
-    """Determina o status do produto face ao mercado.
+    """Determina o status MARKUP do produto: o teu PREÇO ALVO (custo + markup ideal)
+    face ao menor concorrente. Responde: "se eu vendesse ao preço ambicioso, ficaria competitivo?"
+
     Hierarquia de avaliação:
     1. Sem dados → ❔
     2. Concorrente abaixo do custo+imposto → 🟥 Burn (impossível competir sem prejuízo)
@@ -2703,7 +2705,10 @@ def calcular_status(custo, imposto, markup, margem_minima, menor_concorrente):
        (consegue vender mas só com margem mínima, sem nunca alcançar o markup alvo)
     4. Markup alvo ≥ 5% acima do menor concorrente → ⚠️ Caro
     5. Markup alvo entre ±5% do menor → 🟡 Risco
-    6. Markup alvo ≥ 5% abaixo do menor → ✅ Vencendo (folga real para escolher entre preços)"""
+    6. Markup alvo ≥ 5% abaixo do menor → ✅ Vencendo (folga real para escolher entre preços)
+
+    NOTA: este é o status "ambição" — o status "ação real" usa `calcular_status_mercado`
+    aplicado ao Preço Sugerido (que pode ser inferior ao Preço Calculado se houver pressão de mercado)."""
     if menor_concorrente is None:
         return "❔ Sem dados", "sem_dados"
 
@@ -2725,6 +2730,32 @@ def calcular_status(custo, imposto, markup, margem_minima, menor_concorrente):
     if diff_pct <= -0.05:
         return "✅ Vencendo", "vencendo"
     if abs(diff_pct) < 0.05:
+        return "🟡 Risco", "risco"
+    return "⚠️ Caro", "caro"
+
+
+def calcular_status_mercado(preco_sugerido, menor_concorrente):
+    """Determina o status MERCADO: o teu PREÇO SUGERIDO (o que vais realmente praticar)
+    face ao menor concorrente. Responde: "vou conseguir vender ao preço recomendado?"
+
+    Útil porque o Preço Sugerido pode já estar ajustado para baixo (ex: mercado obrigou),
+    e o utilizador quer saber se a ação real é competitiva.
+
+    Regras:
+    - Sem dados → ❔
+    - Sugerido ≥ 5% abaixo do menor concorrente → ✅ Vencendo
+    - Sugerido entre -5% e +0,5% do menor → 🟡 Risco (margem fina vs mercado)
+    - Sugerido > +0,5% do menor → ⚠️ Caro (acima do mercado)
+    """
+    if menor_concorrente is None or preco_sugerido is None:
+        return "❔ Sem dados", "sem_dados"
+    if menor_concorrente <= 0 or preco_sugerido <= 0:
+        return "❔ Sem dados", "sem_dados"
+
+    diff_pct = (preco_sugerido - menor_concorrente) / menor_concorrente
+    if diff_pct <= -0.05:
+        return "✅ Vencendo", "vencendo"
+    if diff_pct <= 0.005:
         return "🟡 Risco", "risco"
     return "⚠️ Caro", "caro"
 
@@ -3931,11 +3962,16 @@ with tab_analise:
                             custo=row["Custo"], imposto=imposto, markup=markup,
                             margem_minima=margem_minima, precos_concorrencia=precos_conc,
                         )
-                        status_label, status_codigo = calcular_status(
+                        # Status Markup: avalia o Preço Calculado (custo + markup ideal) vs mercado.
+                        # Útil para perceber a "ambição teórica" e decidir negociar custo / mudar mix.
+                        status_markup_label, status_markup_codigo = calcular_status(
                             custo=row["Custo"], imposto=imposto, markup=markup,
                             margem_minima=margem_minima,
                             menor_concorrente=estrategias["menor_concorrente"],
                         )
+                        # Manter `status_codigo` como alias para compatibilidade com recomendacao
+                        status_label = status_markup_label
+                        status_codigo = status_markup_codigo
                         recomendacao = recomendacao_investimento(status_codigo, score, row["Qtde"])
 
                         if status_codigo == "vencendo":
@@ -3949,11 +3985,18 @@ with tab_analise:
                         else:
                             preco_sugerido = estrategias["preco_alvo_markup"]
 
+                        # Status Mercado: avalia o Preço Sugerido (acção real) vs mercado.
+                        # Util porque após a app ajustar, a posição real pode ser diferente do Status Markup.
+                        status_mercado_label, status_mercado_codigo = calcular_status_mercado(
+                            preco_sugerido=preco_sugerido,
+                            menor_concorrente=estrategias["menor_concorrente"],
+                        )
+
                         lucro_unitario = preco_sugerido * (1 - imposto) - row["Custo"]
                         lucro_total = round(lucro_unitario * row["Qtde"], 2)
                         margem_real = (lucro_unitario / preco_sugerido * 100) if preco_sugerido > 0 else 0
 
-                        # Pressão de mercado: quanto o Preço Sugerido ficou abaixo (ou acima) do Preço Markup.
+                        # Pressão de mercado: quanto o Preço Sugerido ficou abaixo (ou acima) do Preço Calculado.
                         pressao_mercado = None
                         preco_markup_alvo = estrategias["preco_alvo_markup"]
                         if preco_markup_alvo and preco_sugerido:
@@ -3983,8 +4026,12 @@ with tab_analise:
                             "Margem Real %": round(margem_real, 1),
                             "Lucro Unitário": round(lucro_unitario, 2),
                             "Lucro Total": lucro_total,
-                            "Status": status_label,
+                            "Status Markup": status_markup_label,
+                            "Status Mercado": status_mercado_label,
+                            "Status": status_label,  # mantido para compat com filtros / gráficos
                             "_status_code": status_codigo,
+                            "_status_markup_code": status_markup_codigo,
+                            "_status_mercado_code": status_mercado_codigo,
                             "Score Procura": score,
                             "Procura": rotulo_procura,
                             "Recomendação": recomendacao,
@@ -4344,7 +4391,8 @@ with tab_analise:
                 "Menor Concorrente",
                 "Preço Sugerido", "Margem Real %", "Pressão Mercado %",
                 "Lucro Total",
-                "Status", "Procura", "Atratividade", "Recomendação",
+                "Status Markup", "Status Mercado",
+                "Procura", "Atratividade", "Recomendação",
                 "N Concorrentes",
             ]
             col_config_tabela = {
@@ -4361,6 +4409,24 @@ with tab_analise:
                 "Preço Sugerido": st.column_config.NumberColumn(
                     format=f"{moeda} %.2f",
                     help="Preço efectivo recomendado, considerando o mercado e a sua margem mínima.",
+                ),
+                "Status Markup": st.column_config.TextColumn(
+                    "🎯 Markup",
+                    help="Avalia o Preço CALCULADO (ambição teórica) vs Mercado.\n"
+                         "Útil para planeamento: 'se vendesse ao preço ambicioso, ficaria competitivo?'\n"
+                         "✅ Vencendo: markup já está abaixo do menor concorrente\n"
+                         "🟡 Risco: markup quase igual ao concorrente\n"
+                         "⚠️ Caro: markup acima do mercado — perde vendas\n"
+                         "🟧 Chão alto: custo + margem mínima já acima do mercado\n"
+                         "🟥 Burn: concorrente abaixo do seu custo — não há margem",
+                ),
+                "Status Mercado": st.column_config.TextColumn(
+                    "📊 Mercado",
+                    help="Avalia o Preço SUGERIDO (ação real recomendada) vs Mercado.\n"
+                         "Reflecte a posição efectiva ao vender pelo preço sugerido.\n"
+                         "✅ Vencendo: ≥5% abaixo do mercado\n"
+                         "🟡 Risco: entre -5% e +0,5% do mercado\n"
+                         "⚠️ Caro: mais de 0,5% acima do mercado",
                 ),
                 "Pressão Mercado %": st.column_config.NumberColumn(
                     "Δ Pressão",
