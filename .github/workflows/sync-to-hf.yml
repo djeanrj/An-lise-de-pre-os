@@ -1,0 +1,39 @@
+name: Sync to Hugging Face Space
+
+# Quando este workflow corre:
+# - Sempre que houver push para a branch main
+# - Manualmente via GitHub UI (botão "Run workflow")
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  sync-to-hub:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout do código GitHub
+        uses: actions/checkout@v4
+        with:
+          # Importante: precisamos do histórico completo para o push funcionar
+          fetch-depth: 0
+          # Não precisamos das credenciais GitHub depois deste passo
+          persist-credentials: false
+          lfs: true
+
+      - name: Push para Hugging Face Space
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          HF_USERNAME: VemBrincarComAGente
+          HF_SPACE: viabilidadedevendas
+        run: |
+          # Configurar identidade Git para o commit
+          git config user.email "github-actions@github.com"
+          git config user.name "GitHub Actions (auto-sync)"
+
+          # Adicionar o HF Space como remoto, usando o token de autenticação
+          git remote add huggingface "https://${HF_USERNAME}:${HF_TOKEN}@huggingface.co/spaces/${HF_USERNAME}/${HF_SPACE}"
+
+          # Push forçado (overwrite) para a branch main do HF
+          # --force porque o histórico pode divergir entre GitHub e HF
+          git push --force huggingface main
