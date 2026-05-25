@@ -2116,6 +2116,32 @@ def obter_creditos_serpapi(api_key: str) -> dict | None:
         return None
 
 
+def _log_chamada_serpapi(engine: str, query: str, api_key: str, contexto: str = ""):
+    """Log de auditoria para cada chamada SerpAPI real (que consome créditos).
+    Imprime timestamp, engine, query, créditos antes/depois e stack trace abreviado.
+    Útil para detectar chamadas inesperadas."""
+    try:
+        import traceback
+        from datetime import datetime
+        # Saldo ANTES (pode estar em cache de 60s, mas serve para baseline)
+        try:
+            creditos_antes = obter_creditos_serpapi(api_key)
+            saldo_antes = creditos_antes.get("total_searches_left") if creditos_antes else "?"
+        except Exception:
+            saldo_antes = "?"
+        # Stack trace abreviado (último 3 frames do chamador)
+        stack = traceback.extract_stack()[-5:-1]
+        chamador = " > ".join([f"{f.name}:{f.lineno}" for f in stack])
+        ts = datetime.now().strftime("%H:%M:%S.%f")[:-3]
+        print(
+            f"[SERPAPI-CALL] {ts} engine={engine} q='{str(query)[:50]}' "
+            f"saldo_antes={saldo_antes} contexto={contexto} call_stack={chamador}",
+            flush=True,
+        )
+    except Exception as e:
+        print(f"[SERPAPI-CALL] erro no log: {e}", flush=True)
+
+
 # Para reduzir o custo SerpAPI, fazemos cache no Supabase com TTL 30 dias.
 # Cache é GLOBAL (partilhada entre utilizadores) — é só URL público de loja,
 # não há informação sensível.
@@ -2203,6 +2229,13 @@ def _fetch_real_sellers(cache_key: str, page_token: str, regiao_cfg: dict, api_k
             "more_stores": "1",  # até 13 lojas em vez de 3-5 default
             "api_key": api_key,
         }
+        # LOG AUDITORIA — cada chamada real consome 1 crédito
+        _log_chamada_serpapi(
+            engine="google_immersive_product",
+            query=f"pid={cache_key}",
+            api_key=api_key,
+            contexto="fetch_real_sellers (PID expansão)",
+        )
         search = GoogleSearch(params)
         results = search.get_dict()
 
@@ -2339,6 +2372,13 @@ def buscar_serpapi(produto, ean, sku, custo, regiao_cfg, whitelist, blacklist, a
                     print(f"[CACHE-SERPAPI] HIT q='{q[:40]}' idade={idade_h:.1f}h", flush=True)
             if results is None:
                 # Cache miss ou forçado → chamada real SerpAPI (consome crédito)
+                # LOG AUDITORIA
+                _log_chamada_serpapi(
+                    engine="google_shopping",
+                    query=q,
+                    api_key=api_key,
+                    contexto=f"buscar_serpapi (gl={regiao_cfg['gl']}, forcar={forcar_busca})",
+                )
                 search = GoogleSearch(params)
                 results = search.get_dict()
                 # Guardar em cache se devolveu algo válido
