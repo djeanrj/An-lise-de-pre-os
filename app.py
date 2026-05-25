@@ -4876,6 +4876,47 @@ with tab_analise:
                 st.session_state[envio_state_key] = df_envio.copy()
                 st.session_state[envio_hash_key] = envio_hash
 
+                # ---------- Marca automática Enviar=True ao editar Preço Final ----------
+                # IMPORTANTE: este bloco TEM de vir ANTES do st.data_editor.
+                # Streamlit não permite modificar st.session_state["{widget_key}"]
+                # depois do widget ter sido instanciado nesta render.
+                #
+                # Lê edited_rows guardados pelo Streamlit no rerun anterior.
+                # Para cada linha onde Preço Final foi editado MAS o utilizador
+                # ainda não mexeu na checkbox Enviar, adiciona Enviar=True ao próprio
+                # edited_rows. Quando o data_editor renderizar abaixo, a checkbox
+                # aparecerá já marcada.
+                #
+                # Por que não cria loop infinito:
+                # - Condição de marca: "Preço Final" in mudancas AND "Enviar" not in mudancas
+                # - Após primeira marca, "Enviar" está em mudancas → condição False
+                # - Se user desmarcar manualmente, "Enviar"=False em mudancas → condição False
+                # - Se user voltar Preço Final ao inicial, a diff é pequena → condição False
+                estado_editor_atual = st.session_state.get("bling_envio_editor")
+                if isinstance(estado_editor_atual, dict):
+                    edited_rows_atuais = estado_editor_atual.get("edited_rows", {})
+                    if edited_rows_atuais:
+                        for idx_chave, mudancas in list(edited_rows_atuais.items()):
+                            try:
+                                idx = int(idx_chave)
+                            except (TypeError, ValueError):
+                                continue
+                            if idx < 0 or idx >= len(preco_final_inicial):
+                                continue
+                            # Marca apenas se:
+                            # - Preço Final está nas mudanças
+                            # - Enviar ainda não está (utilizador não interagiu com a checkbox)
+                            # - O valor novo difere significativamente do inicial
+                            if "Preço Final" in mudancas and "Enviar" not in mudancas:
+                                novo_valor = mudancas["Preço Final"]
+                                valor_inicial = preco_final_inicial[idx]
+                                if novo_valor is not None and valor_inicial is not None:
+                                    try:
+                                        if abs(float(novo_valor) - float(valor_inicial)) > 0.005:
+                                            edited_rows_atuais[idx_chave]["Enviar"] = True
+                                    except (TypeError, ValueError):
+                                        pass
+
                 editado = st.data_editor(
                     df_envio,
                     use_container_width=True,
@@ -4913,48 +4954,6 @@ with tab_analise:
                     },
                     key="bling_envio_editor",
                 )
-
-                # ---------- Marca automática Enviar=True ao editar Preço Final ----------
-                # Após o data_editor renderizar, lemos `edited_rows` (gerido pelo Streamlit).
-                # Para cada linha onde Preço Final foi editado MAS o utilizador ainda não
-                # mexeu na checkbox Enviar, adicionamos Enviar=True ao próprio edited_rows.
-                # Fazemos rerun para a marca aparecer visualmente.
-                #
-                # Por que não cria loop infinito:
-                # - Condição de marca: "Preço Final" in mudancas AND "Enviar" not in mudancas
-                # - Após primeira marca, "Enviar" está em mudancas → condição False
-                # - Se user desmarcar manualmente, "Enviar"=False em mudancas → condição False
-                # - Se user voltar Preço Final ao inicial, a diff é pequena → condição False
-                estado_editor_atual = st.session_state.get("bling_envio_editor", {})
-                if isinstance(estado_editor_atual, dict):
-                    edited_rows_atuais = estado_editor_atual.get("edited_rows", {})
-                    marcou_alguma = False
-                    for idx_chave, mudancas in list(edited_rows_atuais.items()):
-                        try:
-                            idx = int(idx_chave)
-                        except (TypeError, ValueError):
-                            continue
-                        if idx < 0 or idx >= len(preco_final_inicial):
-                            continue
-                        # Marca apenas se:
-                        # - Preço Final está nas mudanças
-                        # - Enviar ainda não está (utilizador não interagiu com a checkbox)
-                        # - O valor novo difere significativamente do inicial
-                        if "Preço Final" in mudancas and "Enviar" not in mudancas:
-                            novo_valor = mudancas["Preço Final"]
-                            valor_inicial = preco_final_inicial[idx]
-                            if novo_valor is not None and valor_inicial is not None:
-                                try:
-                                    if abs(float(novo_valor) - float(valor_inicial)) > 0.005:
-                                        edited_rows_atuais[idx_chave]["Enviar"] = True
-                                        marcou_alguma = True
-                                except (TypeError, ValueError):
-                                    pass
-                    if marcou_alguma:
-                        # Guardar de volta e forçar rerun para mostrar checkbox marcada
-                        estado_editor_atual["edited_rows"] = edited_rows_atuais
-                        st.session_state["bling_envio_editor"] = estado_editor_atual
-                        st.rerun()
 
                 # Resumo
                 n_marcados = int(editado["Enviar"].sum())
