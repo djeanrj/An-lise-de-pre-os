@@ -2080,6 +2080,38 @@ def _cache_serpapi_invalidar_tudo():
         pass
 
 
+# ========== CONSULTA DE CRÉDITOS SERPAPI ==========
+# O endpoint /account.json devolve estatísticas da conta (searches_left, plan_searches_left,
+# this_month_usage). É uma chamada META — NÃO consome créditos de busca.
+
+@st.cache_data(ttl=60, show_spinner=False)
+def obter_creditos_serpapi(api_key: str) -> dict | None:
+    """Consulta /account.json da SerpAPI.
+    NÃO consome créditos. Cache local 60s para evitar spam.
+    Retorna dict com 'searches_left', 'plan_searches_left', 'this_month_usage' ou None."""
+    if not api_key or len(api_key.strip()) < 10:
+        return None
+    try:
+        import requests
+        resp = requests.get(
+            "https://serpapi.com/account.json",
+            params={"api_key": api_key.strip()},
+            timeout=8,
+        )
+        if resp.status_code == 200:
+            data = resp.json()
+            return {
+                "searches_left": int(data.get("searches_left", 0)),
+                "plan_searches_left": int(data.get("plan_searches_left", 0)),
+                "this_month_usage": int(data.get("this_month_usage", 0)),
+                "account_email": data.get("account_email", ""),
+            }
+        return None
+    except Exception as e:
+        print(f"[SERPAPI-CREDITOS] erro: {e}", flush=True)
+        return None
+
+
 # Para reduzir o custo SerpAPI, fazemos cache no Supabase com TTL 30 dias.
 # Cache é GLOBAL (partilhada entre utilizadores) — é só URL público de loja,
 # não há informação sensível.
@@ -3184,9 +3216,35 @@ with st.sidebar:
         if st.session_state.api_key:
             _guardar_preferencia("serpapi_key", st.session_state.api_key)
             st.success("Chave ativada e guardada!")
+            # Forçar refresh do contador
+            obter_creditos_serpapi.clear()
         else:
             _guardar_preferencia("serpapi_key", None)
             st.error("Chave vazia.")
+
+    # ---------- Contador discreto de buscas restantes SerpAPI ----------
+    if st.session_state.api_key:
+        col_c, col_r = st.columns([5, 1])
+        with col_c:
+            creditos = obter_creditos_serpapi(st.session_state.api_key)
+            if creditos is not None:
+                left = creditos["searches_left"]
+                used = creditos["this_month_usage"]
+                # Cor consoante quantidade restante (baseado em 250/mês plano gratuito)
+                if left <= 0:
+                    st.error(f"💳 **0 buscas restantes** (chave esgotada)")
+                elif left < 25:
+                    st.warning(f"💳 {left} buscas restantes · usadas {used} este mês")
+                elif left < 75:
+                    st.caption(f"💳 {left} buscas restantes · usadas {used} este mês")
+                else:
+                    st.caption(f"💳 {left} buscas restantes")
+            else:
+                st.caption("💳 Não foi possível consultar créditos")
+        with col_r:
+            if st.button("🔄", help="Atualizar contador de créditos", key="btn_refresh_creditos"):
+                obter_creditos_serpapi.clear()
+                st.rerun()
 
     st.divider()
     # Status do Supabase + Bling
@@ -4235,6 +4293,9 @@ with tab_analise:
                         # Limpar caches de leitura para que o novo histórico apareça
                         carregar_analises_recentes.clear()
                         ranking_produtos_analisados.clear()
+
+                # Forçar refresh do contador de créditos SerpAPI (consumiu agora)
+                obter_creditos_serpapi.clear()
 
                 st.rerun()
 
