@@ -3237,9 +3237,10 @@ with st.sidebar:
             else:
                 _txt = f"🟢 {left} buscas restantes"
             # Markdown compacto: margens negativas puxam 1 linha para cima e baixo
+            # opacity funciona em ambos os temas (claro/escuro) sem precisar de cor fixa
             st.markdown(
                 f"<div style='margin-top:-0.8em; margin-bottom:-0.8em; "
-                f"font-size:0.85em; color:rgba(250,250,250,0.6);'>{_txt}</div>",
+                f"font-size:0.85em; opacity:0.7;'>{_txt}</div>",
                 unsafe_allow_html=True,
             )
 
