@@ -2311,6 +2311,43 @@ def buscar_serpapi(produto, ean, sku, custo, regiao_cfg, whitelist, blacklist, a
     concorrentes_similares = [] # match fraco (marca confirmada, sem SKU exacto — para verificação)
     rejeitados_log = {"usado": 0, "outlier_baixo": 0, "outlier_alto": 0, "irrelevante": 0, "internacional": 0, "acessorio": 0, "vendedor_naoconfiavel": 0, "serpapi_total": 0, "sem_preco": 0}
 
+    # ===== LIMITE DE EXPANSÕES PAGAS POR PRODUTO =====
+    # Cada produto pode disparar várias chamadas extra a google_immersive_product
+    # (uma por PID rico encontrado). Para evitar consumir todo o orçamento SerpAPI
+    # num único produto, limitamos a MAX_EXPANSOES_PAGAS chamadas REAIS.
+    # Cache HITs (gratuitos) não contam para o limite.
+    MAX_EXPANSOES_PAGAS = 5
+    _expansoes_pagas = [0]  # lista para ser mutable em closures
+
+    def _expandir_pid_otimizado(pid, token, contexto_log="expansao"):
+        """Wrapper inteligente sobre _fetch_real_sellers.
+        - Se cache HIT (sem custo): retorna sellers
+        - Se cache MISS e contador atingiu limite: skip (retorna [])
+        - Se cache MISS e dentro do limite: chama API e incrementa contador
+        Devolve: lista de sellers ([] se skip)."""
+        if not pid:
+            return []
+        # 1) Tentar cache (sempre gratuito)
+        cached = _cache_get_sellers(pid)
+        if cached is not None:
+            # Cache hit — devolver sem custo
+            print(f"[PLANO-B] cache HIT key={pid} sellers={len(cached)}", flush=True)
+            if len(cached) >= 5:
+                for s in cached[:13]:
+                    _nm = s.get("name", "")[:30]
+                    _lk = str(s.get("link", ""))[:90]
+                    print(f"[PLANO-B]   store: '{_nm}' | {_lk}", flush=True)
+            return cached
+        # 2) Cache miss — verificar limite antes de pagar
+        if _expansoes_pagas[0] >= MAX_EXPANSOES_PAGAS:
+            print(f"[US-OPT] skip pid={pid} ctx={contexto_log} (limite {MAX_EXPANSOES_PAGAS} expansões pagas/produto)", flush=True)
+            return []
+        if not token:
+            return []
+        # Chamada paga — incrementar contador antes de chamar
+        _expansoes_pagas[0] += 1
+        return _fetch_real_sellers(pid, token, regiao_cfg, api_key)
+
     # Detectar o tipo do produto procurado (principal / acessório / peça avulsa)
     # para filtrar resultados de forma coerente
     tipo_procurado = detectar_tipo_produto(produto)
@@ -2553,7 +2590,9 @@ def buscar_serpapi(produto, ean, sku, custo, regiao_cfg, whitelist, blacklist, a
                 _pid = item.get("product_id")
                 _token = item.get("immersive_product_page_token", "")
                 if _pid and _token:
-                    _all_stores = _fetch_real_sellers(str(_pid), _token, regiao_cfg, api_key)
+                    # Expansão principal: item já foi classificado como "forte"
+                    # → vale tentar mesmo com poucos sellers. Limite global aplica-se.
+                    _all_stores = _expandir_pid_otimizado(str(_pid), _token, contexto_log="expansao-principal")
                     print(f"[US-EXP] inicio expansao pid={_pid} stores_devolvidas={len(_all_stores)} item_source={item.get('source','')}", flush=True)
                     _pids_ja_expandidos.add(str(_pid))  # registar para não duplicar no fim
                     for store in _all_stores:
@@ -2652,11 +2691,23 @@ def buscar_serpapi(produto, ean, sku, custo, regiao_cfg, whitelist, blacklist, a
         # Alguns product_ids têm muitas stores (>=5) mas o item original que aponta
         # para eles foi rejeitado. Vamos tentar expandir esses pids também — se a
         # maioria dos URLs contiver o SKU, é o produto certo.
+        # OTIMIZAÇÃO: se cache hit revelar <5 stores, salta sem custo (raramente
+        # traz valor expandir órfãos com poucas stores). Cache miss respeita o
+        # limite global de MAX_EXPANSOES_PAGAS.
         _sku_check = str(sku).strip().lower() if _valido(sku) else ""
         for _pid_orfao, _token_orfao in _pids_ricos_orfaos.items():
             if _pid_orfao in _pids_ja_expandidos:
                 continue  # já foi expandido pelo item normal
-            _all_stores_orfao = _fetch_real_sellers(_pid_orfao, _token_orfao, regiao_cfg, api_key)
+
+            # OTIMIZAÇÃO: verificar cache PRIMEIRO. Se cache hit com <5 stores,
+            # nem vale a pena prosseguir (US-ORFAO é especulativo).
+            _cached_check = _cache_get_sellers(_pid_orfao)
+            if _cached_check is not None and len(_cached_check) < 5:
+                # Cache hit gratuito mas poucas stores → skip silencioso
+                print(f"[US-OPT] skip pid={_pid_orfao} cache={len(_cached_check)} stores (<5, órfão)", flush=True)
+                continue
+
+            _all_stores_orfao = _expandir_pid_otimizado(_pid_orfao, _token_orfao, contexto_log="US-ORFAO")
             if len(_all_stores_orfao) < 2:
                 # PID vazio ou só com 1 seller que já está no item original → pular
                 continue
@@ -2829,6 +2880,9 @@ def buscar_serpapi(produto, ean, sku, custo, regiao_cfg, whitelist, blacklist, a
     # Se uma loja apareceu nas duas listas, removê-la dos similares (a forte ganha)
     lojas_fortes = {_chave_loja(c) for c in concorrentes}
     concorrentes_similares = [c for c in concorrentes_similares if _chave_loja(c) not in lojas_fortes]
+
+    # Log final: quantas expansões pagas foram consumidas neste produto
+    print(f"[US-OPT] produto consumiu {_expansoes_pagas[0]}/{MAX_EXPANSOES_PAGAS} expansões pagas", flush=True)
 
     return concorrentes, rejeitados_log, concorrentes_similares
 
