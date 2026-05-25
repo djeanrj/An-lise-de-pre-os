@@ -2088,7 +2088,8 @@ def _cache_serpapi_invalidar_tudo():
 def obter_creditos_serpapi(api_key: str) -> dict | None:
     """Consulta /account.json da SerpAPI.
     NÃO consome créditos. Cache local 60s para evitar spam.
-    Retorna dict com 'searches_left', 'plan_searches_left', 'this_month_usage' ou None."""
+    Retorna dict com 'total_searches_left', 'plan_searches_left', 'this_month_usage',
+    'searches_per_month' ou None."""
     if not api_key or len(api_key.strip()) < 10:
         return None
     try:
@@ -2101,9 +2102,12 @@ def obter_creditos_serpapi(api_key: str) -> dict | None:
         if resp.status_code == 200:
             data = resp.json()
             return {
-                "searches_left": int(data.get("searches_left", 0)),
+                # total_searches_left = plan_searches_left + extra_credits
+                # Este é o número que interessa ao utilizador (quanto pode usar)
+                "total_searches_left": int(data.get("total_searches_left", 0)),
                 "plan_searches_left": int(data.get("plan_searches_left", 0)),
                 "this_month_usage": int(data.get("this_month_usage", 0)),
+                "searches_per_month": int(data.get("searches_per_month", 0)),
                 "account_email": data.get("account_email", ""),
             }
         return None
@@ -3226,7 +3230,7 @@ with st.sidebar:
     if st.session_state.api_key:
         creditos = obter_creditos_serpapi(st.session_state.api_key)
         if creditos is not None:
-            left = creditos["searches_left"]
+            left = creditos["total_searches_left"]
             # Emoji muda conforme estado, mas tudo sempre como caption (uma linha)
             if left <= 0:
                 _txt = f"🔴 <b>0 buscas restantes</b> — chave esgotada"
