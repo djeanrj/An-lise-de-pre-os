@@ -4335,7 +4335,8 @@ with tab_analise:
             if not df_poucos.empty:
                 num_problematicos = len(df_poucos)
                 exemplos_skus = ", ".join(
-                    str(s) for s in df_poucos["SKU"].head(5).tolist() if _valido(s)
+                    str(s) for s in df_poucos["SKU"].head(5).tolist()
+                    if s is not None and str(s).strip() and str(s).strip().lower() != "nan"
                 )
                 if exemplos_skus:
                     exemplos_txt = f" Exemplos: **{exemplos_skus}**" + (
@@ -4813,7 +4814,8 @@ with tab_analise:
                     for i in ids_bling_serie
                 ]
                 skus_atuais = [
-                    str(s) if _valido(s) else "" for s in df_v.get("SKU", pd.Series([""] * len(df_v))).values
+                    str(s) if (s is not None and str(s).strip() and str(s).strip().lower() != "nan") else ""
+                    for s in df_v.get("SKU", pd.Series([""] * len(df_v))).values
                 ]
                 # Hash da filtragem actual (ordem + identificadores)
                 envio_hash = hash(tuple(zip(ids_atuais, skus_atuais)))
