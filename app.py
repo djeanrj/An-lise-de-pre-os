@@ -4265,6 +4265,37 @@ with tab_analise:
                 "Se um link mostrar preço diferente, o concorrente atualizou após a captura."
             )
 
+        # ========== AVISO: Produtos com dados insuficientes ==========
+        # Detectar produtos com menos de 3 concorrentes — sinal de que a SerpAPI não
+        # conseguiu indexar bem o produto. Causas típicas:
+        # - Sets antigos (descontinuados, pouca indexação no Google Shopping)
+        # - Lançamentos muito recentes (ainda não indexados pelos marketplaces)
+        # - Produtos de nicho / baixa procura
+        if "N Concorrentes" in df.columns:
+            df_poucos = df[df["N Concorrentes"] < 3]
+            if not df_poucos.empty:
+                num_problematicos = len(df_poucos)
+                exemplos_skus = ", ".join(
+                    str(s) for s in df_poucos["SKU"].head(5).tolist() if _valido(s)
+                )
+                if exemplos_skus:
+                    exemplos_txt = f" Exemplos: **{exemplos_skus}**" + (
+                        " ..." if num_problematicos > 5 else "."
+                    )
+                else:
+                    exemplos_txt = ""
+                st.warning(
+                    f"⚠️ **{num_problematicos} produto(s) com dados insuficientes** "
+                    f"(menos de 3 concorrentes detectados).{exemplos_txt}\n\n"
+                    "**Possíveis causas:**\n"
+                    "- 🕰️ **Sets antigos** (descontinuados ou com pouca indexação no Google Shopping)\n"
+                    "- 🆕 **Lançamentos recentes** (ainda não indexados pelos marketplaces)\n"
+                    "- 🎯 **Produtos de nicho** com baixa concorrência online\n\n"
+                    "**Recomendação:** valida manualmente o preço de mercado nos sites principais "
+                    "(LEGO oficial, Magalu, Amazon BR, Mercado Livre) e ajusta o **Preço Final** "
+                    "no painel Bling antes de enviar."
+                )
+
         cf1, cf2, cf3 = st.columns(3)
         with cf1:
             sel_lojas = st.multiselect("🏪 Marketplace líder (🥇):",
@@ -4709,56 +4740,76 @@ with tab_analise:
                         # Sugerido < Atual → perco margem
                         deltas.append(f"🔴 {pct:+.1f}%")
 
-                # Construir dataframe editável
-                df_envio = pd.DataFrame({
-                    "Enviar": False,  # checkbox por linha
-                    "Nome": df_v["Nome"].values,
-                    "SKU": df_v.get("SKU", pd.Series([""] * len(df_v))).values,
-                    "Preço Atual Bling": [
+                # ---------- Construção/Reutilização do df_envio ----------
+                # Problema anterior: a cada rerun reconstruíamos df_envio do zero,
+                # o que perdia as edições do utilizador (Streamlit aplica edited_rows
+                # do data_editor sobre o NOVO df, mas com os nossos resets, os edits
+                # eram sobrescritos pelo valor inicial).
+                #
+                # Solução: guardar df_envio em session_state e SÓ reconstruir quando
+                # a filtragem (lista de SKUs/IDs) muda. Caso contrário, reutilizamos
+                # o estado já editado pelo utilizador.
+                ids_atuais = [
+                    str(i) if i is not None and not (isinstance(i, float) and pd.isna(i)) else None
+                    for i in ids_bling_serie
+                ]
+                skus_atuais = [
+                    str(s) if _valido(s) else "" for s in df_v.get("SKU", pd.Series([""] * len(df_v))).values
+                ]
+                # Hash da filtragem actual (ordem + identificadores)
+                envio_hash = hash(tuple(zip(ids_atuais, skus_atuais)))
+
+                envio_state_key = "_bling_df_envio_state"
+                envio_hash_key = "_bling_df_envio_hash"
+
+                # Decidir se podemos reutilizar o estado anterior
+                reutilizar = (
+                    envio_state_key in st.session_state
+                    and st.session_state.get(envio_hash_key) == envio_hash
+                )
+
+                if reutilizar:
+                    # Reutilizar df anterior (preserva edições do utilizador)
+                    df_envio = st.session_state[envio_state_key].copy()
+                    # Actualizar colunas read-only (Preço Atual Bling, Δ, Sugerido)
+                    # caso tenham mudado por refresh do Bling
+                    df_envio["Preço Atual Bling"] = [
                         (float(p) if p is not None else None) for p in precos_atuais
-                    ],
-                    "Δ": deltas,
-                    "Preço Sugerido": df_v["Preço Sugerido"].astype(float).values,
-                    "Preço Final": preco_final_inicial,
-                    "Status": df_v.get("Status Mercado", df_v.get("Status", "")).values,
-                })
-                # Guardar ID se existir (em coluna escondida para identificar)
-                if tem_id_bling:
+                    ]
+                    df_envio["Δ"] = deltas
+                    df_envio["Preço Sugerido"] = df_v["Preço Sugerido"].astype(float).values
+                    df_envio["Status"] = df_v.get(
+                        "Status Mercado", df_v.get("Status", "")
+                    ).values
+                else:
+                    # Construir df_envio do zero
+                    df_envio = pd.DataFrame({
+                        "Enviar": False,  # checkbox por linha
+                        "Nome": df_v["Nome"].values,
+                        "SKU": df_v.get("SKU", pd.Series([""] * len(df_v))).values,
+                        "Preço Atual Bling": [
+                            (float(p) if p is not None else None) for p in precos_atuais
+                        ],
+                        "Δ": deltas,
+                        "Preço Sugerido": df_v["Preço Sugerido"].astype(float).values,
+                        "Preço Final": preco_final_inicial,
+                        "Status": df_v.get("Status Mercado", df_v.get("Status", "")).values,
+                    })
+                    # Guardar ID se existir (em coluna escondida para identificar)
+                    if tem_id_bling:
+                        df_envio["_id_bling"] = df_v["ID"].values
+                    # Resetar estado do data_editor (chaves antigas seriam aplicadas
+                    # sobre linhas erradas)
+                    if "bling_envio_editor" in st.session_state:
+                        del st.session_state["bling_envio_editor"]
+
+                # Garantir que coluna _id_bling existe se aplicável
+                if tem_id_bling and "_id_bling" not in df_envio.columns:
                     df_envio["_id_bling"] = df_v["ID"].values
 
-                # ---------- Marca automática: detectar edições do Preço Final ----------
-                # Comparamos com o "snapshot" guardado na sessão. Se o utilizador editar
-                # uma linha (Preço Final diferente do inicial), marcamos Enviar=True
-                # automaticamente. O utilizador pode desmarcar se mudou de ideias.
-                snap_key = "_bling_envio_snapshot"
-                if snap_key in st.session_state:
-                    snap_prev = st.session_state[snap_key]
-                    # snap_prev é dict {chave: preco_inicial} onde chave = (Nome, SKU)
-                    # Detectamos edição comparando com o valor *anterior* da sessão.
-                    estado_editor_key = "bling_envio_editor"
-                    if estado_editor_key in st.session_state:
-                        estado_editor = st.session_state[estado_editor_key]
-                        # edited_rows é dict {idx: {coluna: valor}}
-                        edits = estado_editor.get("edited_rows", {})
-                        for idx_str, mudancas in edits.items():
-                            try:
-                                idx = int(idx_str)
-                            except (TypeError, ValueError):
-                                continue
-                            if idx < 0 or idx >= len(df_envio):
-                                continue
-                            if "Preço Final" in mudancas:
-                                novo_valor = mudancas["Preço Final"]
-                                valor_inicial = preco_final_inicial[idx]
-                                if novo_valor is not None and abs(float(novo_valor) - float(valor_inicial)) > 0.005:
-                                    # Marca automática ao editar (utilizador pode desmarcar)
-                                    if "Enviar" not in mudancas:
-                                        df_envio.at[idx, "Enviar"] = True
-
-                # Guardar snapshot para próxima execução
-                st.session_state[snap_key] = {
-                    i: float(p) for i, p in enumerate(preco_final_inicial)
-                }
+                # Guardar para próxima execução
+                st.session_state[envio_state_key] = df_envio.copy()
+                st.session_state[envio_hash_key] = envio_hash
 
                 editado = st.data_editor(
                     df_envio,
@@ -4797,6 +4848,48 @@ with tab_analise:
                     },
                     key="bling_envio_editor",
                 )
+
+                # ---------- Marca automática Enviar=True ao editar Preço Final ----------
+                # Após o data_editor renderizar, lemos `edited_rows` (gerido pelo Streamlit).
+                # Para cada linha onde Preço Final foi editado MAS o utilizador ainda não
+                # mexeu na checkbox Enviar, adicionamos Enviar=True ao próprio edited_rows.
+                # Fazemos rerun para a marca aparecer visualmente.
+                #
+                # Por que não cria loop infinito:
+                # - Condição de marca: "Preço Final" in mudancas AND "Enviar" not in mudancas
+                # - Após primeira marca, "Enviar" está em mudancas → condição False
+                # - Se user desmarcar manualmente, "Enviar"=False em mudancas → condição False
+                # - Se user voltar Preço Final ao inicial, a diff é pequena → condição False
+                estado_editor_atual = st.session_state.get("bling_envio_editor", {})
+                if isinstance(estado_editor_atual, dict):
+                    edited_rows_atuais = estado_editor_atual.get("edited_rows", {})
+                    marcou_alguma = False
+                    for idx_chave, mudancas in list(edited_rows_atuais.items()):
+                        try:
+                            idx = int(idx_chave)
+                        except (TypeError, ValueError):
+                            continue
+                        if idx < 0 or idx >= len(preco_final_inicial):
+                            continue
+                        # Marca apenas se:
+                        # - Preço Final está nas mudanças
+                        # - Enviar ainda não está (utilizador não interagiu com a checkbox)
+                        # - O valor novo difere significativamente do inicial
+                        if "Preço Final" in mudancas and "Enviar" not in mudancas:
+                            novo_valor = mudancas["Preço Final"]
+                            valor_inicial = preco_final_inicial[idx]
+                            if novo_valor is not None and valor_inicial is not None:
+                                try:
+                                    if abs(float(novo_valor) - float(valor_inicial)) > 0.005:
+                                        edited_rows_atuais[idx_chave]["Enviar"] = True
+                                        marcou_alguma = True
+                                except (TypeError, ValueError):
+                                    pass
+                    if marcou_alguma:
+                        # Guardar de volta e forçar rerun para mostrar checkbox marcada
+                        estado_editor_atual["edited_rows"] = edited_rows_atuais
+                        st.session_state["bling_envio_editor"] = estado_editor_atual
+                        st.rerun()
 
                 # Resumo
                 n_marcados = int(editado["Enviar"].sum())
