@@ -3229,13 +3229,19 @@ with st.sidebar:
             left = creditos["searches_left"]
             # Emoji muda conforme estado, mas tudo sempre como caption (uma linha)
             if left <= 0:
-                st.caption(f"🔴 **0 buscas restantes** — chave esgotada")
+                _txt = f"🔴 <b>0 buscas restantes</b> — chave esgotada"
             elif left < 25:
-                st.caption(f"🟠 **{left}** buscas restantes")
+                _txt = f"🟠 <b>{left}</b> buscas restantes"
             elif left < 75:
-                st.caption(f"🟡 {left} buscas restantes")
+                _txt = f"🟡 {left} buscas restantes"
             else:
-                st.caption(f"🟢 {left} buscas restantes")
+                _txt = f"🟢 {left} buscas restantes"
+            # Markdown compacto: margens negativas puxam 1 linha para cima e baixo
+            st.markdown(
+                f"<div style='margin-top:-0.8em; margin-bottom:-0.8em; "
+                f"font-size:0.85em; color:rgba(250,250,250,0.6);'>{_txt}</div>",
+                unsafe_allow_html=True,
+            )
 
     st.divider()
     # Status do Supabase + Bling
