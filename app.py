@@ -3224,27 +3224,18 @@ with st.sidebar:
 
     # ---------- Contador discreto de buscas restantes SerpAPI ----------
     if st.session_state.api_key:
-        col_c, col_r = st.columns([5, 1])
-        with col_c:
-            creditos = obter_creditos_serpapi(st.session_state.api_key)
-            if creditos is not None:
-                left = creditos["searches_left"]
-                used = creditos["this_month_usage"]
-                # Cor consoante quantidade restante (baseado em 250/mês plano gratuito)
-                if left <= 0:
-                    st.error(f"💳 **0 buscas restantes** (chave esgotada)")
-                elif left < 25:
-                    st.warning(f"💳 {left} buscas restantes · usadas {used} este mês")
-                elif left < 75:
-                    st.caption(f"💳 {left} buscas restantes · usadas {used} este mês")
-                else:
-                    st.caption(f"💳 {left} buscas restantes")
+        creditos = obter_creditos_serpapi(st.session_state.api_key)
+        if creditos is not None:
+            left = creditos["searches_left"]
+            # Emoji muda conforme estado, mas tudo sempre como caption (uma linha)
+            if left <= 0:
+                st.caption(f"🔴 **0 buscas restantes** — chave esgotada")
+            elif left < 25:
+                st.caption(f"🟠 **{left}** buscas restantes")
+            elif left < 75:
+                st.caption(f"🟡 {left} buscas restantes")
             else:
-                st.caption("💳 Não foi possível consultar créditos")
-        with col_r:
-            if st.button("🔄", help="Atualizar contador de créditos", key="btn_refresh_creditos"):
-                obter_creditos_serpapi.clear()
-                st.rerun()
+                st.caption(f"🟢 {left} buscas restantes")
 
     st.divider()
     # Status do Supabase + Bling
