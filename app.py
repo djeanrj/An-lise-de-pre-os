@@ -321,9 +321,25 @@ BLACKLIST_GLOBAL = [
 ]
 
 BLACKLIST_REGIONAL = {
-    "BR": BLACKLIST_GLOBAL + ["ebay", "kidinn.com", "tradeinn.com", "vendiloshop", "you get"],
-    "PT_ONLY": BLACKLIST_GLOBAL + ["ebay", "kidinn.com", "tradeinn.com", "vendiloshop", "you get"],
-    "EU": BLACKLIST_GLOBAL + ["ebay", "kidinn.com", "tradeinn.com", "vendiloshop", "you get"],
+    "BR": BLACKLIST_GLOBAL + [
+        "ebay", "kidinn.com", "tradeinn.com", "vendiloshop", "you get",
+        # Lojas internacionais disfarçadas (têm .com.br mas cobram frete UPS/FedEx
+        # internacional, ou domínio é internacional)
+        "bricksdirect",     # bricksdirect.com.br — frete UPS/FedEx R$168-250
+        "bord31",           # bord31.ro — Romeno
+        "samstoy",          # samstoy.in — Índia
+        "sundora",          # sundora.com.bd — Bangladesh
+        "game.toys",        # internacional
+        "microless",        # UAE (Emirados Árabes)
+    ],
+    "PT_ONLY": BLACKLIST_GLOBAL + [
+        "ebay", "kidinn.com", "tradeinn.com", "vendiloshop", "you get",
+        "bricksdirect", "bord31", "samstoy", "sundora", "game.toys", "microless",
+    ],
+    "EU": BLACKLIST_GLOBAL + [
+        "ebay", "kidinn.com", "tradeinn.com", "vendiloshop", "you get",
+        "bricksdirect", "bord31", "samstoy", "sundora", "game.toys", "microless",
+    ],
     "US": BLACKLIST_GLOBAL + [
         # Lojas estrangeiras com frete internacional caro / impostos extras
         # (lojas "estilo X" / acessórios LEGO não estão aqui — coerente_com_tipo()
@@ -388,6 +404,10 @@ KEYWORDS_ACESSORIO_OU_COMPATIVEL = [
     # PT-BR
     "kit de luzes", "kit de luz", "kit de iluminação", "kit de iluminacao",
     "kit luminoso", "luzes led", "iluminação led", "iluminacao led",
+    # PT-BR — variantes singulares e "para LEGO" (faltavam antes)
+    "luz led", "luz de led", "luzes para lego", "luz para lego",
+    "iluminação para lego", "iluminacao para lego",
+    " para lego ", " para o lego ", "para o lego",
     "compatível com lego", "compativel com lego", "compatível com o lego", "compativel com o lego",
     "compatível para lego", "compativel para lego",
     "alternativa ao lego", "tipo lego", "estilo lego",
@@ -402,6 +422,7 @@ KEYWORDS_ACESSORIO_OU_COMPATIVEL = [
     "compatível com o", "para o",
     # EN — LEGO/brinquedos
     "light kit", "led light kit", "lighting kit", "led kit",
+    "led light for", "led lighting for", "light for lego",
     "compatible with lego", "compatible with the lego",
     "for lego", "fits lego", "designed for lego",
     "display case for lego", "display for lego", "shelf for lego",
@@ -414,6 +435,13 @@ KEYWORDS_ACESSORIO_OU_COMPATIVEL = [
     "kingdombricksupply", "brickshellcases", "brickcessories",  # display brands
     "shoppopdisplays", "wezhape", "icuanuty", "hox3d", "prodocase",  # mais display brands
     "wickedbrick",  # Wicked Brick (displays)
+    # Marcas conhecidas de kits de iluminação LED para LEGO (não são o produto LEGO)
+    "lightailing", "briksmax", "lightgo", "geament", "vaodest", "vonado",
+    "locolee", "brickbling", "kyglaring", "mililier", "seemey", "dalded",
+    "kyglaring", "byb light", "lightspecial",
+    # Variantes com hífen (aparecem em URLs/slugs do Magalu/Amazon/etc)
+    "luz-led", "luz-led-para", "led-para-lego", "kit-luz", "kit-de-luz",
+    "kit-iluminacao", "kit-iluminação", "luzes-led", "luzes-para-lego",
     # MOC = "My Own Creation" — builds não oficiais (clones / instruções alternativas)
     "moc-", "moc compatible", "moc compativel", "moc kompatibel",
     "compatible moc", "build alternativo", "alternative build",
@@ -445,6 +473,73 @@ KEYWORDS_ACESSORIO_OU_COMPATIVEL = [
     "éclairage pour lego", "iluminación para lego", "illuminazione per lego",
     "beleuchtung für lego",
 ]
+
+
+# Keywords que indicam ANÚNCIO INTERNACIONAL no Mercado Livre BR (ou outros sites .com.br)
+# Vendedores chineses/internacionais listam produtos no ML BR mas o slug do URL
+# revela tradução automática estranha ou está em inglês — pistas de que o produto
+# vem do exterior mesmo que o domínio seja .com.br.
+KEYWORDS_ANUNCIO_INTERNACIONAL = [
+    # === PT-BR não-nativo (tradução automática chinesa) ===
+    "brinquedo-de-ces", "brinquedo de ces",
+    "brinquedo-de-cao", "brinquedo de cao",
+    "brinquedo-de-criancas", "brinquedo de criancas",
+    "adequado-para-criancas-com", "adequado para criancas com",
+    "adequado-para-criancas-a-partir", "adequado para criancas a partir",
+    "adequado-para-criancas-de", "adequado para criancas de",
+    "presente-para-criancas-com", "presente para criancas com",
+    "presente-para-criancas-a-partir", "presente para criancas a partir",
+    "presente-para-criancas-de", "presente para criancas de",
+    "para-criancas-com-anos", "para criancas com anos",
+    "construcao-do-brinquedo", "construcao do brinquedo",
+    "construir-brinquedo", "construir brinquedo",
+    "kit-de-construcao-do", "kit de construcao do",
+
+    # === Inglês em URL/título (suspeito num site .com.br) ===
+    # Frases idiomáticas em inglês — não palavras isoladas porque LEGO tem temas em
+    # inglês legítimos como "Friends", "Creator", "Technic", "Star Wars", etc.
+    "building-toy", "building toy",
+    "for-kids-aged", "for kids aged",
+    "for-children-aged", "for children aged",
+    "for-kids-ages", "for kids ages",
+    "for-children-ages", "for children ages",
+    "for-kids-with", "for kids with",
+    "for-children-with", "for children with",
+    "the-lion-king", "the lion king",
+    "lion-king-cub", "lion king cub",
+    "ages-and-up", "ages and up",
+    "and-up-set", "and up set",
+    "building-blocks-set", "building blocks set",
+    "construction-toy-set", "construction toy set",
+    "the-king-cub", "the king cub",
+    "with-mini-figures", "with mini figures",
+
+    # === Auto-declaração de importação ===
+    "compra-internacional", "compra internacional",
+    "produto-importado", "produto importado",
+    "importado-direto", "importado direto",
+    "importacao-direta", "importacao direta",
+    "envio-internacional", "envio internacional",
+]
+
+
+def parece_anuncio_internacional(item):
+    """Detecta se um item parece ser de vendedor internacional disfarçado de BR.
+
+    Pistas detectadas:
+    - Slug do URL tem tradução automática estranha (chinês→PT mal traduzido)
+    - Slug do URL está em inglês mesmo num domínio .com.br
+    - Auto-declaração no slug: "importado", "compra-internacional"
+
+    Devolve: (True/False, keyword_detectada_para_log)
+    """
+    link = (item.get("link") or "").lower()
+    title = (item.get("title") or "").lower()
+    blob = link + " " + title
+    for kw in KEYWORDS_ANUNCIO_INTERNACIONAL:
+        if kw.lower() in blob:
+            return True, kw
+    return False, ""
 
 
 def detectar_tipo_produto(nome_produto):
@@ -2149,7 +2244,8 @@ def _log_chamada_serpapi(engine: str, query: str, api_key: str, contexto: str = 
 @st.cache_data(ttl=300, show_spinner=False)
 def _cache_get_sellers(product_id: str):
     """Procura sellers na cache Supabase. Devolve lista de {name, link, price} ou None.
-    Cache válida durante 30 dias."""
+    Cache válida durante 24 horas (alinhado com cache da query principal).
+    Antes era 30 dias — reduzido para garantir frescura dos preços expandidos."""
     if not product_id:
         return None
     try:
@@ -2160,10 +2256,11 @@ def _cache_get_sellers(product_id: str):
         if not res.data:
             return None
         row = res.data[0]
-        # Verificar TTL: 30 dias
+        # Verificar TTL: 24 horas (era 30 dias, reduzido para evitar preços desactualizados)
         try:
             updated_at = datetime.fromisoformat(row["updated_at"].replace("Z", "+00:00"))
-            if (datetime.now(timezone.utc) - updated_at).days > 30:
+            idade = (datetime.now(timezone.utc) - updated_at).total_seconds() / 3600
+            if idade > 24:
                 return None  # expirou
         except Exception:
             pass
@@ -2251,6 +2348,19 @@ def _fetch_real_sellers(cache_key: str, page_token: str, regiao_cfg: dict, api_k
             link = s.get("link") or ""
             if not link or "google.com" in link.lower():
                 continue  # ignorar links que vão ao Google
+            # LOG DIAGNÓSTICO: mostrar TODOS os campos de preço para detectar
+            # divergências entre extracted_price/extracted_total/price/total
+            _name = s.get("name", "")[:25]
+            _ep = s.get("extracted_price")
+            _et = s.get("extracted_total")
+            _ps = (s.get("price") or "")[:30]
+            _ts = (s.get("total") or "")[:30]
+            _ship = (s.get("shipping") or "")[:20]
+            print(
+                f"[PRECO-DBG] store='{_name}' ep={_ep} et={_et} "
+                f"price='{_ps}' total='{_ts}' ship='{_ship}'",
+                flush=True,
+            )
             sellers.append({
                 "name": s.get("name", ""),
                 "link": link,
@@ -2477,6 +2587,14 @@ def buscar_serpapi(produto, ean, sku, custo, regiao_cfg, whitelist, blacklist, a
                 rejeitados_log["acessorio"] = rejeitados_log.get("acessorio", 0) + 1
                 continue
 
+            # Detectar vendedores internacionais disfarçados (Mercado Livre BR
+            # com slug em inglês, tradução automática chinesa, etc.)
+            _intl_match, _intl_kw = parece_anuncio_internacional(item)
+            if _intl_match:
+                print(f"[US-DBG] INTL-DISF '{_src}' | '{_tit}' (kw='{_intl_kw}')", flush=True)
+                rejeitados_log["internacional"] = rejeitados_log.get("internacional", 0) + 1
+                continue
+
             if parece_compra_internacional(item, regiao_cfg.get("id", "")):
                 print(f"[US-DBG] INT '{_src}' | '{_tit}'", flush=True)
                 rejeitados_log["internacional"] = rejeitados_log.get("internacional", 0) + 1
@@ -2636,6 +2754,12 @@ def buscar_serpapi(produto, ean, sku, custo, regiao_cfg, whitelist, blacklist, a
                             print(f"[US-EXP] TIPO '{store_name}' | {store_link[:80]} (proc={tipo_procurado})", flush=True)
                             continue
 
+                        # Filtro 4: vendedor internacional disfarçado (ML BR em inglês, etc.)
+                        _intl_match, _intl_kw = parece_anuncio_internacional(store_item_compat)
+                        if _intl_match:
+                            print(f"[US-EXP] INTL-DISF '{store_name}' | {store_link[:80]} (kw='{_intl_kw}')", flush=True)
+                            continue
+
                         print(f"[US-EXP] ACEITO '{store_name}' | {store_link[:80]}", flush=True)
 
                         # Filtro 3: preço — heurística robusta para lidar com bug do BR.
@@ -2761,6 +2885,12 @@ def buscar_serpapi(produto, ean, sku, custo, regiao_cfg, whitelist, blacklist, a
                 if apenas_novos and not parece_produto_novo(store_item_compat):
                     continue
                 if not coerente_com_tipo(store_item_compat, tipo_procurado):
+                    continue
+
+                # Filtro: vendedor internacional disfarçado
+                _intl_match, _intl_kw = parece_anuncio_internacional(store_item_compat)
+                if _intl_match:
+                    print(f"[US-ORFAO] INTL-DISF '{store_name}' | {store_link[:80]} (kw='{_intl_kw}')", flush=True)
                     continue
 
                 _ep = store.get("extracted_price") or 0
