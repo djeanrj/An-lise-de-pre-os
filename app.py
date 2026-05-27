@@ -230,6 +230,57 @@ idiomas = {
         "label_chave": "SerpApi Key", "btn_confirmar": "Confirmar Chave",
         "termos_check": "Eu aceito os Termos de Uso do Brasil.",
         "btn_excel": "Subir planilha", "btn_analisar": "Iniciar Análise Real",
+        # === Cabeçalhos ===
+        "header_regiao": "🌎 Região",
+        "header_api": "🔑 Chave API",
+        "header_termos": "📋 Termos de Uso",
+        "header_carregar": "📦 Carregamento de Produtos",
+        "header_selecionar": "🎯 Seleção de Produtos",
+        "header_parametros": "⚙️ Parâmetros da Análise",
+        "header_resultados": "📊 Resultados da Análise",
+        "header_analise_visual": "📉 Análise Visual",
+        "header_tabela": "📋 Tabela Detalhada",
+        "header_bling_update": "📤 Atualizar preços no Bling",
+        "header_verificacao": "🔍 Painel de Verificação de Concorrentes",
+        "header_historico": "📜 Histórico de Análises e Tendências",
+        "header_ultimas": "🗓️ Últimas análises",
+        "header_top": "🏆 Produtos mais analisados (últimos 90 dias)",
+        "header_tendencia": "📈 Tendência de preço por produto",
+        # === Abas ===
+        "tab_nova": "🎯 Nova Análise",
+        "tab_historico": "📜 Histórico",
+        # === Botões ===
+        "btn_sair": "Sair",
+        "btn_retry": "🔄 Tentar de novo",
+        "btn_desconectar": "🚪 Desconectar",
+        "btn_importar_bling": "📥 Importar catálogo do Bling",
+        "btn_reimportar": "🔄 Reimportar",
+        "btn_limpar": "🗑️ Limpar análise e começar nova",
+        "btn_login": "Entrar",
+        # === Mensagens ===
+        "msg_intro": "Análise de preços e concorrência para o seu catálogo",
+        "msg_login_titulo": "Faça login para começar",
+        "msg_serpapi_warn": "⚠️ Insira a sua SerpApi Key na barra lateral para continuar.",
+        "msg_planilha_help": "👉 Não tem ainda uma planilha? Descarregue o exemplo abaixo, preencha com os seus produtos e volte a carregar.",
+        "msg_sem_concorrentes": "Sem concorrentes confiáveis encontrados para este produto.",
+        "msg_historico_ativo": "📚 Histórico ativo (Supabase)",
+        "msg_historico_inativo": "📚 Histórico desativado\n(configure SUPABASE_URL/KEY)",
+        "msg_bling_nao_config": "🛒 Bling não configurado",
+        "msg_sem_analises": "Ainda não há análises gravadas. Corra uma análise no separador ao lado para começar.",
+        "msg_sem_tendencias": "Ainda não há histórico suficiente para mostrar tendências.",
+        "msg_tendencias_min": "São necessárias pelo menos 2 análises do mesmo produto para mostrar tendência. Continue a correr análises ao longo do tempo.",
+        "msg_hist_grava_falha": "Não foi possível gravar histórico: utilizador não autenticado.",
+        # === Expanders / labels ===
+        "exp_suporte": "✉️ Suporte",
+        "exp_detalhes_tec": "🔍 Detalhes técnicos",
+        "exp_previa": "👀 Pré-visualizar dados carregados",
+        "exp_filtros_av": "🎛️ Filtros avançados de qualidade",
+        "exp_debug_serp": "🔍 Debug: ver campos crus da SerpAPI (para ajustar filtros)",
+        # === Labels de formulário ===
+        "label_margem_min": "% Margem mínima (chão)",
+        "label_tipo_grafico": "Tipo de gráfico:",
+        "label_mapping": "**🤖 Mapeamento automático das colunas (corrija se necessário):**",
+        "label_ean": "EAN/CÓD. BARRAS:",
     },
     "Portugal 🇵🇹": {
         "id": "PT", "moeda": "€", "lang": "pt-PT", "domain": "google.pt",
@@ -238,6 +289,57 @@ idiomas = {
         "label_chave": "Chave SerpApi", "btn_confirmar": "Confirmar Chave",
         "termos_check": "Aceito os Termos de Utilização de Portugal.",
         "btn_excel": "Carregar folha de cálculo", "btn_analisar": "Analisar Mercado Ibérico/UE",
+        # === Cabeçalhos ===
+        "header_regiao": "🌎 Região",
+        "header_api": "🔑 Chave API",
+        "header_termos": "📋 Termos de Utilização",
+        "header_carregar": "📦 Carregamento de Produtos",
+        "header_selecionar": "🎯 Selecção de Produtos",
+        "header_parametros": "⚙️ Parâmetros da Análise",
+        "header_resultados": "📊 Resultados da Análise",
+        "header_analise_visual": "📉 Análise Visual",
+        "header_tabela": "📋 Tabela Detalhada",
+        "header_bling_update": "📤 Actualizar preços no Bling",
+        "header_verificacao": "🔍 Painel de Verificação de Concorrentes",
+        "header_historico": "📜 Histórico de Análises e Tendências",
+        "header_ultimas": "🗓️ Últimas análises",
+        "header_top": "🏆 Produtos mais analisados (últimos 90 dias)",
+        "header_tendencia": "📈 Tendência de preço por produto",
+        # === Abas ===
+        "tab_nova": "🎯 Nova Análise",
+        "tab_historico": "📜 Histórico",
+        # === Botões ===
+        "btn_sair": "Sair",
+        "btn_retry": "🔄 Tentar novamente",
+        "btn_desconectar": "🚪 Desligar",
+        "btn_importar_bling": "📥 Importar catálogo do Bling",
+        "btn_reimportar": "🔄 Reimportar",
+        "btn_limpar": "🗑️ Limpar análise e começar nova",
+        "btn_login": "Entrar",
+        # === Mensagens ===
+        "msg_intro": "Análise de preços e concorrência para o seu catálogo",
+        "msg_login_titulo": "Inicie sessão para começar",
+        "msg_serpapi_warn": "⚠️ Introduza a sua SerpApi Key na barra lateral para continuar.",
+        "msg_planilha_help": "👉 Ainda não tem uma folha de cálculo? Descarregue o exemplo abaixo, preencha com os seus produtos e volte a carregar.",
+        "msg_sem_concorrentes": "Sem concorrentes confiáveis encontrados para este produto.",
+        "msg_historico_ativo": "📚 Histórico activo (Supabase)",
+        "msg_historico_inativo": "📚 Histórico desactivado\n(configure SUPABASE_URL/KEY)",
+        "msg_bling_nao_config": "🛒 Bling não configurado",
+        "msg_sem_analises": "Ainda não existem análises gravadas. Corra uma análise no separador ao lado para começar.",
+        "msg_sem_tendencias": "Ainda não existe histórico suficiente para mostrar tendências.",
+        "msg_tendencias_min": "São necessárias pelo menos 2 análises do mesmo produto para mostrar tendência. Continue a correr análises ao longo do tempo.",
+        "msg_hist_grava_falha": "Não foi possível gravar histórico: utilizador não autenticado.",
+        # === Expanders / labels ===
+        "exp_suporte": "✉️ Suporte",
+        "exp_detalhes_tec": "🔍 Detalhes técnicos",
+        "exp_previa": "👀 Pré-visualizar dados carregados",
+        "exp_filtros_av": "🎛️ Filtros avançados de qualidade",
+        "exp_debug_serp": "🔍 Debug: ver campos crus da SerpAPI (para ajustar filtros)",
+        # === Labels de formulário ===
+        "label_margem_min": "% Margem mínima (chão)",
+        "label_tipo_grafico": "Tipo de gráfico:",
+        "label_mapping": "**🤖 Mapeamento automático das colunas (corrija se necessário):**",
+        "label_ean": "EAN/CÓD. BARRAS:",
     },
     "USA 🇺🇸 (experimental)": {
         "id": "US", "moeda": "$", "lang": "en", "domain": "google.com",
@@ -246,8 +348,73 @@ idiomas = {
         "label_chave": "SerpApi Key", "btn_confirmar": "Confirm Key",
         "termos_check": "I accept the USA Terms.",
         "btn_excel": "Upload Spreadsheet", "btn_analisar": "Start Market Analysis",
+        # === Headers ===
+        "header_regiao": "🌎 Region",
+        "header_api": "🔑 API Key",
+        "header_termos": "📋 Terms of Use",
+        "header_carregar": "📦 Product Loading",
+        "header_selecionar": "🎯 Product Selection",
+        "header_parametros": "⚙️ Analysis Parameters",
+        "header_resultados": "📊 Analysis Results",
+        "header_analise_visual": "📉 Visual Analysis",
+        "header_tabela": "📋 Detailed Table",
+        "header_bling_update": "📤 Update Prices on Bling",
+        "header_verificacao": "🔍 Competitor Verification Panel",
+        "header_historico": "📜 Analysis & Trends History",
+        "header_ultimas": "🗓️ Recent analyses",
+        "header_top": "🏆 Most analyzed products (last 90 days)",
+        "header_tendencia": "📈 Price trends by product",
+        # === Tabs ===
+        "tab_nova": "🎯 New Analysis",
+        "tab_historico": "📜 History",
+        # === Buttons ===
+        "btn_sair": "Sign out",
+        "btn_retry": "🔄 Try again",
+        "btn_desconectar": "🚪 Disconnect",
+        "btn_importar_bling": "📥 Import Bling catalog",
+        "btn_reimportar": "🔄 Re-import",
+        "btn_limpar": "🗑️ Clear analysis and start over",
+        "btn_login": "Sign in",
+        # === Messages ===
+        "msg_intro": "Price and competitor analysis for your catalog",
+        "msg_login_titulo": "Log in to get started",
+        "msg_serpapi_warn": "⚠️ Enter your SerpApi Key in the sidebar to continue.",
+        "msg_planilha_help": "👉 Don't have a spreadsheet yet? Download the example below, fill in with your products, and upload it.",
+        "msg_sem_concorrentes": "No reliable competitors found for this product.",
+        "msg_historico_ativo": "📚 History active (Supabase)",
+        "msg_historico_inativo": "📚 History disabled\n(set SUPABASE_URL/KEY)",
+        "msg_bling_nao_config": "🛒 Bling not configured",
+        "msg_sem_analises": "No analyses recorded yet. Run an analysis on the adjacent tab to get started.",
+        "msg_sem_tendencias": "Not enough history yet to show trends.",
+        "msg_tendencias_min": "At least 2 analyses of the same product are needed to show a trend. Keep running analyses over time.",
+        "msg_hist_grava_falha": "Couldn't save history: user not authenticated.",
+        # === Expanders / labels ===
+        "exp_suporte": "✉️ Support",
+        "exp_detalhes_tec": "🔍 Technical details",
+        "exp_previa": "👀 Preview loaded data",
+        "exp_filtros_av": "🎛️ Advanced quality filters",
+        "exp_debug_serp": "🔍 Debug: view raw SerpAPI fields (to tune filters)",
+        # === Form labels ===
+        "label_margem_min": "% Minimum margin (floor)",
+        "label_tipo_grafico": "Chart type:",
+        "label_mapping": "**🤖 Auto-mapping of columns (adjust if needed):**",
+        "label_ean": "EAN/BARCODE:",
     },
 }
+
+
+def tx(key, default=None):
+    """Fetch text from current language dict `t` with safe fallback.
+
+    Use this helper for all newly-translated strings — if a key is missing in
+    a language dict, it falls back to `default` (or the key name itself),
+    avoiding KeyError crashes during the gradual translation rollout.
+    """
+    try:
+        # `t` is the language dict set after region selection (line ~3413)
+        return t.get(key, default if default is not None else key)
+    except (NameError, AttributeError):
+        return default if default is not None else key
 
 
 # =============================================================================
@@ -742,6 +909,142 @@ KEYWORDS_COMPRA_INTERNACIONAL = [
     "from usa",
     "from united states",
 ]
+
+
+# =============================================================================
+# 4. DOCUMENTOS LEGAIS (resumidos para exibição na app)
+# =============================================================================
+DOCUMENTOS_LEGAIS = {
+    "BR": {
+        "privacidade_titulo": "Política de Privacidade",
+        "privacidade_texto": """
+**Dados que recolhemos:** E-mail (autenticação), histórico de análises, tokens OAuth (opcional para Bling).
+
+**Base legal:** LGPD (Lei nº 13.709/2018). Os dados são processados para executar o contrato do serviço.
+
+**Direitos:** Pode solicitar acesso, rectificação, eliminação ou portabilidade dos seus dados enviando e-mail para [EMAIL_PRIVACIDADE@DOMINIO].
+
+**Terceiros:** Supabase (base de dados, GDPR-compliant), Hugging Face (hospedagem), SerpAPI (buscas públicas).
+
+**Retenção:** Histórico guardado 12 meses; contas inativas >24 meses são eliminadas automaticamente.
+
+Para detalhes completos, consulte a **Política de Privacidade completa** nos documentos externos.
+""",
+        "termos_titulo": "Termos de Uso",
+        "termos_texto": """
+**Versão Beta:** Este serviço está em fase gratuita. Pode sofrer alterações, indisponibilidades ou ser descontinuado sem aviso.
+
+**Utilização permitida:** Análise de viabilidade dos seus produtos, consulta de preços de mercado, integração com Bling (com suas credenciais).
+
+**Proibido:** Uso ilegal, ingenharia reversa, tentativas de burlar limites técnicos, distribuição de malware, revenda sem autorização.
+
+**Responsabilidade:** O serviço fornece estimativas baseadas em dados públicos. Não substitui seu julgamento profissional. Preços podem mudar; sempre confirme antes de tomar decisões comerciais.
+
+**Cancelamento:** Pode cancelar a conta a qualquer momento. Dados são eliminados em 30 dias.
+
+Para detalhes completos, consulte os **Termos de Uso completos** nos documentos externos.
+""",
+        "cookies_titulo": "Política de Cookies",
+        "cookies_texto": """
+**Cookies utilizados:** Apenas cookies essenciais ao funcionamento:
+- `streamlit-session`: manter o estado da aplicação (sessão)
+- `sb-access-token`: manter login ativo (1 hora)
+- `sb-refresh-token`: renovar sessão (7 dias)
+
+**Cookies que NÃO usamos:** Google Analytics, Facebook Pixel, rastreamento entre sites, ou qualquer cookie publicitário.
+
+**Como gerir:** Pode desativar cookies nas definições do seu browser, mas isto pode impedir o funcionamento da app.
+
+Para detalhes completos, consulte a **Política de Cookies completa** nos documentos externos.
+""",
+    },
+    "PT": {
+        "privacidade_titulo": "Política de Privacidade",
+        "privacidade_texto": """
+**Dados recolhidos:** E-mail (autenticação), histórico de análises, tokens OAuth (opcional para Bling).
+
+**Base legal:** LGPD (Lei nº 13.709/2018). Os dados são processados para executar o contrato do serviço.
+
+**Direitos:** Pode solicitar acesso, rectificação, eliminação ou portabilidade dos seus dados enviando e-mail para [EMAIL_PRIVACIDADE@DOMINIO].
+
+**Terceiros:** Supabase (base de dados, GDPR-compliant), Hugging Face (hospedagem), SerpAPI (buscas públicas).
+
+**Retenção:** Histórico guardado 12 meses; contas inactivas >24 meses são eliminadas automaticamente.
+
+Para detalhes completos, consulte a **Política de Privacidade completa** nos documentos externos.
+""",
+        "termos_titulo": "Termos de Utilização",
+        "termos_texto": """
+**Versão Beta:** Este serviço está em fase gratuita. Pode sofrer alterações, indisponibilidades ou ser descontinuado sem aviso.
+
+**Utilização permitida:** Análise de viabilidade dos seus produtos, consulta de preços de mercado, integração com Bling (com as suas credenciais).
+
+**Proibido:** Uso ilegal, engenharia reversa, tentativas de burlar limites técnicos, distribuição de malware, revenda sem autorização.
+
+**Responsabilidade:** O serviço fornece estimativas baseadas em dados públicos. Não substitui o seu julgamento profissional. Preços podem mudar; sempre confirme antes de tomar decisões comerciais.
+
+**Cancelamento:** Pode cancelar a conta a qualquer momento. Dados são eliminados em 30 dias.
+
+Para detalhes completos, consulte os **Termos de Utilização completos** nos documentos externos.
+""",
+        "cookies_titulo": "Política de Cookies",
+        "cookies_texto": """
+**Cookies utilizados:** Apenas cookies essenciais ao funcionamento:
+- `streamlit-session`: manter o estado da aplicação (sessão)
+- `sb-access-token`: manter login activo (1 hora)
+- `sb-refresh-token`: renovar sessão (7 dias)
+
+**Cookies que NÃO usamos:** Google Analytics, Facebook Pixel, rastreamento entre sites, ou qualquer cookie publicitário.
+
+**Como gerir:** Pode desactivar cookies nas definições do seu browser, mas isto pode impedir o funcionamento da app.
+
+Para detalhes completos, consulte a **Política de Cookies completa** nos documentos externos.
+""",
+    },
+    "US": {
+        "privacidade_titulo": "Privacy Policy",
+        "privacidade_texto": """
+**Data collected:** Email (authentication), analysis history, OAuth tokens (optional for Bling).
+
+**Legal basis:** LGPD (Brazilian law nº 13.709/2018) and GDPR (EU). Data is processed to execute the service contract.
+
+**Your rights:** You can request access, correction, deletion, or portability of your data by emailing [EMAIL_PRIVACIDADE@DOMINIO].
+
+**Third parties:** Supabase (database, GDPR-compliant), Hugging Face (hosting), SerpAPI (public searches).
+
+**Retention:** History kept for 12 months; inactive accounts >24 months are deleted automatically.
+
+For full details, see the **complete Privacy Policy** in external documents.
+""",
+        "termos_titulo": "Terms of Use",
+        "termos_texto": """
+**Beta Version:** This service is in free beta phase. It may change, have downtime, or be discontinued without notice.
+
+**Permitted use:** Analyzing product viability, checking market prices, integrating with Bling (using your own credentials).
+
+**Prohibited:** Illegal use, reverse engineering, attempts to bypass limits, malware distribution, unauthorized resale.
+
+**Liability:** The service provides estimates based on public data. It does not replace your professional judgment. Prices may change; always confirm before making business decisions.
+
+**Cancellation:** You can cancel your account anytime. Data is deleted within 30 days.
+
+For full details, see the **complete Terms of Use** in external documents.
+""",
+        "cookies_titulo": "Cookie Policy",
+        "cookies_texto": """
+**Cookies used:** Only essential cookies for functionality:
+- `streamlit-session`: maintain app state (session)
+- `sb-access-token`: keep login active (1 hour)
+- `sb-refresh-token`: refresh session (7 days)
+
+**Cookies we do NOT use:** Google Analytics, Facebook Pixel, cross-site tracking, or advertising cookies.
+
+**How to manage:** You can disable cookies in your browser settings, but this may prevent the app from working.
+
+For full details, see the **complete Cookie Policy** in external documents.
+""",
+    },
+}
 
 
 def parece_compra_internacional(item, regiao):
@@ -1329,12 +1632,12 @@ def fazer_logout():
 def renderizar_pagina_login():
     """Tela de login. Em HF Spaces, target=_top funciona normalmente."""
     st.title("🌎 Viabilidade de Vendas")
-    st.markdown("### Análise de preços e concorrência para o seu catálogo")
+    st.markdown(f"### {tx('msg_intro', 'Análise de preços e concorrência para o seu catálogo')}")
     st.divider()
 
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
-        st.markdown("#### Faça login para começar")
+        st.markdown(f"#### {tx('msg_login_titulo', 'Faça login para começar')}")
         st.write("")
 
         # Se houve tentativa de login que falhou, mostrar erro
@@ -1350,7 +1653,7 @@ def renderizar_pagina_login():
                 "🔌 Sistema de autenticação indisponível. "
                 "Tente recarregar a página. Se persistir, contacte o suporte."
             )
-            with st.expander("🔍 Detalhes técnicos"):
+            with st.expander(tx("exp_detalhes_tec", "🔍 Detalhes técnicos")):
                 st.code(_debug_secrets_disponiveis(), language="text")
                 init_err = st.session_state.get("_supabase_init_error")
                 if init_err:
@@ -1837,7 +2140,7 @@ def gravar_historico_supabase(df_resultado, regiao, scope, imposto, markup, marg
     # Validar que há utilizador autenticado (não devíamos chegar aqui sem user, mas defensivo)
     uid = user_id_actual()
     if not uid:
-        st.warning("Não foi possível gravar histórico: utilizador não autenticado.")
+        st.warning(tx("msg_hist_grava_falha", "Não foi possível gravar histórico: utilizador não autenticado."))
         return None
 
     try:
@@ -3302,7 +3605,7 @@ if _sid_warn:
     with col_warn1:
         st.warning(f"⚠️ {_sid_warn}")
     with col_warn2:
-        if st.button("🔄 Tentar de novo", key="btn_retry_sid"):
+        if st.button(tx("btn_retry", "🔄 Tentar de novo"), key="btn_retry_sid"):
             sess = st.session_state.get("user_session") or {}
             if sess:
                 sid_retry = _criar_sessao_persistente(sess)
@@ -3382,7 +3685,7 @@ with st.sidebar:
     </style>
     """, unsafe_allow_html=True)
 
-    st.header("🌎 Região")
+    st.header(tx("header_regiao", "🌎 Região"))
     # Persistência: usa última região guardada como default
     _opcoes_pais = list(idiomas.keys())
     _pais_pref = st.session_state.get("regiao_default_pref")
@@ -3437,7 +3740,7 @@ with st.sidebar:
         )
 
     st.divider()
-    st.header("🔑 Chave API")
+    st.header(tx("header_api", "🔑 Chave API"))
     api_key_input = st.text_input(t["label_chave"], type="password", value=st.session_state.api_key or "")
     if st.button(t["btn_confirmar"]):
         st.session_state.api_key = api_key_input.strip() or None
@@ -3475,16 +3778,16 @@ with st.sidebar:
     st.divider()
     # Status do Supabase + Bling
     if supabase_ativo():
-        st.success("📚 Histórico ativo (Supabase)")
+        st.success(tx("msg_historico_ativo", "📚 Histórico ativo (Supabase)"))
     else:
-        st.info("📚 Histórico desativado\n(configure SUPABASE_URL/KEY)")
+        st.info(tx("msg_historico_inativo", "📚 Histórico desativado\n(configure SUPABASE_URL/KEY)"))
     if bling_credenciais_disponiveis():
         if bling_conectado():
             st.caption("🛒 Bling conectado")
         else:
             st.caption("🛒 Bling pronto para conectar")
     else:
-        st.caption("🛒 Bling não configurado")
+        st.caption(tx("msg_bling_nao_config", "🛒 Bling não configurado"))
 
     st.divider()
     st.markdown("""
@@ -3501,7 +3804,7 @@ with st.sidebar:
     """, unsafe_allow_html=True)
 
     st.divider()
-    with st.expander("✉️ Suporte"):
+    with st.expander(tx("exp_suporte", "✉️ Suporte")):
         with st.form("suporte_form", clear_on_submit=True):
             sn = st.text_input("Nome")
             se = st.text_input("Email")
@@ -3531,9 +3834,28 @@ with st.sidebar:
         else:
             st.caption(f"👤 {nome}")
     with col_logout:
-        if st.button("Sair", key="btn_logout", help="Terminar sessão"):
+        if st.button(tx("btn_sair", "Sair"), key="btn_logout", help="Terminar sessão"):
             fazer_logout()
             st.rerun()
+
+    # --- Rodapé legal (links discretos) ---
+    # URL placeholder: substituir depois pela URL real do GitHub Pages
+    # Estrutura padrão GitHub Pages: https://USER.github.io/REPO/
+    _LEGAL_BASE_URL = "https://djeanrj.github.io/An-lise-de-pre-os"
+    st.sidebar.markdown(
+        f"""
+        <div style="margin-top:1.5em; padding-top:0.8em; border-top:1px solid rgba(128,128,128,0.2); font-size:0.75em; opacity:0.6; line-height:1.6;">
+        <a href="{_LEGAL_BASE_URL}/politica-privacidade" target="_blank" style="text-decoration:none; color:inherit;">Privacidade</a>
+        &nbsp;·&nbsp;
+        <a href="{_LEGAL_BASE_URL}/termos-de-uso" target="_blank" style="text-decoration:none; color:inherit;">Termos</a>
+        &nbsp;·&nbsp;
+        <a href="{_LEGAL_BASE_URL}/cookies" target="_blank" style="text-decoration:none; color:inherit;">Cookies</a>
+        <br/>
+        <span style="font-size:0.85em;">Beta gratuito · v1.0</span>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
 
 # =============================================================================
@@ -3804,7 +4126,7 @@ with st.expander(_tutorial_label, expanded=False):
     st.markdown(_tutorial_md)
 
 
-st.subheader("📋 Termos de Uso")
+st.subheader(tx("header_termos", "📋 Termos de Uso"))
 aceite_regiao = st.checkbox(t["termos_check"], key=f"aceite_{pais_sel}")
 if aceite_regiao:
     # Persistir aceitação para esta região (uma vez aceite, fica para sempre)
@@ -3824,11 +4146,15 @@ else:
     st.stop()
 
 if not st.session_state.api_key:
-    st.warning("⚠️ Insira a sua SerpApi Key na barra lateral para continuar.")
+    st.warning(tx("msg_serpapi_warn", "⚠️ Insira a sua SerpApi Key na barra lateral para continuar."))
     st.stop()
 
 
-tab_analise, tab_historico = st.tabs(["🎯 Nova Análise", "📜 Histórico"])
+tab_analise, tab_historico, tab_documentos = st.tabs([
+    tx("tab_nova", "🎯 Nova Análise"), 
+    tx("tab_historico", "📜 Histórico"),
+    "📜 Documentos Legais"
+])
 
 
 # =============================================================================
@@ -3836,11 +4162,11 @@ tab_analise, tab_historico = st.tabs(["🎯 Nova Análise", "📜 Histórico"])
 # =============================================================================
 with tab_analise:
     if st.session_state.df_final is None:
-        st.header("📦 Carregamento de Produtos")
+        st.header(tx("header_carregar", "📦 Carregamento de Produtos"))
 
         col_ex1, col_ex2 = st.columns([2, 1])
         with col_ex1:
-            st.info("👉 Não tem ainda uma planilha? Descarregue o exemplo abaixo, preencha com os seus produtos e volte a carregar.")
+            st.info(tx("msg_planilha_help", "👉 Não tem ainda uma planilha? Descarregue o exemplo abaixo, preencha com os seus produtos e volte a carregar."))
         with col_ex2:
             st.download_button(
                 "📥 Baixar planilha de exemplo",
@@ -3954,7 +4280,7 @@ with tab_analise:
                 with col_a:
                     st.success("✅ Bling conectado.")
                 with col_b:
-                    if st.button("🚪 Desconectar", help="Apagar tokens e exigir nova autorização"):
+                    if st.button(tx("btn_desconectar", "🚪 Desconectar"), help="Apagar tokens e exigir nova autorização"):
                         bling_desconectar()
                         st.rerun()
 
@@ -3964,7 +4290,7 @@ with tab_analise:
                     help="Ignora produtos com stock zero (mais rápido e foca em produtos vendáveis).",
                 )
 
-                if st.button("📥 Importar catálogo do Bling", type="primary"):
+                if st.button(tx("btn_importar_bling", "📥 Importar catálogo do Bling"), type="primary"):
                     progresso = st.progress(0.0, text="A importar produtos...")
                     contador = st.empty()
 
@@ -4060,10 +4386,10 @@ with tab_analise:
                 cols = df_raw.columns.tolist()
                 st.success(f"✅ Ficheiro lido com sucesso. {len(df_raw)} linhas, {len(cols)} colunas detectadas.")
 
-                with st.expander("👀 Pré-visualizar dados carregados"):
+                with st.expander(tx("exp_previa", "👀 Pré-visualizar dados carregados")):
                     st.dataframe(df_raw.head(10))
 
-                st.markdown("**🤖 Mapeamento automático das colunas (corrija se necessário):**")
+                st.markdown(tx("label_mapping", "**🤖 Mapeamento automático das colunas (corrija se necessário):**"))
                 c1, c2, c3, c4, c5, c6 = st.columns(6)
 
                 idx_n = identificar_coluna(cols, ["nome produto", "descrição", "descricao", "produto", "nome", "item", "name"])
@@ -4130,9 +4456,9 @@ with tab_analise:
             st.divider()
             col_hdr1, col_hdr2 = st.columns([5, 1])
             with col_hdr1:
-                st.header("🎯 Seleção de Produtos")
+                st.header(tx("header_selecionar", "🎯 Seleção de Produtos"))
             with col_hdr2:
-                if st.button("🔄 Reimportar", help="Voltar à tela de importação para recarregar o catálogo do zero"):
+                if st.button(tx("btn_reimportar", "🔄 Reimportar"), help="Voltar à tela de importação para recarregar o catálogo do zero"):
                     st.session_state.pop("_df_base_carregado", None)
                     st.rerun()
 
@@ -4215,21 +4541,21 @@ with tab_analise:
             df_base = df_base_filtrado
 
             st.divider()
-            st.header("⚙️ Parâmetros da Análise")
+            st.header(tx("header_parametros", "⚙️ Parâmetros da Análise"))
             ca1, ca2, ca3 = st.columns(3)
             with ca1:
                 imposto = st.number_input("% Imposto sobre venda", 0.0, 90.0, 4.0, step=0.5) / 100
             with ca2:
                 markup = st.number_input("% Markup desejado", 0.0, 500.0, 70.0, step=5.0) / 100
             with ca3:
-                margem_minima = st.number_input("% Margem mínima (chão)", 0.0, 200.0, 15.0, step=5.0) / 100
+                margem_minima = st.number_input(tx("label_margem_min", "% Margem mínima (chão)"), 0.0, 200.0, 15.0, step=5.0) / 100
 
             st.caption(
                 "ℹ️ **Markup** é a margem que quer ganhar; **Margem mínima** é o chão abaixo do qual nunca vendemos. "
                 "O imposto é descontado do preço de venda na hora de calcular o lucro real."
             )
 
-            with st.expander("🎛️ Filtros avançados de qualidade"):
+            with st.expander(tx("exp_filtros_av", "🎛️ Filtros avançados de qualidade")):
                 cf_a, cf_b = st.columns(2)
                 with cf_a:
                     apenas_novos = st.checkbox(
@@ -4532,7 +4858,7 @@ with tab_analise:
         imposto_used = df.attrs.get("imposto", 0.04)
 
         st.divider()
-        st.header("📊 Resultados da Análise")
+        st.header(tx("header_resultados", "📊 Resultados da Análise"))
 
         # Aviso de snapshot — preços capturados num momento específico podem mudar depois
         ts_analise = df.attrs.get("timestamp")
@@ -4677,7 +5003,7 @@ with tab_analise:
             )
 
         st.divider()
-        st.subheader("📉 Análise Visual")
+        st.subheader(tx("header_analise_visual", "📉 Análise Visual"))
 
         # Filtrar opções de gráfico conforme modo de análise
         # No modo "preco_venda" não temos Lucro Total nem Margem, então escondemos
@@ -4789,7 +5115,7 @@ with tab_analise:
         st.plotly_chart(fig, use_container_width=True)
 
         st.divider()
-        st.subheader("📋 Tabela Detalhada")
+        st.subheader(tx("header_tabela", "📋 Tabela Detalhada"))
         st.caption(
             "ℹ️ **Sobre os preços de concorrentes:** os valores apresentados vêm do Google Shopping (via SerpAPI) "
             "e podem ter 1-5% de diferença face ao preço actual na loja. "
@@ -4939,7 +5265,7 @@ with tab_analise:
         # ---------- ATUALIZAR PREÇOS NO BLING (apenas Brasil + Bling conectado) ----------
         if regiao_id == "BR" and bling_conectado():
             st.divider()
-            st.subheader("📤 Atualizar preços no Bling")
+            st.subheader(tx("header_bling_update", "📤 Atualizar preços no Bling"))
             st.caption(
                 "Selecione os produtos que pretende atualizar e ajuste o preço se necessário. "
                 "Apenas os produtos marcados serão enviados ao Bling."
@@ -5248,7 +5574,7 @@ with tab_analise:
 
         # ---------- PAINEL DE VERIFICAÇÃO ----------
         st.divider()
-        st.subheader("🔍 Painel de Verificação de Concorrentes")
+        st.subheader(tx("header_verificacao", "🔍 Painel de Verificação de Concorrentes"))
         st.caption(
             "ℹ️ Os preços abaixo vêm do Google Shopping (via SerpAPI). Podem ter pequena variação "
             "face ao preço actual na loja (1-5%) devido a latência e variações no mesmo listing "
@@ -5325,7 +5651,7 @@ with tab_analise:
                 ci4.metric("Concorrentes encontrados", len(concorrentes_lista))
 
             if not concorrentes_lista:
-                st.info("Sem concorrentes confiáveis encontrados para este produto.")
+                st.info(tx("msg_sem_concorrentes", "Sem concorrentes confiáveis encontrados para este produto."))
             else:
                 # Construir tabela de concorrentes; fallback inteligente quando o link directo
                 # não vem da SerpAPI:
@@ -5509,7 +5835,7 @@ with tab_analise:
                 # ---- DEBUG: ver campos crus da SerpAPI para cada concorrente ----
                 # Útil para identificar como cada loja marca "produto internacional"
                 # e ajustar as keywords/regras de filtragem.
-                with st.expander("🔍 Debug: ver campos crus da SerpAPI (para ajustar filtros)"):
+                with st.expander(tx("exp_debug_serp", "🔍 Debug: ver campos crus da SerpAPI (para ajustar filtros)")):
                     st.caption(
                         "Se algum dos concorrentes acima é 'produto internacional' mas escapou ao filtro, "
                         "expanda aqui e procure pelo nome da loja — vai ver exactamente os campos que a SerpAPI "
@@ -5540,7 +5866,7 @@ with tab_analise:
                                file_name="analise_precos.xlsx",
                                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
         with cd2:
-            if st.button("🗑️ Limpar análise e começar nova"):
+            if st.button(tx("btn_limpar", "🗑️ Limpar análise e começar nova")):
                 st.session_state.df_final = None
                 st.rerun()
 
@@ -5549,7 +5875,7 @@ with tab_analise:
 # 8.2 TAB: HISTÓRICO
 # =============================================================================
 with tab_historico:
-    st.header("📜 Histórico de Análises e Tendências")
+    st.header(tx("header_historico", "📜 Histórico de Análises e Tendências"))
 
     if not supabase_ativo():
         st.warning(
@@ -5570,10 +5896,10 @@ with tab_historico:
     st.caption(f"A mostrar dados da região: **{regiao_id}**")
 
     # ----- Análises recentes -----
-    st.subheader("🗓️ Últimas análises")
+    st.subheader(tx("header_ultimas", "🗓️ Últimas análises"))
     df_analises = carregar_analises_recentes(limite=20)
     if df_analises.empty:
-        st.info("Ainda não há análises gravadas. Corra uma análise no separador ao lado para começar.")
+        st.info(tx("msg_sem_analises", "Ainda não há análises gravadas. Corra uma análise no separador ao lado para começar."))
     else:
         df_show = df_analises[df_analises["regiao"] == regiao_id].copy() if "regiao" in df_analises.columns else df_analises.copy()
         if df_show.empty:
@@ -5593,7 +5919,7 @@ with tab_historico:
     st.divider()
 
     # ----- Ranking de produtos -----
-    st.subheader("🏆 Produtos mais analisados (últimos 90 dias)")
+    st.subheader(tx("header_top", "🏆 Produtos mais analisados (últimos 90 dias)"))
     df_rank = ranking_produtos_analisados(regiao_id, dias=90)
     if df_rank.empty:
         st.info("Sem dados suficientes para gerar ranking.")
@@ -5612,9 +5938,9 @@ with tab_historico:
     st.divider()
 
     # ----- Tendência de preço por produto -----
-    st.subheader("📈 Tendência de preço por produto")
+    st.subheader(tx("header_tendencia", "📈 Tendência de preço por produto"))
     if df_rank.empty:
-        st.caption("Ainda não há histórico suficiente para mostrar tendências.")
+        st.caption(tx("msg_sem_tendencias", "Ainda não há histórico suficiente para mostrar tendências."))
     else:
         opcoes_produtos = df_rank["nome"].head(50).tolist()
         produto_sel = st.selectbox("Escolha um produto:", opcoes_produtos)
@@ -5625,7 +5951,7 @@ with tab_historico:
 
         df_tend = carregar_historico_produto(ean_sel, sku_sel, produto_sel, regiao_id, dias=dias_sel)
         if df_tend.empty or len(df_tend) < 2:
-            st.info("São necessárias pelo menos 2 análises do mesmo produto para mostrar tendência. Continue a correr análises ao longo do tempo.")
+            st.info(tx("msg_tendencias_min", "São necessárias pelo menos 2 análises do mesmo produto para mostrar tendência. Continue a correr análises ao longo do tempo."))
         else:
             df_tend["criado_em"] = pd.to_datetime(df_tend["criado_em"])
             fig_tend = go.Figure()
@@ -5655,3 +5981,44 @@ with tab_historico:
                     f"{seta} Variação do menor concorrente desde {primeira['criado_em'].strftime('%d/%m')}",
                     f"{var:+.1f}%",
                 )
+
+# =============================================================================
+# 8.3 TAB: DOCUMENTOS LEGAIS
+# =============================================================================
+with tab_documentos:
+    st.markdown("## 📜 Documentos Legais")
+    st.markdown("> Esta aplicação está em fase **Beta gratuita**. Consulte os documentos abaixo para compreender seus direitos e responsabilidades.")
+    
+    # Obter idioma actual (BR/PT/US)
+    _regiao_atual = t.get("id", "BR")
+    _docs = DOCUMENTOS_LEGAIS.get(_regiao_atual, DOCUMENTOS_LEGAIS["BR"])
+    
+    # Expander 1: Privacidade
+    with st.expander(f"🔐 {_docs['privacidade_titulo']}", expanded=False):
+        st.markdown(_docs['privacidade_texto'])
+        st.markdown("---")
+        st.caption("Para política completa e actualizações, contacte: [EMAIL_PRIVACIDADE@DOMINIO]")
+    
+    st.divider()
+    
+    # Expander 2: Termos
+    with st.expander(f"⚖️ {_docs['termos_titulo']}", expanded=False):
+        st.markdown(_docs['termos_texto'])
+        st.markdown("---")
+        st.caption("Última actualização: 27 de maio de 2026")
+    
+    st.divider()
+    
+    # Expander 3: Cookies
+    with st.expander(f"🍪 {_docs['cookies_titulo']}", expanded=False):
+        st.markdown(_docs['cookies_texto'])
+        st.markdown("---")
+        st.caption("Cookies são gerados pelo Streamlit e Supabase automaticamente.")
+    
+    st.divider()
+    
+    st.markdown("### 📎 Documentos Completos")
+    st.info("Para versões completas e detalhadas de cada documento, consulte os documentos legais externos.")
+    st.markdown("- 📋 [Política de Privacidade (completa)](https://djeanrj.github.io/An-lise-de-pre-os/politica-privacidade/)")
+    st.markdown("- ⚖️ [Termos de Uso (completos)](https://djeanrj.github.io/An-lise-de-pre-os/termos-de-uso/)")
+    st.markdown("- 🍪 [Política de Cookies (completa)](https://djeanrj.github.io/An-lise-de-pre-os/cookies/)")
