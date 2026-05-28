@@ -228,7 +228,7 @@ idiomas = {
         "gl": "br", "loc": "Brazil", "currency_format": "BR",
         "titulo": "Inteligência de Mercado Brasil + Bling Sync",
         "label_chave": "SerpApi Key", "btn_confirmar": "Confirmar Chave",
-        "termos_check": "Eu aceito os Termos de Uso do Brasil.",
+        "termos_check": "Eu li e aceito os Termos de Uso. Beta gratuito: serviço pode mudar/indisponibilizar sem aviso. Preços são estimativas; confirme sempre antes de decisões comerciais.",
         "btn_excel": "Subir planilha", "btn_analisar": "Iniciar Análise Real",
         # === Cabeçalhos ===
         "header_regiao": "🌎 Região",
@@ -287,7 +287,7 @@ idiomas = {
         "gl": "pt", "loc": "Portugal", "currency_format": "EU",
         "titulo": "Inteligência de Mercado Portugal & UE",
         "label_chave": "Chave SerpApi", "btn_confirmar": "Confirmar Chave",
-        "termos_check": "Aceito os Termos de Utilização de Portugal.",
+        "termos_check": "Li e aceito os Termos de Utilização. Beta gratuito: serviço pode mudar/ficar indisponível sem aviso. Preços são estimativas; confirme sempre antes de decisões comerciais.",
         "btn_excel": "Carregar folha de cálculo", "btn_analisar": "Analisar Mercado Ibérico/UE",
         # === Cabeçalhos ===
         "header_regiao": "🌎 Região",
@@ -346,7 +346,7 @@ idiomas = {
         "gl": "us", "loc": "United States", "currency_format": "US",
         "titulo": "USA Marketplace Intelligence (experimental)",
         "label_chave": "SerpApi Key", "btn_confirmar": "Confirm Key",
-        "termos_check": "I accept the USA Terms.",
+        "termos_check": "I have read and accept the Terms of Use. Free beta: service may change/become unavailable without notice. Prices are estimates; always confirm before business decisions.",
         "btn_excel": "Upload Spreadsheet", "btn_analisar": "Start Market Analysis",
         # === Headers ===
         "header_regiao": "🌎 Region",
@@ -4128,6 +4128,7 @@ with st.expander(_tutorial_label, expanded=False):
 
 st.subheader(tx("header_termos", "📋 Termos de Uso"))
 aceite_regiao = st.checkbox(t["termos_check"], key=f"aceite_{pais_sel}")
+st.caption("📖 Ver detalhes completos na aba **📜 Documentos Legais** →")
 if aceite_regiao:
     # Persistir aceitação para esta região (uma vez aceite, fica para sempre)
     pais_para_campo = {
