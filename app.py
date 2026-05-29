@@ -226,7 +226,7 @@ idiomas = {
     "Brasil 🇧🇷": {
         "id": "BR", "moeda": "R$", "lang": "pt-BR", "domain": "google.com.br",
         "gl": "br", "loc": "Brazil", "currency_format": "BR",
-        "titulo": "Inteligência de Mercado Brasil + Bling Sync",
+        "titulo": "Análise de Viabilidade de Mercado + Bling Sync",
         "label_chave": "SerpApi Key", "btn_confirmar": "Confirmar Chave",
         "termos_check": "Eu li e aceito os Termos de Uso. Beta gratuito: serviço pode mudar/indisponibilizar sem aviso. Preços são estimativas; confirme sempre antes de decisões comerciais.",
         "btn_excel": "Subir planilha", "btn_analisar": "Iniciar Análise Real",
@@ -258,7 +258,7 @@ idiomas = {
         "btn_limpar": "🗑️ Limpar análise e começar nova",
         "btn_login": "Entrar",
         # === Mensagens ===
-        "msg_intro": "Análise de preços e concorrência para o seu catálogo",
+        "msg_intro": "Análise de preços e concorrência",
         "msg_login_titulo": "Faça login para começar",
         "msg_serpapi_warn": "⚠️ Insira a sua SerpApi Key na barra lateral para continuar.",
         "msg_planilha_help": "👉 Não tem ainda uma planilha? Descarregue o exemplo abaixo, preencha com os seus produtos e volte a carregar.",
@@ -285,7 +285,7 @@ idiomas = {
     "Portugal 🇵🇹": {
         "id": "PT", "moeda": "€", "lang": "pt-PT", "domain": "google.pt",
         "gl": "pt", "loc": "Portugal", "currency_format": "EU",
-        "titulo": "Inteligência de Mercado Portugal & UE",
+        "titulo": "Análise de Viabilidade de Mercado Portugal & UE",
         "label_chave": "Chave SerpApi", "btn_confirmar": "Confirmar Chave",
         "termos_check": "Li e aceito os Termos de Utilização. Beta gratuito: serviço pode mudar/ficar indisponível sem aviso. Preços são estimativas; confirme sempre antes de decisões comerciais.",
         "btn_excel": "Carregar folha de cálculo", "btn_analisar": "Analisar Mercado Ibérico/UE",
@@ -317,7 +317,7 @@ idiomas = {
         "btn_limpar": "🗑️ Limpar análise e começar nova",
         "btn_login": "Entrar",
         # === Mensagens ===
-        "msg_intro": "Análise de preços e concorrência para o seu catálogo",
+        "msg_intro": "Análise de preços e concorrência",
         "msg_login_titulo": "Inicie sessão para começar",
         "msg_serpapi_warn": "⚠️ Introduza a sua SerpApi Key na barra lateral para continuar.",
         "msg_planilha_help": "👉 Ainda não tem uma folha de cálculo? Descarregue o exemplo abaixo, preencha com os seus produtos e volte a carregar.",
@@ -344,7 +344,7 @@ idiomas = {
     "USA 🇺🇸 (experimental)": {
         "id": "US", "moeda": "$", "lang": "en", "domain": "google.com",
         "gl": "us", "loc": "United States", "currency_format": "US",
-        "titulo": "USA Marketplace Intelligence (experimental)",
+        "titulo": "USA Marketplace Analysis (experimental)",
         "label_chave": "SerpApi Key", "btn_confirmar": "Confirm Key",
         "termos_check": "I have read and accept the Terms of Use. Free beta: service may change/become unavailable without notice. Prices are estimates; always confirm before business decisions.",
         "btn_excel": "Upload Spreadsheet", "btn_analisar": "Start Market Analysis",
@@ -1632,7 +1632,7 @@ def fazer_logout():
 def renderizar_pagina_login():
     """Tela de login. Em HF Spaces, target=_top funciona normalmente."""
     st.title("🌎 Viabilidade de Vendas")
-    st.markdown(f"### {tx('msg_intro', 'Análise de preços e concorrência para o seu catálogo')}")
+    st.markdown(f"### {tx('msg_intro', 'Análise de preços e concorrência')}")
     st.divider()
 
     col1, col2, col3 = st.columns([1, 2, 1])
@@ -4127,6 +4127,18 @@ with st.expander(_tutorial_label, expanded=False):
 
 
 st.subheader(tx("header_termos", "📋 Termos de Uso"))
+
+# === TERMOS VISÍVEIS ANTES DO CHECKBOX ===
+st.markdown("**📋 Termos de Uso (obrigatório para continuar):**")
+with st.expander("📖 Ler Termos de Uso completos →", expanded=True):
+    _regiao_termos = t.get("id", "BR")
+    _docs_termos = DOCUMENTOS_LEGAIS.get(_regiao_termos, DOCUMENTOS_LEGAIS["BR"])
+    st.markdown(_docs_termos['termos_texto'])
+    st.markdown("---")
+    st.caption("✓ Leia os termos acima para compreender os seus direitos e responsabilidades.")
+
+# Checkbox de confirmação (após ler termos)
+
 aceite_regiao = st.checkbox(t["termos_check"], key=f"aceite_{pais_sel}")
 st.caption("📖 Ver detalhes completos na aba **📜 Documentos Legais** →")
 if aceite_regiao:
