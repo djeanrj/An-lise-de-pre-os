@@ -3780,9 +3780,6 @@ _handle_bling_oauth_callback()
 if "_prefs_loaded" not in st.session_state:
     _prefs = _carregar_preferencias_user()
     if _prefs:
-        # Chave SerpAPI
-        if _prefs.get("serpapi_key"):
-            st.session_state["api_key"] = _prefs["serpapi_key"]
         # Termos aceites por região (vão directamente para o checkbox)
         if _prefs.get("termos_aceites_br"):
             st.session_state["aceite_🇧🇷 Brasil"] = True
