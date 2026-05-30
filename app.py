@@ -3780,6 +3780,9 @@ _handle_bling_oauth_callback()
 if "_prefs_loaded" not in st.session_state:
     _prefs = _carregar_preferencias_user()
     if _prefs:
+        # Chave SerpAPI (sistema antigo — preferências)
+        if _prefs.get("serpapi_key"):
+            st.session_state["api_key"] = _prefs["serpapi_key"]
         # Termos aceites por região (vão directamente para o checkbox)
         if _prefs.get("termos_aceites_br"):
             st.session_state["aceite_🇧🇷 Brasil"] = True
@@ -3818,21 +3821,6 @@ if _sid_warn:
                     st.session_state.pop("_sid_init_warning", None)
                     st.session_state.pop("_sid_save_error", None)
                     st.rerun()
-
-
-# =============================================================================
-# 6.5 RECUPERAR SERPAPI KEY: Do Supabase (user_settings)
-# =============================================================================
-user_session = st.session_state.get("user_session") or {}
-user_id = user_session.get("user", {}).get("id")
-
-# Recuperar chave da tabela (se existe)
-if user_id and "serpapi_key" not in st.session_state:
-    serpapi_key_db = obter_serpapi_key(user_id)
-    if serpapi_key_db and serpapi_key_db.strip() != "":
-        st.session_state["serpapi_key"] = serpapi_key_db
-    else:
-        st.session_state["serpapi_key"] = ""
 
 
 # =============================================================================
@@ -3930,24 +3918,6 @@ with st.sidebar:
         # Guarda preferência (1 chamada Supabase só quando muda mesmo)
         if pais_sel != _pais_pref:
             _guardar_preferencia("regiao_default", pais_sel)
-    
-    # ===== SerpAPI Key =====
-    st.divider()
-    serpapi_input = st.text_input(
-        "🔑 SerpAPI Key",
-        value=st.session_state.get("serpapi_key", ""),
-        type="password",
-        key="serpapi_sidebar"
-    )
-    
-    # Se mudou, guarda automaticamente
-    if serpapi_input and serpapi_input != st.session_state.get("serpapi_key", ""):
-        if len(serpapi_input) > 5:
-            sucesso, msg = guardar_serpapi_key(user_id, serpapi_input)
-            if sucesso:
-                st.session_state["serpapi_key"] = serpapi_input
-            else:
-                st.error(msg)
             st.session_state["regiao_default_pref"] = pais_sel
 
     t = idiomas[pais_sel]
