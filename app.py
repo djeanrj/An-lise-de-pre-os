@@ -1058,7 +1058,7 @@ Para detalhes completos, consulte a **Política de Privacidade completa** nos do
         "termos_texto": """
 **Versão Beta:** Este serviço está em fase gratuita. Pode sofrer alterações, indisponibilidades ou ser descontinuado sem aviso.
 
-**Utilização permitida:** Análise de viabilidade dos seus produtos, consulta de preços de mercado, integração com Bling (com as suas credenciais).
+**Utilização permitida:** Análise de viabilidade dos seus produtos, consulta de preços de mercado.
 
 **Proibido:** Uso ilegal, engenharia reversa, tentativas de burlar limites técnicos, distribuição de malware, revenda sem autorização.
 
@@ -1101,7 +1101,7 @@ For full details, see the **complete Privacy Policy** in external documents.
         "termos_texto": """
 **Beta Version:** This service is in free beta phase. It may change, have downtime, or be discontinued without notice.
 
-**Permitted use:** Analyzing product viability, checking market prices, integrating with Bling (using your own credentials).
+**Permitted use:** Analyzing product viability, checking market prices.
 
 **Prohibited:** Illegal use, reverse engineering, attempts to bypass limits, malware distribution, unauthorized resale.
 
