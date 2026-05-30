@@ -144,6 +144,87 @@ def _apagar_sessao_persistente():
         pass
 
 
+# =============================================================================
+# BETA ONBOARDING: Validação de código de convite
+# =============================================================================
+
+def validar_codigo_convite(codigo: str) -> tuple:
+    """Valida código de convite beta. Retorna (sucesso: bool, mensagem: str, codigo_id: str)"""
+    if not codigo or len(codigo) < 5:
+        return False, "Código inválido (muito curto)", None
+    
+    sb = get_supabase_client()
+    if sb is None:
+        return False, "Sistema indisponível, tente mais tarde", None
+    
+    try:
+        # Procurar código na tabela
+        resultado = sb.table("beta_invites").select("id, used_by_email").eq("code", codigo.strip()).execute()
+        
+        if not resultado.data or len(resultado.data) == 0:
+            return False, f"❌ Código '{codigo}' não encontrado", None
+        
+        convite = resultado.data[0]
+        
+        # Se já foi usado
+        if convite.get("used_by_email"):
+            return False, f"❌ Este código já foi utilizado por {convite['used_by_email']}", None
+        
+        # Código válido e disponível
+        return True, "✅ Código válido! Bem-vindo ao beta.", convite.get("id")
+    
+    except Exception as e:
+        return False, f"Erro ao validar código: {str(e)[:100]}", None
+
+
+def marcar_codigo_como_usado(codigo_id: str, email_user: str) -> bool:
+    """Marca código de convite como usado por um user"""
+    sb = get_supabase_client()
+    if sb is None:
+        return False
+    
+    try:
+        sb.table("beta_invites").update({
+            "used_by_email": email_user,
+            "used_at": __import__('datetime').datetime.now().isoformat()
+        }).eq("id", codigo_id).execute()
+        return True
+    except Exception as e:
+        print(f"Erro ao marcar código como usado: {e}")
+        return False
+
+
+def user_eh_novo(user_id: str) -> bool:
+    """Verifica se é novo user (não tem entrada em user_settings)"""
+    sb = get_supabase_client()
+    if sb is None:
+        return True
+    
+    try:
+        resultado = sb.table("user_settings").select("id").eq("user_id", user_id).execute()
+        return len(resultado.data) == 0
+    except Exception:
+        return True
+
+
+def criar_user_settings(user_id: str, serpapi_key: str = None) -> bool:
+    """Cria entrada de user_settings para novo user"""
+    sb = get_supabase_client()
+    if sb is None:
+        return False
+    
+    try:
+        sb.table("user_settings").insert({
+            "user_id": user_id,
+            "serpapi_key": serpapi_key
+        }).execute()
+        return True
+    except Exception as e:
+        print(f"Erro ao criar user_settings: {e}")
+        return False
+
+
+
 # ─── PREFERÊNCIAS PERSISTENTES POR UTILIZADOR ────────────────────────────────
 # Guardadas em user_preferences (Supabase) para sobreviverem a navegações
 # (ex: depois de autorizar Bling, a chave SerpAPI e termos aceites mantêm-se).
@@ -1595,6 +1676,20 @@ def _processar_token_url():
                 "avatar": user_meta.get("avatar_url", ""),
             },
         }
+        
+        # ===== NOVO: Check se é novo user (precisa de código de convite) =====
+        user_id = user["id"]
+        if user_eh_novo(user_id):
+            # Novo user — não pode entrar sem código de convite válido
+            st.session_state["_novo_user_sem_convite"] = True
+            st.session_state["_novo_user_id"] = user_id
+            st.session_state["_novo_user_email"] = user.get("email", "")
+            # NÃO criar sessão persistente ainda — só quando convite for validado
+            st.query_params.clear()
+            st.rerun()
+            return
+        # ======================================================================
+        
         # Criar sessão persistente no Supabase e injectar ?sid=... na URL.
         # Isto sobrevive a navegações (Bling OAuth, refresh, fechar/abrir aba).
         sid = _criar_sessao_persistente(st.session_state["user_session"])
@@ -3560,6 +3655,69 @@ _restaurar_sessao_de_sid()
 
 # 3) Tentar processar callback Google (caso utilizador acabe de autorizar)
 _processar_token_url()
+
+# 3.5) Se novo user fez Google OAuth, pedir código de convite
+if st.session_state.get("_novo_user_sem_convite"):
+    st.set_page_config(page_title="Validar Código de Convite Beta", layout="centered")
+    
+    col1, col2, col3 = st.columns([1, 2, 1])
+    with col2:
+        st.markdown("### 🎟️ Bem-vindo ao Beta!")
+        st.markdown(f"**Email:** `{st.session_state.get('_novo_user_email', 'user')}`")
+        st.divider()
+        st.markdown("Para completar o seu registro, insira o **código de convite** que recebeu:")
+        
+        codigo_input = st.text_input(
+            "Código de convite",
+            placeholder="Ex: BETA-ABC123DEF456",
+            key="beta_convite_input"
+        )
+        
+        col_btn1, col_btn2 = st.columns(2)
+        
+        with col_btn1:
+            if st.button("✅ Validar código", use_container_width=True):
+                if not codigo_input:
+                    st.error("❌ Por favor, insira um código")
+                else:
+                    valido, msg, codigo_id = validar_codigo_convite(codigo_input)
+                    
+                    if valido:
+                        # Marcar como usado
+                        user_email = st.session_state.get("_novo_user_email", "")
+                        if marcar_codigo_como_usado(codigo_id, user_email):
+                            # Criar user_settings
+                            user_id = st.session_state.get("_novo_user_id", "")
+                            criar_user_settings(user_id)
+                            
+                            # Limpar flags de novo user
+                            st.session_state.pop("_novo_user_sem_convite", None)
+                            st.session_state.pop("_novo_user_id", None)
+                            st.session_state.pop("_novo_user_email", None)
+                            
+                            # Criar sessão persistente
+                            sid = _criar_sessao_persistente(st.session_state["user_session"])
+                            st.query_params.clear()
+                            if sid:
+                                st.query_params["sid"] = sid
+                            
+                            st.success(msg)
+                            st.balloons()
+                            st.rerun()
+                        else:
+                            st.error("❌ Erro ao processar código. Tente novamente.")
+                    else:
+                        st.error(msg)
+        
+        with col_btn2:
+            if st.button("❌ Cancelar", use_container_width=True):
+                # Logout
+                st.session_state.pop("user_session", None)
+                st.session_state.pop("_novo_user_sem_convite", None)
+                st.query_params.clear()
+                st.rerun()
+    
+    st.stop()
 
 # 4) Se não está autenticado, mostrar página de login
 if not utilizador_autenticado():
