@@ -222,11 +222,14 @@ def obter_serpapi_key(user_id: str) -> str:
         return ""
 
 
-def guardar_serpapi_key(user_id: str, serpapi_key: str) -> bool:
-    """Guarda a SerpAPI key do user"""
+def guardar_serpapi_key(user_id: str, serpapi_key: str) -> tuple:
+    """Guarda a SerpAPI key do user. Retorna (sucesso: bool, mensagem: str)"""
     sb = get_supabase_client()
     if sb is None:
-        return False
+        return False, "Sistema indisponível (Supabase não respondeu)"
+    
+    if not serpapi_key or len(serpapi_key) < 5:
+        return False, "Chave SerpAPI inválida (muito curta)"
     
     try:
         # Tentar update primeiro
@@ -238,17 +241,19 @@ def guardar_serpapi_key(user_id: str, serpapi_key: str) -> bool:
                 "serpapi_key": serpapi_key,
                 "updated_at": __import__('datetime').datetime.now().isoformat()
             }).eq("user_id", user_id).execute()
+            return True, "✅ Chave guardada com sucesso!"
         else:
             # Não existe, fazer insert
             sb.table("user_settings").insert({
                 "user_id": user_id,
                 "serpapi_key": serpapi_key
             }).execute()
-        
-        return True
+            return True, "✅ Chave guardada com sucesso!"
+    
     except Exception as e:
-        print(f"Erro ao guardar SerpAPI key: {e}")
-        return False
+        erro_msg = str(e)[:150]
+        print(f"[DEBUG] Erro ao guardar SerpAPI key para user {user_id}: {erro_msg}")
+        return False, f"❌ Erro ao guardar: {erro_msg}"
 
 
 def criar_user_settings(user_id: str, serpapi_key: str = None) -> bool:
@@ -3819,64 +3824,18 @@ if _sid_warn:
 
 
 # =============================================================================
-# 6.5 CHECK: Precisa de SerpAPI key?
+# 6.5 RECUPERAR SERPAPI KEY: Do Supabase (user_settings)
 # =============================================================================
 user_session = st.session_state.get("user_session") or {}
 user_id = user_session.get("user", {}).get("id")
-user_email = user_session.get("user", {}).get("email")
 
-if user_id:
-    serpapi_key_guardada = obter_serpapi_key(user_id)
-    
-    if not serpapi_key_guardada or serpapi_key_guardada.strip() == "":
-        # User não tem SerpAPI key — mostrar página de configuração
-        st.set_page_config(page_title="Configurar SerpAPI", layout="centered")
-        
-        col1, col2, col3 = st.columns([1, 2, 1])
-        with col2:
-            st.markdown("### 🔑 Configurar SerpAPI")
-            st.markdown(f"**Bem-vindo, {user_email}!**")
-            st.divider()
-            st.markdown("""
-Para usar a aplicação, precisa de insira a sua **chave SerpAPI** pessoal.
-
-**Como obter uma chave:**
-1. Vai a [https://serpapi.com](https://serpapi.com)
-2. Cria uma conta (ou faz login)
-3. Vai a Settings → API Key
-4. Copia a chave e cola abaixo
-""")
-            
-            serpapi_input = st.text_input(
-                "SerpAPI Key",
-                placeholder="xxx_yyy_zzz",
-                type="password",
-                key="serpapi_key_input"
-            )
-            
-            col_btn1, col_btn2 = st.columns(2)
-            
-            with col_btn1:
-                if st.button("✅ Guardar chave", use_container_width=True):
-                    if not serpapi_input or len(serpapi_input) < 5:
-                        st.error("❌ Por favor, insira uma chave válida")
-                    else:
-                        # Guardar no Supabase
-                        if guardar_serpapi_key(user_id, serpapi_input):
-                            st.success("✅ Chave guardada com sucesso!")
-                            st.balloons()
-                            st.rerun()
-                        else:
-                            st.error("❌ Erro ao guardar chave. Tente novamente.")
-            
-            with col_btn2:
-                if st.button("❌ Sair", use_container_width=True):
-                    # Logout
-                    st.session_state.pop("user_session", None)
-                    st.query_params.clear()
-                    st.rerun()
-        
-        st.stop()
+# Recuperar chave da tabela (se existe)
+if user_id and "serpapi_key" not in st.session_state:
+    serpapi_key_db = obter_serpapi_key(user_id)
+    if serpapi_key_db and serpapi_key_db.strip() != "":
+        st.session_state["serpapi_key"] = serpapi_key_db
+    else:
+        st.session_state["serpapi_key"] = ""
 
 
 # =============================================================================
@@ -3974,6 +3933,37 @@ with st.sidebar:
         # Guarda preferência (1 chamada Supabase só quando muda mesmo)
         if pais_sel != _pais_pref:
             _guardar_preferencia("regiao_default", pais_sel)
+    
+    # ===== SerpAPI Key (inserir/mudar) =====
+    st.divider()
+    st.markdown("**🔑 SerpAPI**")
+    
+    serpapi_key_atual = st.session_state.get("serpapi_key", "")
+    
+    if serpapi_key_atual:
+        # Mostrar que tem chave (masked)
+        st.caption(f"✅ Chave guardada: `{serpapi_key_atual[:10]}...`")
+    else:
+        st.caption("❌ Sem chave SerpAPI")
+    
+    # Campo para inserir/mudar
+    serpapi_novo = st.text_input(
+        "Mudar chave SerpAPI:",
+        value="",
+        placeholder="Deixa vazio para manter",
+        type="password",
+        key="serpapi_sidebar_input"
+    )
+    
+    if serpapi_novo and len(serpapi_novo) > 5:
+        if st.button("💾 Guardar chave", key="btn_guardar_serpapi"):
+            sucesso, msg = guardar_serpapi_key(user_id, serpapi_novo)
+            if sucesso:
+                st.session_state["serpapi_key"] = serpapi_novo
+                st.success(msg)
+                st.rerun()
+            else:
+                st.error(msg)
             st.session_state["regiao_default_pref"] = pais_sel
 
     t = idiomas[pais_sel]
