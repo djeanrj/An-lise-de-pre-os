@@ -207,6 +207,50 @@ def user_eh_novo(user_id: str) -> bool:
         return True
 
 
+def obter_serpapi_key(user_id: str) -> str:
+    """Obtém a SerpAPI key do user (ou vazio se não tem)"""
+    sb = get_supabase_client()
+    if sb is None:
+        return ""
+    
+    try:
+        resultado = sb.table("user_settings").select("serpapi_key").eq("user_id", user_id).execute()
+        if resultado.data and len(resultado.data) > 0:
+            return resultado.data[0].get("serpapi_key") or ""
+        return ""
+    except Exception:
+        return ""
+
+
+def guardar_serpapi_key(user_id: str, serpapi_key: str) -> bool:
+    """Guarda a SerpAPI key do user"""
+    sb = get_supabase_client()
+    if sb is None:
+        return False
+    
+    try:
+        # Tentar update primeiro
+        resultado = sb.table("user_settings").select("id").eq("user_id", user_id).execute()
+        
+        if resultado.data and len(resultado.data) > 0:
+            # Já existe, fazer update
+            sb.table("user_settings").update({
+                "serpapi_key": serpapi_key,
+                "updated_at": __import__('datetime').datetime.now().isoformat()
+            }).eq("user_id", user_id).execute()
+        else:
+            # Não existe, fazer insert
+            sb.table("user_settings").insert({
+                "user_id": user_id,
+                "serpapi_key": serpapi_key
+            }).execute()
+        
+        return True
+    except Exception as e:
+        print(f"Erro ao guardar SerpAPI key: {e}")
+        return False
+
+
 def criar_user_settings(user_id: str, serpapi_key: str = None) -> bool:
     """Cria entrada de user_settings para novo user"""
     sb = get_supabase_client()
@@ -3772,6 +3816,67 @@ if _sid_warn:
                     st.session_state.pop("_sid_init_warning", None)
                     st.session_state.pop("_sid_save_error", None)
                     st.rerun()
+
+
+# =============================================================================
+# 6.5 CHECK: Precisa de SerpAPI key?
+# =============================================================================
+user_session = st.session_state.get("user_session") or {}
+user_id = user_session.get("user", {}).get("id")
+user_email = user_session.get("user", {}).get("email")
+
+if user_id:
+    serpapi_key_guardada = obter_serpapi_key(user_id)
+    
+    if not serpapi_key_guardada or serpapi_key_guardada.strip() == "":
+        # User não tem SerpAPI key — mostrar página de configuração
+        st.set_page_config(page_title="Configurar SerpAPI", layout="centered")
+        
+        col1, col2, col3 = st.columns([1, 2, 1])
+        with col2:
+            st.markdown("### 🔑 Configurar SerpAPI")
+            st.markdown(f"**Bem-vindo, {user_email}!**")
+            st.divider()
+            st.markdown("""
+Para usar a aplicação, precisa de insira a sua **chave SerpAPI** pessoal.
+
+**Como obter uma chave:**
+1. Vai a [https://serpapi.com](https://serpapi.com)
+2. Cria uma conta (ou faz login)
+3. Vai a Settings → API Key
+4. Copia a chave e cola abaixo
+""")
+            
+            serpapi_input = st.text_input(
+                "SerpAPI Key",
+                placeholder="xxx_yyy_zzz",
+                type="password",
+                key="serpapi_key_input"
+            )
+            
+            col_btn1, col_btn2 = st.columns(2)
+            
+            with col_btn1:
+                if st.button("✅ Guardar chave", use_container_width=True):
+                    if not serpapi_input or len(serpapi_input) < 5:
+                        st.error("❌ Por favor, insira uma chave válida")
+                    else:
+                        # Guardar no Supabase
+                        if guardar_serpapi_key(user_id, serpapi_input):
+                            st.success("✅ Chave guardada com sucesso!")
+                            st.balloons()
+                            st.rerun()
+                        else:
+                            st.error("❌ Erro ao guardar chave. Tente novamente.")
+            
+            with col_btn2:
+                if st.button("❌ Sair", use_container_width=True):
+                    # Logout
+                    st.session_state.pop("user_session", None)
+                    st.query_params.clear()
+                    st.rerun()
+        
+        st.stop()
 
 
 # =============================================================================
