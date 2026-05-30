@@ -3934,34 +3934,21 @@ with st.sidebar:
         if pais_sel != _pais_pref:
             _guardar_preferencia("regiao_default", pais_sel)
     
-    # ===== SerpAPI Key (inserir/mudar) =====
+    # ===== SerpAPI Key =====
     st.divider()
-    st.markdown("**🔑 SerpAPI**")
-    
-    serpapi_key_atual = st.session_state.get("serpapi_key", "")
-    
-    if serpapi_key_atual:
-        # Mostrar que tem chave (masked)
-        st.caption(f"✅ Chave guardada: `{serpapi_key_atual[:10]}...`")
-    else:
-        st.caption("❌ Sem chave SerpAPI")
-    
-    # Campo para inserir/mudar
-    serpapi_novo = st.text_input(
-        "Mudar chave SerpAPI:",
-        value="",
-        placeholder="Deixa vazio para manter",
+    serpapi_input = st.text_input(
+        "🔑 SerpAPI Key",
+        value=st.session_state.get("serpapi_key", ""),
         type="password",
-        key="serpapi_sidebar_input"
+        key="serpapi_sidebar"
     )
     
-    if serpapi_novo and len(serpapi_novo) > 5:
-        if st.button("💾 Guardar chave", key="btn_guardar_serpapi"):
-            sucesso, msg = guardar_serpapi_key(user_id, serpapi_novo)
+    # Se mudou, guarda automaticamente
+    if serpapi_input and serpapi_input != st.session_state.get("serpapi_key", ""):
+        if len(serpapi_input) > 5:
+            sucesso, msg = guardar_serpapi_key(user_id, serpapi_input)
             if sucesso:
-                st.session_state["serpapi_key"] = serpapi_novo
-                st.success(msg)
-                st.rerun()
+                st.session_state["serpapi_key"] = serpapi_input
             else:
                 st.error(msg)
             st.session_state["regiao_default_pref"] = pais_sel
