@@ -194,6 +194,62 @@ def marcar_codigo_como_usado(codigo_id: str, email_user: str) -> bool:
         return False
 
 
+def calcular_indice_potencial_mercado(search_volume: float = 0, cpc: float = 0, competition: float = 0) -> dict:
+    """Calcula um índice único (0-100) de potencial de mercado baseado em:
+    - search_volume: buscas/mês (quanto maior, melhor)
+    - cpc: custo por clique em $ (quanto maior, mais valioso o mercado)
+    - competition: nível 0-1 (0=baixa, 1=alta - competição alta pode ser boa ou má)
+    
+    Retorna dict com:
+    - indice: score 0-100
+    - descricao: texto explicativo
+    - nivel: "Muito Baixo", "Baixo", "Moderado", "Alto", "Muito Alto"
+    """
+    
+    # Normalizar valores
+    # search_volume: log scale (100 = 10K buscas, 500 = 100K buscas)
+    sv_score = min(100, (search_volume / 100) if search_volume > 0 else 0)
+    
+    # cpc: $0.50-$5 é típico; normalizar para 0-100
+    # $0.50 = 25%, $5 = 100%
+    cpc_score = min(100, (cpc / 5) * 100) if cpc > 0 else 20
+    
+    # competition: 0-1 normalizado para 0-100 (alta competição = oportunidade)
+    comp_score = min(100, competition * 100) if competition > 0 else 10
+    
+    # Fórmula: 60% search volume + 25% cpc + 15% competition
+    indice = (sv_score * 0.60) + (cpc_score * 0.25) + (comp_score * 0.15)
+    indice = round(min(100, max(0, indice)), 1)
+    
+    # Classificar
+    if indice >= 80:
+        nivel = "Muito Alto"
+        desc = "Excelente oportunidade — alta procura + valor elevado"
+    elif indice >= 60:
+        nivel = "Alto"
+        desc = "Boa oportunidade — procura significativa e valor competitivo"
+    elif indice >= 40:
+        nivel = "Moderado"
+        desc = "Interesse moderado — considerar se houver margem"
+    elif indice >= 20:
+        nivel = "Baixo"
+        desc = "Baixo interesse — verificar se faz sentido"
+    else:
+        nivel = "Muito Baixo"
+        desc = "Interesse muito reduzido"
+    
+    return {
+        "indice": indice,
+        "nivel": nivel,
+        "descricao": desc,
+        "detalhes": {
+            "search_volume": search_volume,
+            "cpc": f"${cpc:.2f}" if cpc > 0 else "—",
+            "competition": f"{competition*100:.0f}%" if competition > 0 else "—"
+        }
+    }
+
+
 def user_eh_novo(user_id: str) -> bool:
     """Verifica se é novo user (não tem entrada em user_settings)"""
     sb = get_supabase_client()
@@ -207,53 +263,6 @@ def user_eh_novo(user_id: str) -> bool:
         return True
 
 
-def obter_serpapi_key(user_id: str) -> str:
-    """Obtém a SerpAPI key do user (ou vazio se não tem)"""
-    sb = get_supabase_client()
-    if sb is None:
-        return ""
-    
-    try:
-        resultado = sb.table("user_settings").select("serpapi_key").eq("user_id", user_id).execute()
-        if resultado.data and len(resultado.data) > 0:
-            return resultado.data[0].get("serpapi_key") or ""
-        return ""
-    except Exception:
-        return ""
-
-
-def guardar_serpapi_key(user_id: str, serpapi_key: str) -> tuple:
-    """Guarda a SerpAPI key do user. Retorna (sucesso: bool, mensagem: str)"""
-    sb = get_supabase_client()
-    if sb is None:
-        return False, "Sistema indisponível (Supabase não respondeu)"
-    
-    if not serpapi_key or len(serpapi_key) < 5:
-        return False, "Chave SerpAPI inválida (muito curta)"
-    
-    try:
-        # Tentar update primeiro
-        resultado = sb.table("user_settings").select("id").eq("user_id", user_id).execute()
-        
-        if resultado.data and len(resultado.data) > 0:
-            # Já existe, fazer update
-            sb.table("user_settings").update({
-                "serpapi_key": serpapi_key,
-                "updated_at": __import__('datetime').datetime.now().isoformat()
-            }).eq("user_id", user_id).execute()
-            return True, "✅ Chave guardada com sucesso!"
-        else:
-            # Não existe, fazer insert
-            sb.table("user_settings").insert({
-                "user_id": user_id,
-                "serpapi_key": serpapi_key
-            }).execute()
-            return True, "✅ Chave guardada com sucesso!"
-    
-    except Exception as e:
-        erro_msg = str(e)[:150]
-        print(f"[DEBUG] Erro ao guardar SerpAPI key para user {user_id}: {erro_msg}")
-        return False, f"❌ Erro ao guardar: {erro_msg}"
 
 
 def criar_user_settings(user_id: str, serpapi_key: str = None) -> bool:
@@ -5871,7 +5880,51 @@ with tab_analise:
                 ci4.metric("Concorrentes encontrados", len(concorrentes_lista))
 
             if not concorrentes_lista:
+                # Mostrar Atratividade mesmo sem concorrentes
                 st.info(tx("msg_sem_concorrentes", "Sem concorrentes confiáveis encontrados para este produto."))
+                
+                st.divider()
+                st.markdown("### 📊 Potencial de Mercado")
+                
+                # Usar dados disponíveis
+                procura = linha_inspect.get("Procura", 0)
+                atratividade = linha_inspect.get("Atratividade", 0)
+                status = linha_inspect.get("Status", "Análise pendente")
+                
+                # Calcular índice (usando procura como proxy de search volume)
+                # procura já é 0-100, então usar como search_volume
+                potencial = calcular_indice_potencial_mercado(
+                    search_volume=procura * 100,  # escalar de 0-100 para 0-10000
+                    cpc=0,  # sem dados de CPC ainda
+                    competition=0  # sem dados de competição ainda
+                )
+                
+                # Mostrar indicador único
+                col_ind = st.columns([2, 1])
+                
+                with col_ind[0]:
+                    # Barra de progresso visual
+                    st.markdown(f"#### 🎯 Índice de Potencial: **{potencial['indice']:.1f}/100**")
+                    st.markdown(f"**Nível:** {potencial['nivel']}")
+                    st.markdown(f"*{potencial['descricao']}*")
+                
+                with col_ind[1]:
+                    st.metric("Procura", f"{procura:.0f}/100")
+                    st.metric("Status", status)
+                
+                # Expandir para detalhes
+                with st.expander("📈 Detalhes da análise"):
+                    st.markdown(f"""
+**Bases da análise (mercado: {pais_sel}):**
+- 🔍 **Procura**: {procura:.1f}/100 (interesse do consumidor)
+- 🎯 **Atratividade**: {atratividade:.1f} (procura × margem)
+- 📍 **Status**: {status}
+
+**Recomendação:**
+{"✅ **Produto com alto potencial!** Monitorar para quando houver disponibilidade nas lojas." if potencial['indice'] >= 60 
+else "ℹ️ **Interesse moderado.** Pode ser oportunidade se houver margem." if potencial['indice'] >= 40
+else "⚠️ **Baixo interesse atual.** Considerar outras opções."}
+                    """)
             else:
                 # Construir tabela de concorrentes; fallback inteligente quando o link directo
                 # não vem da SerpAPI:
