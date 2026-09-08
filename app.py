@@ -25,6 +25,7 @@ import base64
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from urllib.parse import urlparse, quote_plus
+from pytrends.request import TrendReq
 
 # Supabase é opcional — se não estiver configurado, a app continua a funcionar sem histórico
 try:
@@ -145,8 +146,291 @@ def _apagar_sessao_persistente():
 
 
 # =============================================================================
-# BETA ONBOARDING: Validação de código de convite
+# RANKING DE ATRATIVIDADE POR REGIÃO (Fase 1)
 # =============================================================================
+
+# Stop words em Português (expandido)
+STOP_WORDS_PT = {
+    # Artigos
+    "o", "a", "os", "as", "um", "uma", "uns", "umas",
+    # Preposições
+    "de", "da", "do", "das", "dos", "em", "no", "na", "nos", "nas",
+    "por", "para", "com", "sem", "sob", "sobre", "entre",
+    "até", "desde", "durante", "mediante", "perante", "ante",
+    "junto", "perante", "contra", "exceto", "salvo", "mediante",
+    # Conjunções
+    "e", "ou", "mas", "porém", "contudo", "todavia", "entretanto",
+    "se", "caso", "embora", "conquanto", "ainda", "portanto",
+    "logo", "assim", "pois", "because", "então", "senão",
+    # Verbos auxiliares / estar/ser
+    "é", "são", "era", "eram", "foi", "foram", "ser", "estar",
+    "está", "estão", "estou", "estamos", "estais",
+    "tem", "têm", "tinha", "tinham", "teve", "tiveram", "ter", "há",
+    "sendo", "estando", "tendo",
+    # Pronomes pessoais
+    "eu", "tu", "ele", "ela", "nós", "vós", "eles", "elas",
+    "me", "te", "se", "nos", "vos", "lhe", "lhes", "mim", "ti", "si",
+    # Pronomes possessivos
+    "meu", "teu", "seu", "nosso", "vosso", "dele", "dela", "deles", "delas",
+    "minha", "tua", "sua", "nossa", "vossa",
+    # Pronomes demonstrativos
+    "este", "esse", "aquele", "isto", "isso", "aquilo",
+    "estes", "esses", "aqueles", "estas", "essas", "aquelas",
+    # Adjetivos muito comuns
+    "novo", "velho", "grande", "pequeno", "bom", "mau",
+    "muito", "pouco", "todo", "outro", "mesmo", "próprio",
+    "único", "último", "primeiro", "próximo", "anterior", "posterior",
+    "alto", "baixo", "caro", "barato", "fácil", "difícil",
+    # Advérbios comuns
+    "bem", "mal", "sempre", "nunca", "jamais", "talvez",
+    "já", "ainda", "cedo", "tarde", "hoje", "ontem", "amanhã",
+    "aqui", "aí", "ali", "acolá", "lá", "cá",
+    "mais", "menos", "muito", "pouco", "bastante", "demais",
+    # Numerais e quantificadores
+    "um", "dois", "três", "quatro", "cinco", "seis", "sete", "oito", "nove", "dez",
+    "onze", "doze", "treze", "quatorze", "quinze", "vinte", "trinta", "quarenta",
+    "cinquenta", "sessenta", "setenta", "oitenta", "noventa", "cem", "mil",
+    "primeira", "segundo", "terceira", "quarta", "quinta",
+    "primeira", "primeiro", "segundo", "terceiro",
+    # Interjeições e conectivos
+    "ah", "oh", "hm", "psiu", "opa", "opa", "uau",
+    # Preposições contraídas
+    "à", "ao", "aos", "à", "do", "da", "dos", "das",
+    "no", "na", "nos", "nas", "pelo", "pela", "pelos", "pelas",
+    "ao", "aos", "à", "às", "num", "numa", "nuns", "numas",
+    "dum", "duma", "duns", "dumas",
+    # Outros muito comuns
+    "vs", "versus", "vendo", "vendendo", "quanto", "quanta",
+    "não", "sim", "talvez", "que", "qual", "quais", "quando", "onde",
+    "porque", "porquê", "pra", "pro", "tá", "tô", "tá", "tô",
+}
+
+# Mapeamento Regiões → Estados Brasil
+REGIOES_BRASIL = {
+    "Norte": ["Acre", "Amapá", "Amazonas", "Pará", "Rondônia", "Roraima", "Tocantins"],
+    "Nordeste": ["Alagoas", "Bahia", "Ceará", "Maranhão", "Paraíba", "Pernambuco", "Piauí", "Rio Grande do Norte", "Sergipe"],
+    "Centro-Oeste": ["Distrito Federal", "Goiás", "Mato Grosso", "Mato Grosso do Sul"],
+    "Sudeste": ["Espírito Santo", "Minas Gerais", "Rio de Janeiro", "São Paulo"],
+    "Sul": ["Paraná", "Rio Grande do Sul", "Santa Catarina"],
+}
+
+# Inverso: Estado → Região
+ESTADO_PARA_REGIAO = {}
+for regiao, estados in REGIOES_BRASIL.items():
+    for estado in estados:
+        ESTADO_PARA_REGIAO[estado] = regiao
+
+# Todos os estados em ordem alfabética
+TODOS_OS_ESTADOS = sorted([est for estados in REGIOES_BRASIL.values() for est in estados])
+
+
+def extrair_palavras_chave(texto: str, marca: str = None, max_palavras: int = 10) -> list:
+    """Extrai palavras-chave do nome do produto removendo stop words, números (SKU) e marca.
+    
+    Exemplo:
+    - Input: "77237 - LEGO® Speed Champions - Carro Esportivo Dodge Challenger SRT Hellcat", marca="LEGO"
+    - Output: ["speed", "champions", "carro", "esportivo", "dodge", "challenger", "srt", "hellcat"]
+    """
+    if not texto:
+        return []
+    
+    # Lowercase e split
+    palavras = texto.lower().split()
+    marca_lower = marca.lower().strip() if marca else ""
+    
+    # Remover pontuação e stop words
+    palavras_filtradas = []
+    for palavra in palavras:
+        # Remove pontuação e símbolos de marca registrada
+        palavra_limpa = palavra.strip(".,;:!?-–—()[]{}\"'®™©")
+        
+        # Ignora vazios, stop words, números puros (SKU), e o nome da marca
+        if not palavra_limpa:
+            continue
+        if palavra_limpa in STOP_WORDS_PT:
+            continue
+        if palavra_limpa.isdigit():
+            continue
+        if marca_lower and palavra_limpa == marca_lower:
+            continue
+        
+        palavras_filtradas.append(palavra_limpa)
+    
+    # Retornar primeiras N palavras
+    return palavras_filtradas[:max_palavras]
+
+
+# =============================================================================
+# GOOGLE TRENDS: Interesse por região/estado
+# =============================================================================
+
+# Códigos geo do Google Trends para o Brasil (formato: BR-XX)
+GEO_CODES_BRASIL_ESTADOS = {
+    "Acre": "BR-AC", "Alagoas": "BR-AL", "Amapá": "BR-AP", "Amazonas": "BR-AM",
+    "Bahia": "BR-BA", "Ceará": "BR-CE", "Distrito Federal": "BR-DF",
+    "Espírito Santo": "BR-ES", "Goiás": "BR-GO", "Maranhão": "BR-MA",
+    "Mato Grosso": "BR-MT", "Mato Grosso do Sul": "BR-MS", "Minas Gerais": "BR-MG",
+    "Pará": "BR-PA", "Paraíba": "BR-PB", "Paraná": "BR-PR", "Pernambuco": "BR-PE",
+    "Piauí": "BR-PI", "Rio de Janeiro": "BR-RJ", "Rio Grande do Norte": "BR-RN",
+    "Rio Grande do Sul": "BR-RS", "Rondônia": "BR-RO", "Roraima": "BR-RR",
+    "Santa Catarina": "BR-SC", "São Paulo": "BR-SP", "Sergipe": "BR-SE",
+    "Tocantins": "BR-TO",
+}
+
+
+@st.cache_data(ttl=86400, show_spinner=False)  # cache 24h — Trends muda pouco
+@st.cache_data(ttl=86400, show_spinner=False)  # cache 24h — Trends muda pouco
+def buscar_trends_por_estado(termo: str, geo_pais: str = "BR") -> dict:
+    """Busca interesse no Google Trends para um termo, devolvendo os valores
+    de TODOS os estados/subdivisões do país numa ÚNICA chamada (interest_by_region).
+
+    Isto é importante: os valores de vários estados só são directamente
+    comparáveis entre si quando vêm da MESMA chamada (o Trends normaliza
+    0-100 dentro do universo pedido). Chamar estado a estado e comparar
+    os resultados entre chamadas diferentes produz números incorrectos.
+
+    Retorna dict:
+    {
+        "por_estado": {"São Paulo": 45.0, "Rio de Janeiro": 38.0, ...} ou {},
+        "nacional": 0-100 (valor agregado do país todo),
+        "erro": None ou mensagem
+    }
+    """
+    if not termo or not termo.strip():
+        return {"por_estado": {}, "nacional": 0, "erro": "Termo vazio"}
+
+    try:
+        pytrends = TrendReq(hl='pt-BR', tz=360, timeout=(5, 10))
+        pytrends.build_payload([termo], geo=geo_pais, timeframe="today 3-m")
+
+        # Valor nacional agregado (para quando não há filtro de região/estado)
+        dados_tempo = pytrends.interest_over_time()
+        nacional = float(dados_tempo[termo].mean()) if (not dados_tempo.empty and termo in dados_tempo.columns) else 0.0
+
+        # Valores por subdivisão (estado), todos comparáveis entre si
+        dados_regiao = pytrends.interest_by_region(resolution='REGION', inc_low_vol=True, inc_geo_code=False)
+
+        por_estado = {}
+        if not dados_regiao.empty and termo in dados_regiao.columns:
+            por_estado = dados_regiao[termo].to_dict()
+
+        return {"por_estado": por_estado, "nacional": round(nacional, 1), "erro": None}
+
+    except Exception as e:
+        erro_str = str(e)[:100]
+        return {"por_estado": {}, "nacional": 0, "erro": erro_str}
+
+
+def geo_code_para_estado(estado: str) -> str:
+    """Converte nome do estado para código geo do Google Trends (ex: 'São Paulo' -> 'BR-SP')"""
+    return GEO_CODES_BRASIL_ESTADOS.get(estado, "BR")
+
+
+def calcular_atratividade_regional(sku: str, marca: str, nome: str, regiao_br: str = None,
+                                     estado_br: str = None, geo_pais: str = "BR") -> dict:
+    """Calcula atratividade de um produto para um filtro geográfico (Nacional/Região/Estado),
+    usando UMA chamada ao Trends (interest_by_region) e depois lendo o valor certo:
+
+    - Estado escolhido  -> valor daquele estado (directo da mesma chamada)
+    - Região escolhida  -> SOMA dos valores dos estados daquela região (não é média —
+                            reflecte o interesse total agregado da região)
+    - Nenhum filtro     -> valor nacional agregado
+
+    Retorna dict:
+    {
+        "sku": ..., "marca": ..., "nome": ...,
+        "keywords": [...], "atratividade": 0-100 (ou soma, se região),
+        "geo_label": "São Paulo" / "Região Sudeste" / "Brasil (nacional)",
+        "erro": None ou mensagem
+    }
+    """
+    keywords = extrair_palavras_chave(nome, marca=marca, max_palavras=6)
+    termo_busca = f"{marca} {' '.join(keywords[:4])}".strip()
+
+    resultado = buscar_trends_por_estado(termo_busca, geo_pais=geo_pais)
+
+    atratividade = 0.0
+    geo_label = "Brasil (nacional)"
+
+    if resultado["erro"] is not None:
+        atratividade = 0.0
+    elif geo_pais == "BR" and estado_br and estado_br != "Todos":
+        atratividade = round(float(resultado["por_estado"].get(estado_br, 0)), 1)
+        geo_label = estado_br
+    elif geo_pais == "BR" and regiao_br and regiao_br != "Todas":
+        estados_da_regiao = REGIOES_BRASIL.get(regiao_br, [])
+        soma = sum(float(resultado["por_estado"].get(est, 0)) for est in estados_da_regiao)
+        atratividade = round(soma, 1)
+        geo_label = f"Região {regiao_br} (soma dos estados)"
+    else:
+        atratividade = resultado["nacional"]
+        geo_label = {"BR": "Brasil (nacional)", "PT": "Portugal", "US": "Estados Unidos"}.get(geo_pais, geo_pais)
+
+    return {
+        "sku": sku,
+        "marca": marca,
+        "nome": nome,
+        "keywords": keywords,
+        "termo_busca": termo_busca,
+        "atratividade": atratividade,
+        "geo_label": geo_label,
+        "erro": resultado["erro"],
+    }
+
+
+def calcular_ranking_atratividade_regiao(produtos: list, regiao_br: str = None,
+                                           estado_br: str = None, regiao_pais: str = "BR",
+                                           progress_callback=None) -> pd.DataFrame:
+    """Calcula ranking de atratividade para uma lista de produtos num filtro geográfico.
+
+    Args:
+        produtos: lista de dicts com {"sku": ..., "marca": ..., "nome": ..., "custo": ...}
+        regiao_br: Nome região brasileira (Norte/Nordeste/etc) ou None/"Todas"
+        estado_br: Nome estado brasileiro ou None/"Todos"
+        regiao_pais: País/região principal da app ("BR", "PT", "US")
+        progress_callback: função opcional para reportar progresso (i, total)
+
+    Retorna: DataFrame ordenado por Atratividade (desc), colunas:
+        SKU, Marca, Nome, Custo, Palavras-chave, Atratividade, Geo, Status
+    """
+    resultados = []
+    total = len(produtos)
+    geo_label_usado = "Brasil (nacional)"
+
+    for i, produto in enumerate(produtos):
+        sku = produto.get("sku", "")
+        marca = produto.get("marca", "")
+        nome = produto.get("nome", "")
+        custo = produto.get("custo", 0)
+
+        r = calcular_atratividade_regional(
+            sku, marca, nome,
+            regiao_br=regiao_br, estado_br=estado_br, geo_pais=regiao_pais
+        )
+        geo_label_usado = r["geo_label"]
+
+        status = "OK" if r["erro"] is None else f"Sem dados ({r['erro']})"
+
+        resultados.append({
+            "SKU": sku,
+            "Marca": marca,
+            "Nome": nome,
+            "Custo": custo,
+            "Palavras-chave": ", ".join(r["keywords"]),
+            "Atratividade": r["atratividade"],
+            "Geo": geo_label_usado,
+            "Status": status,
+        })
+
+        if progress_callback:
+            progress_callback(i + 1, total)
+
+    df = pd.DataFrame(resultados)
+    if not df.empty:
+        df = df.sort_values("Atratividade", ascending=False).reset_index(drop=True)
+        df.index = df.index + 1  # Ranking começa em 1
+
+    return df
 
 def validar_codigo_convite(codigo: str) -> tuple:
     """Valida código de convite beta. Retorna (sucesso: bool, mensagem: str, codigo_id: str)"""
@@ -4379,9 +4663,10 @@ if not st.session_state.api_key:
     st.stop()
 
 
-tab_analise, tab_historico, tab_documentos = st.tabs([
+tab_analise, tab_historico, tab_ranking, tab_documentos = st.tabs([
     tx("tab_nova", "🎯 Nova Análise"), 
     tx("tab_historico", "📜 Histórico"),
+    "📊 Ranking de Atratividade",
     "📜 Documentos Legais"
 ])
 
@@ -6256,7 +6541,187 @@ with tab_historico:
                 )
 
 # =============================================================================
-# 8.3 TAB: DOCUMENTOS LEGAIS
+# 8.3 TAB: RANKING DE ATRATIVIDADE POR REGIÃO
+# =============================================================================
+with tab_ranking:
+    st.markdown("## 📊 Ranking de Atratividade por Região")
+    st.markdown(
+        "Descubra quais produtos têm **maior potencial de mercado** em cada região/estado, "
+        "com base no interesse real de pesquisa (Google Trends). Útil especialmente para "
+        "**lançamentos** ou produtos ainda sem concorrência nas lojas."
+    )
+    st.divider()
+
+    # --- Upload da planilha (mesmo formato da Nova Análise) ---
+    st.markdown("### 1️⃣ Carregar produtos")
+    arquivo_ranking = st.file_uploader(
+        "Planilha com SKU, Marca, Nome e Custo de Compra",
+        type=["xlsx", "xls"],
+        key="upload_ranking_atratividade",
+    )
+
+    df_ranking_base = None
+    if arquivo_ranking is not None:
+        try:
+            df_ranking_base = pd.read_excel(arquivo_ranking)
+            st.success(f"✓ {len(df_ranking_base)} produtos carregados.")
+            with st.expander("👀 Pré-visualizar dados carregados"):
+                st.dataframe(df_ranking_base.head(10), use_container_width=True)
+        except Exception as e:
+            st.error(f"Erro ao ler planilha: {e}")
+
+    st.divider()
+
+    # --- Filtros em cascata: Região -> Estado ---
+    st.markdown("### 2️⃣ Filtrar por região (opcional)")
+
+    col_f1, col_f2 = st.columns(2)
+
+    with col_f1:
+        opcoes_regiao = ["Todas"] + list(REGIOES_BRASIL.keys())
+        regiao_selecionada = st.selectbox(
+            "🌎 Região",
+            opcoes_regiao,
+            key="ranking_regiao_sel",
+        )
+
+    with col_f2:
+        # Cascata: se região escolhida, mostrar só estados dela; senão, todos
+        if regiao_selecionada != "Todas":
+            estados_disponiveis = ["Todos"] + REGIOES_BRASIL[regiao_selecionada]
+        else:
+            estados_disponiveis = ["Todos"] + TODOS_OS_ESTADOS
+
+        # Se o estado guardado em sessão não pertence mais à lista (mudou a região), reset
+        estado_atual = st.session_state.get("ranking_estado_sel", "Todos")
+        if estado_atual not in estados_disponiveis:
+            estado_atual = "Todos"
+
+        estado_selecionado = st.selectbox(
+            "📍 Estado",
+            estados_disponiveis,
+            index=estados_disponiveis.index(estado_atual),
+            key="ranking_estado_sel",
+        )
+
+    # Se o user escolheu um Estado primeiro (sem região), inferir a região automaticamente
+    # para mostrar de forma coerente (mas o ranking usa sempre o Estado, que é mais específico)
+    if estado_selecionado != "Todos" and regiao_selecionada == "Todas":
+        regiao_inferida = ESTADO_PARA_REGIAO.get(estado_selecionado)
+        if regiao_inferida:
+            st.caption(f"ℹ️ {estado_selecionado} pertence à região {regiao_inferida}.")
+
+    # Label explicativo do que vai ser calculado
+    if estado_selecionado != "Todos":
+        st.info(f"📍 Ranking será calculado para o **estado de {estado_selecionado}**.")
+    elif regiao_selecionada != "Todas":
+        st.info(f"🌎 Ranking será calculado para a **região {regiao_selecionada}** (soma dos seus estados).")
+    else:
+        st.info("🇧🇷 Ranking será calculado a nível **nacional (Brasil)**.")
+
+    st.divider()
+
+    # --- Botão de gerar ranking ---
+    st.markdown("### 3️⃣ Gerar ranking")
+
+    if df_ranking_base is None:
+        st.warning("⬆️ Carregue uma planilha de produtos primeiro.")
+    else:
+        # Detectar colunas automaticamente (tolerante a variações de nome)
+        cols_lower = {c.lower().strip(): c for c in df_ranking_base.columns}
+
+        def _achar_coluna(possiveis):
+            for p in possiveis:
+                if p in cols_lower:
+                    return cols_lower[p]
+            return None
+
+        col_sku = _achar_coluna(["sku", "código", "codigo"])
+        col_marca = _achar_coluna(["marca"])
+        col_nome = _achar_coluna(["nome", "produto", "descrição", "descricao"])
+        col_custo = _achar_coluna(["custo", "custo de compra", "preço de custo", "preco de custo"])
+
+        if not col_nome:
+            st.error("❌ Não foi possível identificar a coluna de Nome do produto na planilha.")
+        else:
+            if st.button("🚀 Gerar Ranking de Atratividade", key="btn_gerar_ranking", type="primary"):
+                produtos_lista = []
+                for _, linha in df_ranking_base.iterrows():
+                    produtos_lista.append({
+                        "sku": str(linha[col_sku]) if col_sku else "",
+                        "marca": str(linha[col_marca]) if col_marca else "",
+                        "nome": str(linha[col_nome]),
+                        "custo": float(linha[col_custo]) if col_custo and pd.notna(linha[col_custo]) else 0.0,
+                    })
+
+                barra = st.progress(0, text="A calcular atratividade...")
+
+                def _atualizar_progresso(i, total):
+                    barra.progress(i / total, text=f"A calcular atratividade... ({i}/{total})")
+
+                regiao_param = None if regiao_selecionada == "Todas" else regiao_selecionada
+                estado_param = None if estado_selecionado == "Todos" else estado_selecionado
+
+                df_resultado_ranking = calcular_ranking_atratividade_regiao(
+                    produtos_lista,
+                    regiao_br=regiao_param,
+                    estado_br=estado_param,
+                    regiao_pais="BR",
+                    progress_callback=_atualizar_progresso,
+                )
+
+                barra.empty()
+                st.session_state["df_ranking_resultado"] = df_resultado_ranking
+
+    # --- Mostrar resultado (se já foi calculado) ---
+    if st.session_state.get("df_ranking_resultado") is not None:
+        df_res = st.session_state["df_ranking_resultado"]
+
+        st.divider()
+        st.markdown("### 🏆 Resultado do Ranking")
+
+        if df_res.empty:
+            st.warning("Nenhum resultado calculado.")
+        else:
+            st.dataframe(
+                df_res,
+                use_container_width=True,
+                column_config={
+                    "Atratividade": st.column_config.ProgressColumn(
+                        "Atratividade",
+                        min_value=0,
+                        max_value=max(100, float(df_res["Atratividade"].max() or 100)),
+                        format="%.1f",
+                    ),
+                    "Custo": st.column_config.NumberColumn("Custo", format="%.2f"),
+                },
+            )
+
+            # Top 3 destacado
+            top3 = df_res.head(3)
+            if not top3.empty:
+                st.markdown("#### 🥇 Top 3 mais atrativos")
+                cols_top = st.columns(len(top3))
+                for idx, (_, linha) in enumerate(top3.iterrows()):
+                    with cols_top[idx]:
+                        st.metric(
+                            f"#{idx+1} — {linha['SKU']}",
+                            f"{linha['Atratividade']:.1f}",
+                            help=linha['Nome']
+                        )
+
+            # Exportar
+            csv_export = df_res.to_csv(index=True).encode("utf-8")
+            st.download_button(
+                "⬇️ Descarregar ranking (CSV)",
+                data=csv_export,
+                file_name="ranking_atratividade.csv",
+                mime="text/csv",
+            )
+
+
+# =============================================================================
+# 8.4 TAB: DOCUMENTOS LEGAIS
 # =============================================================================
 with tab_documentos:
     st.markdown("## 📜 Documentos Legais")

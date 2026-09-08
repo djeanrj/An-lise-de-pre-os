@@ -105,30 +105,65 @@ Aplicação SaaS para análise de viabilidade comercial de produtos (inicialment
 - **Recuperação:** Auto-carrega na primeira vez
 - **Fluxo:** User insere chave na sidebar → guarda em preferências → persiste
 
+### 13. RANKING DE ATRATIVIDADE POR REGIÃO ✅ IMPLEMENTADO
+- **Nova aba:** "📊 Ranking de Atratividade" (entre Histórico e Documentos Legais)
+- **Objetivo:** Prever quais produtos comprar para quais regiões, mesmo para lançamentos sem concorrência
+- **Fonte de dados:** Google Trends (`pytrends`), não SerpAPI — evita gastar créditos do user
+- **Método técnico (IMPORTANTE):**
+  - Usa `interest_by_region()` — **UMA única chamada** ao Trends que devolve todos os
+    estados do Brasil já normalizados/comparáveis entre si
+  - ⚠️ NÃO fazer chamadas separadas por estado e depois média — o Trends normaliza
+    0-100 dentro do universo pedido em cada chamada, logo comparar chamadas diferentes
+    dá números incorrectos
+  - **Estado filtrado** → valor directo daquele estado (da mesma chamada)
+  - **Região filtrada** (Norte/Nordeste/Centro-Oeste/Sudeste/Sul) → **SOMA** dos valores
+    dos estados daquela região (não é média — reflecte interesse agregado real da região)
+  - **Sem filtro** → valor nacional agregado (`interest_over_time`)
+- **Extração de palavras-chave:**
+  - Função `extrair_palavras_chave(texto, marca, max_palavras)`
+  - Remove: stop words PT (~150 palavras), números puros (SKU), nome da marca
+  - Testado com casos reais: "Carro Esportivo Dodge Challenger SRT Hellcat" → 
+    `['speed','champions','carro','esportivo','dodge','challenger','srt','hellcat']`
+  - "do", "ao", "vs" corretamente removidos (confirmado com exemplos do user)
+- **Termo de busca no Trends:** `"{marca} {4 primeiras keywords}"` (termos curtos funcionam melhor)
+- **Filtros em cascata (UI):**
+  - Região → Estado (Estado mostra só os da região escolhida)
+  - Estado escolhido sem região → infere e mostra a região automaticamente
+  - Reset Estado → volta ao ranking da Região (ou Nacional se região também vazia)
+  - Reset Região → Estado volta a mostrar todos os 27
+  - Users pode ir direto ao Estado sem escolher Região primeiro
+- **Cache:** 24h por termo+geo (`st.cache_data`), evita chamadas repetidas ao Trends
+- **Funções principais:**
+  - `buscar_trends_por_estado(termo, geo_pais)` — 1 chamada, devolve nacional + por-estado
+  - `geo_code_para_estado(estado)` — nome → código ISO (ex: "São Paulo" → "BR-SP")
+  - `calcular_atratividade_regional(sku, marca, nome, regiao_br, estado_br, geo_pais)` — 
+    calcula o valor certo (estado/soma região/nacional) para 1 produto
+  - `calcular_ranking_atratividade_regiao(produtos, ...)` — processa lista completa,
+    devolve DataFrame ordenado por Atratividade desc
+- **Mapeamentos:**
+  - `REGIOES_BRASIL` — 5 regiões → lista de estados
+  - `ESTADO_PARA_REGIAO` — inverso, para inferir região a partir do estado
+  - `GEO_CODES_BRASIL_ESTADOS` — nome do estado → código ISO 3166-2 (BR-SP, BR-RJ, etc)
+  - `TODOS_OS_ESTADOS` — lista alfabética dos 27 estados
+- **UI/Resultado:**
+  - Upload da mesma planilha (SKU, Marca, Nome, Custo) — detecção automática de colunas
+  - Tabela com coluna de progresso visual (Atratividade)
+  - Top 3 destacado em métricas
+  - Exportação CSV
+- **Dependência adicionada:** `pytrends` (requirements.txt)
+- **Limitação conhecida:** só implementado para Brasil (5 regiões + 27 estados). 
+  Portugal/USA usam só nível nacional por agora (sem subdivisão regional).
+
 ---
 
 ## ❌ O QUE FALTA IMPLEMENTAR
 
-### FASE 1 - RANKING DE ATRATIVIDADE POR REGIÃO (PRÓXIMA)
-- [ ] **Google Trends API integração** (capturar interesse por região/estado)
-- [ ] **Abordagem Híbrida:**
-  - Trends para interesse (0-100 por geo)
-  - SerpAPI para concorrentes (quando existem)
-  - Combinar em score final
-- [ ] **Mapeamento geográfico:**
-  - 5 Regiões Brasil
-  - 27 Estados Brasil
-  - Validação: região → estados válidos
-- [ ] **Extração de palavras-chave** de nome do produto
-  - Stop words PT: lista abrangente (~100 palavras)
-  - Automático do nome na planilha
-- [ ] **Ranking por geo:**
-  - Nacional → Região → Estado (cascata)
-  - Reset de filtros com comportamento correto
-  - Recálculo de ordenação por nível geo
-- [ ] **Tabela de resultados:**
-  - SKU | Marca | Nome | Atratividade | Procura | Concorrentes | Margem Esperada
-  - Ordenação por atratividade (maior primeiro)
+### FASE 1 - RANKING DE ATRATIVIDADE POR REGIÃO — ✅ CONCLUÍDA (ver secção 13 acima)
+Itens que ainda podem ser refinados dentro desta fase:
+- [ ] Testar com casos reais de lançamento (planilha de LEGOs sem concorrência)
+- [ ] Validar se `interest_by_region` devolve dados suficientes para termos muito de nicho
+- [ ] Considerar extensão para Portugal (distritos) e USA (estados) no futuro
+- [ ] Guardar histórico de rankings gerados (atualmente não persiste, só sessão)
 
 ### FASE 2 - COMERCIALIZAÇÃO
 - [ ] Planos pagos (Stripe/MercadoPago)
