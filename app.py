@@ -2228,7 +2228,10 @@ def _bling_basic_header():
 
 def bling_trocar_codigo_por_tokens(codigo):
     """Troca o `code` recebido do redirect pelo par (access_token, refresh_token).
-    Guarda os tokens no Supabase para reutilização entre sessões."""
+    Guarda os tokens no Supabase para reutilização entre sessões.
+    
+    NOTA (out/2026): Bling exige o header 'enable-jwt: 1' para migrar do token
+    opaco antigo para o novo padrão JWT (obrigatório a partir de 15/10/2026)."""
     try:
         r = requests.post(
             BLING_TOKEN_URL,
@@ -2236,6 +2239,7 @@ def bling_trocar_codigo_por_tokens(codigo):
                 "Authorization": f"Basic {_bling_basic_header()}",
                 "Content-Type": "application/x-www-form-urlencoded",
                 "Accept": "application/json",
+                "enable-jwt": "1",
             },
             data={
                 "grant_type": "authorization_code",
@@ -2253,7 +2257,9 @@ def bling_trocar_codigo_por_tokens(codigo):
 
 
 def bling_renovar_token():
-    """Usa refresh_token para obter novo access_token. Devolve True/False."""
+    """Usa refresh_token para obter novo access_token. Devolve True/False.
+    
+    NOTA (out/2026): header 'enable-jwt: 1' também obrigatório na renovação."""
     tokens = _bling_carregar_tokens()
     if not tokens or not tokens.get("refresh_token"):
         return False
@@ -2264,6 +2270,7 @@ def bling_renovar_token():
                 "Authorization": f"Basic {_bling_basic_header()}",
                 "Content-Type": "application/x-www-form-urlencoded",
                 "Accept": "application/json",
+                "enable-jwt": "1",
             },
             data={
                 "grant_type": "refresh_token",
